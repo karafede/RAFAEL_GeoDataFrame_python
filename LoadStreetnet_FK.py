@@ -13,8 +13,10 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import matplotlib.cm as cm
+import matplotlib.colors as colors
 import folium
 from itertools import chain
+from colour import Color
 
 import os
 os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
@@ -24,7 +26,6 @@ os.getcwd()
 #load Graph
 Catania = ox.load_graphml('Catania__Italy.graphml')
 ox.plot_graph(Catania)
-
 
 
 # way class: mean, max, min  (make a DICTIONARY) these are the "keys"
@@ -91,8 +92,6 @@ for u,v,key,attr in Catania.edges(keys=True,data=True):
         print(attr.get("highway"), speedlist[0], attr.get("cost"),'-----------')
         Catania.add_edge(u,v,key,attr_dict=attr)
 
-
-
 # highlight only motorway
 # ec = ['r' if data['highway']== "motorway" else 'b' for u, v, key, data in Catania.edges(keys=True, data=True)]
 # ox.plot_graph(Catania, node_size=0, edge_color=ec)
@@ -150,6 +149,86 @@ AAA = ox.plot_graph_folium(Catania, graph_map=None, popup_attribute=None, tiles=
                   fit_bounds=True, edge_width=3, edge_opacity=1)
 AAA.save("BBB.html")
 
+#######################################################
+#######################################################
+#######################################################
+
+import osmnx as ox
+import networkx as nx
+import numpy as np
+import pandas as pd
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+import folium
+from itertools import chain
+from colour import Color
+from folium_stuff_FK import make_folium_polyline_FK
+from folium_stuff_FK import plot_graph_folium_FK
+
+
+import os
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.getcwd()
+
+
+# # node closeness centrality
+file_graphml = 'Catania__Italy.graphml'
+grafo = ox.load_graphml(file_graphml)
+# node_centrality = nx.closeness_centrality(grafo)
+# df = pd.DataFrame(data=pd.Series(node_centrality).sort_values(), columns=['cc'])
+# df['colors'] = ox.get_colors(n=len(df), cmap='inferno', start=0.2)
+# df = df.reindex(grafo.nodes())
+# nc = df['colors'].tolist()
+# fig, ax = ox.plot_graph(grafo, bgcolor='k', node_size=30, node_color=nc, node_edgecolor='none', node_zorder=2,
+#                         edge_color='#555555', edge_linewidth=1.5, edge_alpha=1)
+
+# edge centrality
+edge_centrality = nx.closeness_centrality(nx.line_graph(grafo))
+ev = [edge_centrality[edge + (0,)] for edge in grafo.edges()]
+# color scale converted to list of colors for graph edges
+norm = colors.Normalize(vmin=min(ev)*0.8, vmax=max(ev))
+# cividis, viridis, YlGn  (good colormaps
+# 'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+#             'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+#             'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn',
+#             'viridis', 'plasma', 'inferno', 'magma', 'cividis']
+cmap = cm.ScalarMappable(norm=norm, cmap=cm.YlGn)
+ec = [cmap.to_rgba(cl) for cl in ev]
+
+
+# row = gdf_edges.iloc[3]
+# row = row["edge_color"][0:3]
+# # C = Color(hsl=(0.865006, 0.316822, 0.226055))
+# row = Color(hsl=row)
+# row = "%s" % row
+
+# https://pypi.org/project/colour/
+
+# color the edges in the original graph with closeness centralities in the line graph
+fig, ax = ox.plot_graph(grafo, bgcolor='k', axis_off=True, node_size=0, node_color='w',
+                        node_edgecolor='gray', node_zorder=2,
+                        edge_color=ec, edge_linewidth=1.5, edge_alpha=1)
+
+
+gdf_edges = ox.graph_to_gdfs(grafo, nodes=False, fill_edge_geometry=True)
+gdf_edges['edge_color'] = ec
+# gdf_edges.crs = {'init' :'epsg:4326'}
+# gdf_edges.plot()
+
+# for i in range(len(gdf_edges)):
+#     make_folium_polyline_FK(edge = gdf_edges.iloc[i],
+#                             edge_width = 4, edge_opacity = 1, popup_attribute=None).add_to(m)
+
+AAA = plot_graph_folium_FK(gdf_edges, graph_map=None, popup_attribute=None,
+                        tiles='cartodbpositron', zoom=1, fit_bounds=True, edge_width=4, edge_opacity=1)
+AAA.save("prova_centrality.html")
+
+
+#######################################################
+#######################################################
+#######################################################
+
+
 
 
 
@@ -185,7 +264,6 @@ AAA.save("BBB.html")
 #
 # from itertools import chain
 # motorway_unlisted = list(chain.from_iterable(Row_list))
-
 
 from_n=np.random.choice(Catania.nodes)
 to_n=np.random.choice(Catania.nodes)
