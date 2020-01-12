@@ -13,7 +13,6 @@ from itertools import chain
 from folium_stuff_FK import make_folium_polyline_FK
 from folium_stuff_FK import plot_graph_folium_FK
 
-
 # check version of modules osmn and networkx
 # print(nx.__version__)  # version 2.3 ONLY!
 # print(ox.__version__)  # version 1.0
@@ -149,7 +148,6 @@ def roads_type_folium(file_graphml, road_type, place_country):
         "motorway_link": "yellow",
         "motorway": "black"
     }
-
     points = []
     # prepare a base_map ###########################################################
     gen_network = gdf_edges[(gdf_edges.highway.isin([road_type.split(",")[0]]))]
@@ -199,15 +197,21 @@ def clos_centrality(file_graphml, road_type, place_country):
     #             'viridis', 'plasma', 'inferno', 'magma', 'cividis']
     cmap = cm.ScalarMappable(norm=norm, cmap=cm.YlGn)
     ec = [cmap.to_rgba(cl) for cl in ev]
+    fig, ax = ox.plot_graph(grafo, bgcolor='k', axis_off=True, node_size=0, node_color='w',
+                            node_edgecolor='gray', node_zorder=2,
+                            edge_color=ec, edge_linewidth=1.5, edge_alpha=1)
+
     gdf_edges = ox.graph_to_gdfs(grafo, nodes=False, fill_edge_geometry=True)
     gdf_edges['edge_color'] = ec
 
     my_map = plot_graph_folium_FK(gdf_edges, graph_map=None, popup_attribute=None,
                             zoom=1, fit_bounds=True, edge_width=4, edge_opacity=1) #tiles='cartodbpositron'
     name_place_country = re.sub('[/," ",:]', '_', place_country)
-    # roadtype = ' '.join([str(elem) for elem in road_type])
-    # roads = re.sub('[/," ",:]', '_', roadtype)
-    my_map.save("closness_centrality" + "_" + name_place_country + ".html")
+    road_type = road_type.replace(' ', '')
+    road_type = list(road_type.split(","))
+    roadtype = ' '.join([str(elem) for elem in road_type])
+    roads = re.sub('[/," ",:]', '_', roadtype)
+    my_map.save("closness_centrality" + "_" + roads + "_" + name_place_country + ".html")
 
 #############################################################
 #############################################################

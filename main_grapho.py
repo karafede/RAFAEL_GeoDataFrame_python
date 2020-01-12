@@ -10,8 +10,18 @@ from funcs_network_FK import clos_centrality
 
 # input name of City and Country
 place_country = "Catania, Italy"
-filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|' \
-         'raceway|cycleway|steps|construction|primary|tertiary"]')
+# filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|' \
+#          'raceway|cycleway|steps|construction|primary|tertiary"]')
+
+# define input road types as list
+# road_type = "motorway, motorway_link"
+road_type = "motorway, motorway_link, secondary"
+# road_type = "motorway, motorway_link, secondary, primary, tertiary"
+
+# filter = ('["highway"~"motorway|motorway_link"]')
+roads = road_type.replace(', ', '|')
+filter = '["highway"~' + '"' + roads + '"' + "]"
+
 # distance from the center of the map (in meters)
 distance = 20000
 
@@ -26,10 +36,6 @@ file_graphml = 'Catania__Italy.graphml'
 cost_assignment(file_graphml, place_country)
 
 # select road type and save on a html folium map
-# define input road types as list
-# road_type = "motorway, motorway_link"
-road_type = "motorway, motorway_link, secondary"
-# road_type = "motorway, motorway_link, secondary, primary, tertiary"
 roads_type_folium(file_graphml, road_type, place_country)
 
 # edge centrality
