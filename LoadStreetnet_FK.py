@@ -68,19 +68,19 @@ for u,v,key,attr in Catania.edges(keys=True,data=True):
        speedlist=way_dict.get("other")
        speed=speedlist[0]*1000/3600
        # create a new attribute time == "cost" in the field "highway"
-       attr['cost']=attr.get("length")/speed     
+       attr['cost']=attr.get("length")/speed
        print(attr.get("highway"), speedlist[0], attr.get("cost"),'^^^^^^^^^^^')
     # add the "attr_dict" to the edge file
        Catania.add_edge(u,v,key,attr_dict=attr)
        continue
-    
+
     if 'maxspeed' in set(attr.keys()) and len(attr.get("maxspeed"))<4:
         if type(attr.get("maxspeed")) is list:
             speedList = [int(i) for i in attr.get("maxspeed")]
-            speed=np.mean(speedList)*1000/3600  
+            speed=np.mean(speedList)*1000/3600
             attr['cost']=attr.get("length")/speed
             print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"),'========')
-        else: 
+        else:
             speed=float(attr.get("maxspeed"))*1000/3600
             attr['cost']=attr.get("length")/speed
             print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"),'°°°°°°°°°')
@@ -88,7 +88,7 @@ for u,v,key,attr in Catania.edges(keys=True,data=True):
     else:#read speed from way class dictionary
         speedlist = way_dict.get(attr["highway"])
         speed=speedlist[0]*1000/3600
-        attr['cost']=attr.get("length")/speed     
+        attr['cost']=attr.get("length")/speed
         print(attr.get("highway"), speedlist[0], attr.get("cost"),'-----------')
         Catania.add_edge(u,v,key,attr_dict=attr)
 
@@ -98,9 +98,11 @@ for u,v,key,attr in Catania.edges(keys=True,data=True):
 
 # adding a new column of edge color to gdf of the graph edges
 gdf_edges = ox.graph_to_gdfs(Catania, nodes=False,  fill_edge_geometry=True)
+gdf_nodes = ox.graph_to_gdfs(Catania, edges = False)
 # gdf_edges['edge_color'] = ec
 # road_type = "motorway"
-road_type = "motorway, motorway_link, secondary, primary, tertiary"
+road_type = "motorway, motorway_link"
+# road_type = "motorway, motorway_link, secondary, primary, tertiary"
 # road_type = "secondary"
 # road_type = "motorway, motorway_link"
 road_type = road_type.replace(' ', '')
@@ -116,7 +118,7 @@ road_color_dict={
 
 points = []
 # prepare a base_map ###########################################################
-gen_network = gdf_edges[(gdf_edges.highway.isin(["secondary"]))]
+gen_network = gdf_edges[(gdf_edges.highway.isin(["motorway"]))]
 for i in range(len(gen_network)):
     gen_poly = ox.make_folium_polyline(edge=gen_network.iloc[i], edge_color="black", edge_width=1,
                                        edge_opacity=1, popup_attribute=None)
@@ -128,8 +130,19 @@ for i in range(len(gen_network)):
 my_map = folium.Map(location=[ave_lat, ave_lon], zoom_start=12)
 ##################################################################################
 
+# add nodes to my_map
+for i in range(len(gdf_nodes)):
+    folium.CircleMarker(location=[gdf_nodes.y.iloc[i], gdf_nodes.x.iloc[i]],
+                                                 popup=gdf_nodes.osmid.iloc[i],
+                                                 radius=5,
+                                                 color="red",
+                                                 fill=True,
+                                                 fill_color="yellow",
+                                                 fill_opacity=0.6).add_to(my_map)
+
+
+# add edges
 road_type = list(road_type.split(","))
-# if type(road_type) is list:
 for road in road_type:
     if road in road_color_dict.keys():
         color_road = road_color_dict.get(road)
@@ -142,12 +155,12 @@ for road in road_type:
     folium.PolyLine(points, color=color_road, weight=5, opacity=1).add_to(my_map)
     my_map.save("Catania_motorway.html")
 
-
-
+'''
 # plot all the networl on the map
 AAA = ox.plot_graph_folium(Catania, graph_map=None, popup_attribute=None, tiles='cartodbpositron', zoom=1,
                   fit_bounds=True, edge_width=3, edge_opacity=1)
 AAA.save("BBB.html")
+'''
 
 #######################################################
 #######################################################
@@ -164,15 +177,15 @@ from itertools import chain
 from colour import Color
 from folium_stuff_FK import make_folium_polyline_FK
 from folium_stuff_FK import plot_graph_folium_FK
+from folium_stuff_FK import graph_to_gdfs_FK
 
 
 import os
 os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 os.getcwd()
 
-
 # # node closeness centrality
-file_graphml = 'Catania__Italy.graphml'
+file_graphml = 'Catania__Italy_cost.graphml'
 grafo = ox.load_graphml(file_graphml)
 # node_centrality = nx.closeness_centrality(grafo)
 # df = pd.DataFrame(data=pd.Series(node_centrality).sort_values(), columns=['cc'])
@@ -182,12 +195,19 @@ grafo = ox.load_graphml(file_graphml)
 # fig, ax = ox.plot_graph(grafo, bgcolor='k', node_size=30, node_color=nc, node_edgecolor='none', node_zorder=2,
 #                         edge_color='#555555', edge_linewidth=1.5, edge_alpha=1)
 
-# edge centrality
-edge_centrality = nx.closeness_centrality(nx.line_graph(grafo))
+### edge centrality
+### OSMnx automatically uses edge lengths as the weight when calculating betweenness centrality. ###
+# convert MultiDiGraph into simple Graph
+# grafo = nx.DiGraph(grafo)
+# edge_centrality = nx.closeness_centrality(nx.line_graph(grafo))
+edge_centrality = nx.betweenness_centrality(nx.line_graph(grafo), weight='length')
+edge_centrality = nx.betweenness_centrality(nx.line_graph(grafo))
 ev = [edge_centrality[edge + (0,)] for edge in grafo.edges()]
+# ev = [edge_centrality[edge] for edge in grafo.edges()]
 # color scale converted to list of colors for graph edges
 norm = colors.Normalize(vmin=min(ev)*0.8, vmax=max(ev))
-# cividis, viridis, YlGn  (good colormaps
+### color scales
+# inferno, cividis, viridis, YlGn  (good colormaps
 # 'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
 #             'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
 #             'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn',
@@ -209,8 +229,10 @@ fig, ax = ox.plot_graph(grafo, bgcolor='k', axis_off=True, node_size=0, node_col
                         node_edgecolor='gray', node_zorder=2,
                         edge_color=ec, edge_linewidth=1.5, edge_alpha=1)
 
-
+grafo_edges = grafo.edges(keys=True,data=True)
+# grafo_edges = grafo.edges(data=True)
 gdf_edges = ox.graph_to_gdfs(grafo, nodes=False, fill_edge_geometry=True)
+# gdf_edges = graph_to_gdfs_FK(grafo, nodes=False, fill_edge_geometry=True)
 gdf_edges['edge_color'] = ec
 # gdf_edges.crs = {'init' :'epsg:4326'}
 # gdf_edges.plot()
@@ -224,46 +246,19 @@ AAA = plot_graph_folium_FK(gdf_edges, graph_map=None, popup_attribute=None,
 AAA.save("prova_centrality.html")
 
 
+for u, v, key, attr in grafo.edges(keys=True, data=True):
+    print(attr)
+    print(attr["length"])
+    attr['length'] = attr.get("cost")
+    # grafo.add_edge(u, v, key, attr_dict=attr)
+    grafo.add_edge(u, v, key)
+
+ox.extended_stats(grafo, bc=True)
+ox.extended_stats(grafo, ecc=True, bc=True, cc=True)
 #######################################################
 #######################################################
 #######################################################
 
-
-
-
-
-# # convert a graph to a GeoDataFrame (gdf)
-# gdf_nodes, gdf_edges = ox.graph_to_gdfs(Catania)
-# gdf_edges.columns
-# gdf_nodes.columns
-# motorway = gdf_edges[gdf_edges['highway']=='motorway']
-
-# https://automating-gis-processes.github.io/2017/lessons/L7/network-analysis.html
-# ox.config(use_cache=True, log_console=True)
-# custom_filter = '["highway"~"motorway|motorway_link"]'
-# Catania2 = ox.graph_from_place('Catania, Italy', network_type=None, simplify=True, infrastructure='way["highway"]', custom_filter=custom_filter)
-# print(ox.graph_to_gdfs(Catania2, nodes=False)['highway'].value_counts())
-# ox.plot_graph(Catania2)
-
-# https://stackoverflow.com/questions/49546015/osmnx-visualize-the-graph-of-edge-centrality-on-folium
-
-
-# motorway = motorway[['u', 'v']]
-# motorway.reset_index(drop=True, inplace=True)
-#
-# len(motorway)
-# # make a consecutive list
-# Row_list = []
-#
-# # Iterate over each row
-# for index, rows in motorway.iterrows():
-#     # Create list for the current row
-#     my_list = [rows.u, rows.v]
-#     # append the list to the final list
-#     Row_list.append(my_list)
-#
-# from itertools import chain
-# motorway_unlisted = list(chain.from_iterable(Row_list))
 
 from_n=np.random.choice(Catania.nodes)
 to_n=np.random.choice(Catania.nodes)
