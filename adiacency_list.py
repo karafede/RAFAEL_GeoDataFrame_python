@@ -77,9 +77,11 @@ buffer = viasat_gdf.buffer(0.0005)  #50 meters # this is a geoseries
 buffer.plot()
 # transform a geoseries into a geodataframe
 # https://gis.stackexchange.com/questions/266098/how-to-convert-a-geoserie-to-a-geodataframe-with-geopandas
-union = buffer.unary_union
-env = union.envelope
-buffer_viasat = gpd.GeoDataFrame(geometry=gpd.GeoSeries(env))
+# union = buffer.unary_union
+# env = union.envelope
+# buffer_viasat = gpd.GeoDataFrame(geometry=gpd.GeoSeries(env))
+buffer_viasat = pd.DataFrame(buffer)
+buffer_viasat.columns = ['geometry']
 type(buffer_viasat)
 
 # geodataframe with edges
@@ -89,19 +91,46 @@ gdf_edges.plot()
 # intesect polygons with linestring......
 # https://gis.stackexchange.com/questions/269441/intersecting-linestrings-with-polygons-in-python
 index_edges = []
+edge = []
 print("Start")
 for index1, streets in gdf_edges.iterrows():
     for index2, via_buff in buffer_viasat.iterrows():
         if streets['geometry'].intersects(via_buff['geometry']) is True:
             print("OK=======================OK")
             index_edges.append(index1)
-        else:
-            print("NO==NO")
+            AAA = streets.u, streets.v
+            edge.append(AAA)
+        # else:
+        #     print("NO==NO")
 
-len(index_edges)
-# find edges corresponding to the index_edges
-len(gdf_edges)
-len(gdf_nodes)
+# filter gdf_edges based on index_edges (edges in the buffer)
+# near neighbour egdes (near the viasat measurements)
+nn_gdf_edges = gdf_edges[gdf_edges.index.isin(index_edges)]
+nn_gdf_edges.plot()
+
+#############################
+# plot in a Folium map ######
+#############################
+# make main map
+place_country = "Catania, Italy"
+road_type = "motorway, motorway_link, secondary, primary, tertiary"
+file_graphml = 'Catania__Italy_cost.graphml'
+my_map = roads_type_folium(file_graphml, road_type, place_country)
+
+# add neighbour edges
+points = []
+for i in range(len(nn_gdf_edges)):
+    nn_edges = ox.make_folium_polyline(edge=nn_gdf_edges.iloc[i], edge_color="yellow", edge_width=1,
+                                            edge_opacity=1, popup_attribute=None)
+    points.append(nn_edges.locations)
+folium.PolyLine(points, color="yellow", weight=4, opacity=1).add_to(my_map)
+
+# add buffered viasat polygons
+# save first as geojson file
+buffer.to_file(filename='buffer_viasat.geojson', driver='GeoJSON')
+folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
+my_map.save("near_neighbours_Catania.html")
+
 
 # https://shapely.readthedocs.io/en/stable/manual.html
 # https://gis.stackexchange.com/questions/127878/line-vs-polygon-intersection-coordinates
