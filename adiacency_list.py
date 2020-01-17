@@ -2,6 +2,7 @@
 import os
 os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 
+from datetime import datetime
 import psycopg2
 import db_connect
 from sklearn.metrics import silhouette_score
@@ -75,14 +76,18 @@ viasat_gdf.plot()
 # Buffer the points by some units (unit is kilometer)
 buffer = viasat_gdf.buffer(0.0005)  #50 meters # this is a geoseries
 buffer.plot()
-# transform a geoseries into a geodataframe
-# https://gis.stackexchange.com/questions/266098/how-to-convert-a-geoserie-to-a-geodataframe-with-geopandas
-# union = buffer.unary_union
-# env = union.envelope
-# buffer_viasat = gpd.GeoDataFrame(geometry=gpd.GeoSeries(env))
+# make a dataframe
 buffer_viasat = pd.DataFrame(buffer)
 buffer_viasat.columns = ['geometry']
 type(buffer_viasat)
+# transform a geoseries into a geodataframe
+# https://gis.stackexchange.com/questions/266098/how-to-convert-a-geoserie-to-a-geodataframe-with-geopandas
+
+## circumscript the area of the track (buffer zone)
+union = buffer.unary_union
+envelope = union.envelope
+rectangle_viasat = gpd.GeoDataFrame(geometry=gpd.GeoSeries(envelope))
+# rectangle_viasat.plot()
 
 # geodataframe with edges
 type(gdf_edges)
@@ -90,23 +95,52 @@ gdf_edges.plot()
 
 # intesect polygons with linestring......
 # https://gis.stackexchange.com/questions/269441/intersecting-linestrings-with-polygons-in-python
+
+from datetime import datetime
+
+buff = []
 index_edges = []
+index_buff = []
 edge = []
-print("Start")
+now1 = datetime.now()
+
 for index1, streets in gdf_edges.iterrows():
     for index2, via_buff in buffer_viasat.iterrows():
         if streets['geometry'].intersects(via_buff['geometry']) is True:
             print("OK=======================OK")
             index_edges.append(index1)
-            AAA = streets.u, streets.v
-            edge.append(AAA)
+            index_buff.append(index2)
+            STREET = streets.u, streets.v, index2
+            edge.append(STREET)
+            # list all buffers in sequence
+            buff.append(via_buff.name)
+now2 = datetime.now()
+print(now2 - now1)
         # else:
         #     print("NO==NO")
 
-# filter gdf_edges based on index_edges (edges in the buffer)
-# near neighbour egdes (near the viasat measurements)
+
+# sort edges and associated buffer (first buffer is the Number 43)
+df = pd.DataFrame(edge)
+df.columns = ['u', 'v', 'buffer_ID']
+df.sort_values(by=['buffer_ID'], inplace=True)
+print(df)
+
+# for each buffer_ID get the VIASAT measurement
+
+# build the class...
+# u.measurement
+
+# set_of_edges = set(edge)
+
+
+## filter gdf_edges based on index_edges (edges in the buffer)
+## near neighbour edges (near the viasat measurements)
 nn_gdf_edges = gdf_edges[gdf_edges.index.isin(index_edges)]
+## plot selects edges
 nn_gdf_edges.plot()
+
+
 
 #############################
 # plot in a Folium map ######
@@ -117,13 +151,13 @@ road_type = "motorway, motorway_link, secondary, primary, tertiary"
 file_graphml = 'Catania__Italy_cost.graphml'
 my_map = roads_type_folium(file_graphml, road_type, place_country)
 
-# add neighbour edges
+# add neighbour edges crossed by the buffer of the viasat data
 points = []
 for i in range(len(nn_gdf_edges)):
     nn_edges = ox.make_folium_polyline(edge=nn_gdf_edges.iloc[i], edge_color="yellow", edge_width=1,
                                             edge_opacity=1, popup_attribute=None)
     points.append(nn_edges.locations)
-folium.PolyLine(points, color="yellow", weight=4, opacity=1).add_to(my_map)
+folium.PolyLine(points, color="yellow", weight=2, opacity=1).add_to(my_map)
 
 # add buffered viasat polygons
 # save first as geojson file
@@ -131,9 +165,16 @@ buffer.to_file(filename='buffer_viasat.geojson', driver='GeoJSON')
 folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
 my_map.save("near_neighbours_Catania.html")
 
+# add the rectangle that circusmcript the area of the viasat data
+# rectangle_viasat.to_file(filename='rectangle_viasat.geojson', driver='GeoJSON')
+# folium.GeoJson('rectangle_viasat.geojson').add_to((my_map))
 
 # https://shapely.readthedocs.io/en/stable/manual.html
 # https://gis.stackexchange.com/questions/127878/line-vs-polygon-intersection-coordinates
+
+
+####################################################################################
+####################################################################################
 
 
 maxdist = 50 # meters
@@ -169,28 +210,6 @@ adjacent_list = list(filter(None, adjacent_list))
 # https://gis.stackexchange.com/questions/314949/creating-square-buffers-around-points-using-shapely
 
 # https://gis.stackexchange.com/questions/314949/creating-square-buffers-around-points-using-shapely
-
-
-
-# Generate some sample data
-p1 = Point((1,2))
-p2 = Point((5,6))
-df = pd.DataFrame({'a': [11,22]})
-gdf = gpd.GeoDataFrame(df, geometry = [p1,p2])
-gdf.plot()
-
-# Buffer the points by 2 units
-buffer = gdf.buffer(2)
-buffer.plot()
-
-# Apply an envelope around circular buffers
-envelope = buffer.envelope
-envelope.plot()
-
-
-
-
-
 
 
 '''
