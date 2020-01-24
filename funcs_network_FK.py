@@ -42,6 +42,7 @@ def graph(place_country, distance, filter):
                               network_type='drive',
                               custom_filter=filter)
 
+
     # import shapefile
     # G_shp = ox.gdf_from_place(place_country)
     # import shapefile with edges and nodes
@@ -125,7 +126,7 @@ def cost_assignment(file_graphml, place_country):
             grafo.add_edge(u, v, key, attr_dict=attr)
     # save shp file AGAIN street network as ESRI shapefile (includes NODES and EDGES and new attributes)
     name_place_country = re.sub('[/," ",:]', '_', place_country)
-    ox.save_graphml(grafo, filename=name_place_country + "_cost" + '.graphml')
+    ox.save_graphml(grafo, filename=name_place_country + "_cost" + '.graphml')  # when I save, the field "cost" becomes a string...wrong!
     # ox.save_graphml(grafo, filename=name_place_country + '.graphml')
     # ox.save_graph_shapefile(grafo, filename='network_' + name_place_country + '-shape')
 

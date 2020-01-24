@@ -91,6 +91,7 @@ for u,v,key,attr in Catania.edges(keys=True,data=True):
         attr['cost']=attr.get("length")/speed
         print(attr.get("highway"), speedlist[0], attr.get("cost"),'-----------')
         Catania.add_edge(u,v,key,attr_dict=attr)
+    ox.save_graphml(Catania, filename='AAAAA.graphml')
 
 # highlight only motorway
 # ec = ['r' if data['highway']== "motorway" else 'b' for u, v, key, data in Catania.edges(keys=True, data=True)]
