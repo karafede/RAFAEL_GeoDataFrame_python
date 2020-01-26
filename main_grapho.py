@@ -41,6 +41,6 @@ my_map = roads_type_folium(file_graphml, road_type, place_country)
 viasat_data = viasat_map_data(file_graphml, road_type, place_country)
 
 # edge centrality (make a map) (bc = betweenness centrality; cc = closeness centrality)
-centrality(file_graphml, road_type, place_country, bc=True, cc=False)
+centrality(file_graphml, road_type, place_country, bc=False, cc=True)
 
 

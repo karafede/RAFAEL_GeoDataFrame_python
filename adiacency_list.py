@@ -96,8 +96,6 @@ type(buffer_viasat)
 type(gdf_edges)
 # gdf_edges.plot()
 
-# intesect polygons with linestring......
-# https://gis.stackexchange.com/questions/269441/intersecting-linestrings-with-polygons-in-python
 
 from datetime import datetime
 
@@ -105,6 +103,7 @@ buff = []
 index_edges = []
 index_buff = []
 edge = []
+viasat_uncertainty = []
 now1 = datetime.now()
 
 for index1, streets in gdf_edges.iterrows():
@@ -114,9 +113,11 @@ for index1, streets in gdf_edges.iterrows():
             index_edges.append(index1)
             index_buff.append(index2)
             STREET = streets.u, streets.v, index2
-            distance = (Point(viasat[['longitude', 'latitude']].iloc[index2]).distance(streets.geometry))*100000 # rough meter conversion
-            print(distance)  # km??
+            # get distance between Viasat measurement and edge
+            distance = (Point(viasat[['longitude', 'latitude']].iloc[index2]).distance(streets.geometry))*100000 # roughly meter conversion
+            print("distance: ", distance, " meters")
             edge.append(STREET)
+            viasat_uncertainty.append(distance)
             # list all buffers in sequence
             buff.append(via_buff.name)
 now2 = datetime.now()
@@ -173,7 +174,43 @@ df_edges.columns = ['u', 'v', 'buffer_ID']
 df_edges.sort_values(by=['buffer_ID'], inplace=True)
 
 # sort df by u and v
-# df_edges.sort_values(['u','v'],ascending=False, inplace=True)
+df_edges.sort_values(['u','v'],ascending=False, inplace=True)
+# remove row in df_edges where u in never in v
+df_edges.sort_values(['u','v'],ascending=False, inplace=True)
+
+idx_rows_to_remove = []
+for i in range(len(df_edges)):
+    if int(df_edges[['u']].iloc[i]) in df_edges['v'].values:
+        print("OK")
+        print(i)
+    else:
+        print("============================================")
+        print(i)
+        idx = df_edges.iloc[i].name
+        idx_rows_to_remove.append(idx)
+df_edges = df_edges.drop(idx_rows_to_remove, axis='rows')
+len(df_edges)
+
+'''
+# make a dictionary: for each buffer/track/measurement (key) assign u and v
+ID_TRACK = list(df_edges.buffer_ID.unique())
+df_edges_dict = {}
+keys = ID_TRACK
+for track in keys:
+        df_edges_dict[track] = df_edges[['u', 'v']][df_edges['buffer_ID']==track ].values.tolist()
+print(df_edges_dict)
+
+
+nodes_u = list(df_edges.u.unique())
+u_dict = {}
+keys = nodes_u
+for u in keys:
+        u_dict[u] = df_edges[df_edges['u']==u ].values.tolist()
+print(u_dict)
+u = 4277112580
+u_dict[u][2][2]
+[x[2] for x in u_dict[u]]
+'''
 
 # u.measurement
 class adj_list_u:
@@ -198,9 +235,7 @@ for index, rowf in df_edges.iterrows():
     node_v.append(  adj_list_v( rowf[['v', 'buffer_ID']] ) )
 
 
- # u_measurement = int(df_edges[df_edges['u'] == u]['buffer_ID'])
-
-def haversine_measurement_node(node_measurement, node):
+def great_circle_measurement_node(node_measurement, node):
     # u_measurement = u.measurement
     # u = node_u
     """
@@ -233,7 +268,7 @@ def haversine_measurement_node(node_measurement, node):
     return c * r # Kilometers
 
 
-def haversine_measurement(u_measurement, v_measurement):
+def great_circle_measurement(u_measurement, v_measurement):
     # u_measurement = u.measurement
     # v_measurement = v.measurement
     """
@@ -258,28 +293,28 @@ def haversine_measurement(u_measurement, v_measurement):
 
 
 # calcualtion of "sigma" for the Gaussian distribution that will be defined next
-# https://stackoverflow.com/questions/26368533/distance-of-a-gps-point-to-a-polyline
-# "sigma" has been calculated ad the standard deviation of all the hrvesine distances betweeen meaurments and nodes)
-dist_degrees = []
+# "sigma" has been calculated ad the standard deviation of all the distances between viasat measurements and nodes
+'''
+dist = []
 for i in range(len(df_edges)):
     u = node_u[i]
     u_measurement = u.measurement
     DIST_DEGREES = haversine_measurement_node(u_measurement, u)
     print(DIST_DEGREES)
-    dist_degrees.append(DIST_DEGREES)
-# calculate the standard deviation of the distance between two points in degrees
-SIGMA_Z = np.std(dist_degrees)
+    dist.append(DIST_DEGREES)
+SIGMA_Z = np.std(dist)
+'''
+SIGMA_Z = 1.4826*np.median(viasat_uncertainty) # meters
+# SIGMA_Z = SIGMA_Z/1000 #kms
 
-u = node_u[i]
-v = node_v[i]
 
 ###############################
 ### emission probability ######
 ###############################
-# A gaussian distribution of all NODES that are closer a node stays to its measurement
+# A gaussian distribution of all NODES that closer node to its measurement is the measurement that will go to match it
 def emission_prob(u):
     c = 1 / (SIGMA_Z * math.sqrt(2 * math.pi))
-    return c * math.exp(-haversine_measurement_node(u.measurement, u)**2)
+    return c * math.exp(-(great_circle_measurement_node(u.measurement, u))**2)
 
 
 prob = []
@@ -312,21 +347,45 @@ nx.shortest_path_length(grafo, u.u, v.v, weight='length')
 u = node_u[0]
 v = node_v[10]
 
-# transition probability (probability that the distance u-->v is frm the mesasurements's distances at nodes u and v
+# transition probability (probability that the distance u-->v is from the mesasurements's distances at nodes u and v
 # A empirical distribution
 def transition_prob(u, v):
     BETA = 1
     c = 1 / BETA
     # Calculating route distance is expensive.
     # We will discuss how to reduce the number of calls to this function later.
+    # distance on the route
     delta = abs(nx.shortest_path_length(grafo, u.u, v.v, weight='length')/1000 -
-                haversine_measurement(u.measurement, v.measurement))  # in Kilometers
+                great_circle_measurement(u.measurement, v.measurement))  # in Kilometers
     return c * math.exp(-delta)
 
-trans_prob = []
+# calculate BETA
+betas = []
+len_route = []
+deltaB = []
+
 for i in range(len(df_edges)):
-    u = node_u[i]
-    v = node_v[i]
+    u = node_u[i]  # first track
+    v = node_v[i]  # next consecutive track
+    # distance on the route
+    LEN_ROUTE = nx.shortest_path_length(grafo, u.u, v.v, weight='length') / 1000
+    # distance on the sphere (cartesian distance)
+    DIST = great_circle_measurement(u.measurement, v.measurement)
+    delta_beta = abs(DIST - LEN_ROUTE)
+    print(LEN_ROUTE)
+    print(DIST, "=============================")
+    deltaB.append(delta_beta)
+BETA = (1/math.log(2))*np.median(deltaB)
+print("BETA: ", BETA)
+
+
+trans_prob = []
+# for i in range(len(df_edges)):
+for idx, row in viasat.iterrows():
+    track_idx = idx
+    print(track_idx)
+    u = node_u[track_idx]
+    v = node_v[track_idx+1]
     t_prob = transition_prob(u, v)
     print(t_prob)
     trans_prob.append(t_prob)
@@ -368,29 +427,16 @@ def path_prob(path):
 ####################################################################################
 ####################################################################################
 
-# remove row in df_edges where u in never in v
-df_edges.sort_values(['u','v'],ascending=False, inplace=True)
 
-
-idx_rows_to_remove = []
-for i in range(len(df_edges)):
-    if int(df_edges[['u']].iloc[i]) in df_edges['v'].values:
-        print("OK")
-        print(i)
-    else:
-        print("============================================")
-        print(i)
-        idx = df_edges.iloc[i].name
-        idx_rows_to_remove.append(idx)
-df_edges = df_edges.drop(idx_rows_to_remove, axis='rows')
-
-
+# build a dataframe indicating how many times a buffer (track) is next to an edge (nodes u, v)
 df1 = pd.DataFrame(df_edges['buffer_ID'].value_counts().values, index=df_edges['buffer_ID'].value_counts().index, columns=['count'])
-# sort df1  by index
+# sort df1 by index
 df1=df1.sort_index()
-ADJ_LIST = []
 
-# build ADJACENCY LIST
+
+adjacency_list = dict()
+# adjacency_list = []
+# build ADJACENCY LIST (all possible paths between nodes from u ---> v) (list all paths in between)
 # df_edges adjacent list with GPS tracks ordered by priority of appearance
 for idx, row in df1.iterrows():
         track_freq = row['count']
@@ -419,20 +465,31 @@ for idx, row in df1.iterrows():
                 else:
                     paths = nx.shortest_path(grafo, u, v, weight='length')
                     print("path:", paths)
+                    adjacency_list[u] = paths
+                    # -----build adjacency list: append all lists of paths-----------------
+                    # concatenate all dictionsies....no need??
+                    #adjacency_list.append(pairs)
+print('adjacency_list (list of paths): ', adjacency_list)
 
-# nx.shortest_path_length(grafo, u, v, weight='length') / 1000 (in Km)
+# Generate all paths from s to t recursively
+s = node_u[i].u
+t = node_v[i].v
+
+def all_paths(adjacency_list, s, t):
+    if s == t: return [[]]
+    paths = []
+    for v in adjacency_list[s]:
+        print(v)
+        for path in all_paths(adjacency_list, v, t):
+            paths.append([(s, v)] + path)
+    return paths
 
 
-ADJ_LIST.append(pairs)
-print('ADJ_LIST:', ADJ_LIST)
+AAA = all_paths(adjacency_list, s, t)
 
-
-
-
-# def maximum_path_prob(adjacency_list, s, t):
-#     return max((path_prob(path), path)
-#                for path in all_paths(adjacency_list, s, t),
-#                key=lambda prob, path: prob)
+# https://stackoverflow.com/questions/8966538/syntax-behind-sortedkey-lambda
+def maximum_path_prob(adjacency_list, s, t):
+    return max( (path_prob(path), path) for path in all_paths(adjacency_list, s, t), key=lambda prob, path: prob) # sorted by probability
 
 
 
