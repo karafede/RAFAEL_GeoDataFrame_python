@@ -103,7 +103,7 @@ buff = []
 index_edges = []
 index_buff = []
 edge = []
-viasat_uncertainty = []
+DISTANCES = []
 now1 = datetime.now()
 
 for index1, streets in gdf_edges.iterrows():
@@ -117,7 +117,8 @@ for index1, streets in gdf_edges.iterrows():
             distance = (Point(viasat[['longitude', 'latitude']].iloc[index2]).distance(streets.geometry))*100000 # roughly meter conversion
             print("distance: ", distance, " meters")
             edge.append(STREET)
-            viasat_uncertainty.append(distance)
+            distance = distance, index2
+            DISTANCES.append(distance)
             # list all buffers in sequence
             buff.append(via_buff.name)
 now2 = datetime.now()
@@ -191,7 +192,7 @@ for i in range(len(df_edges)):
 df_edges = df_edges.drop(idx_rows_to_remove, axis='rows')
 len(df_edges)
 
-'''
+
 # make a dictionary: for each buffer/track/measurement (key) assign u and v
 ID_TRACK = list(df_edges.buffer_ID.unique())
 df_edges_dict = {}
@@ -200,64 +201,36 @@ for track in keys:
         df_edges_dict[track] = df_edges[['u', 'v']][df_edges['buffer_ID']==track ].values.tolist()
 print(df_edges_dict)
 
-
+'''
 nodes_u = list(df_edges.u.unique())
 u_dict = {}
 keys = nodes_u
 for u in keys:
         u_dict[u] = df_edges[df_edges['u']==u ].values.tolist()
 print(u_dict)
-u = 4277112580
-u_dict[u][2][2]
-[x[2] for x in u_dict[u]]
+# track = u_dict.get(u)[0][2]
 '''
 
-# u.measurement
-class adj_list_u:
-    def __init__(self, rowf):
-        self.u = int(rowf[0])
-        self.measurement = int(rowf[1])
-
-node_u = []
-for index, rowf in df_edges.iterrows():
-    print(rowf)
-    node_u.append(  adj_list_u( rowf[['u', 'buffer_ID']] ) )
-
-# v.measurement
-class adj_list_v:
-    def __init__(self, rowf):
-        self.v = int(rowf[0])
-        self.measurement = int(rowf[1])
-
-node_v = []
-for index, rowf in df_edges.iterrows():
-    print(rowf)
-    node_v.append(  adj_list_v( rowf[['v', 'buffer_ID']] ) )
-
-
-def great_circle_measurement_node(node_measurement, node):
-    # u_measurement = u.measurement
-    # u = node_u
+def great_circle_track_node(u_track, u):
     """
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
     """
-    # u_measurement = int(df_edges[df_edges['u'] == u]['buffer_ID'])
-    coords_measurements = viasat[viasat.ID == node_measurement].values.tolist()
-    lon_measurement_u = coords_measurements[0][1]
-    lat_measurement_u = coords_measurements[0][0]
-    if node == u:
-        coords_u = gdf_nodes[gdf_nodes.index == node.u][['x', 'y']].values.tolist()
-        lon_u = coords_u[0][0]
-        lat_u = coords_u[0][1]
-        # convert decimal degrees to radians
-        lon1, lat1, lon2, lat2 = map(radians, [lon_measurement_u, lat_measurement_u, lon_u, lat_u])
-    elif node == v:
-        coords_v = gdf_nodes[gdf_nodes.index == node.v][['x', 'y']].values.tolist()
-        lon_v = coords_v[0][0]
-        lat_v = coords_v[0][1]
-        # convert decimal degrees to radians
-        lon1, lat1, lon2, lat2 = map(radians, [lon_measurement_u, lat_measurement_u, lon_v, lat_v])
+    coords_track = viasat[viasat.ID == u_track].values.tolist()
+    lon_track = coords_track[0][1]
+    lat_track = coords_track[0][0]
+    # if node == u:
+    coords_u = gdf_nodes[gdf_nodes.index == u][['x', 'y']].values.tolist()
+    lon_u = coords_u[0][0]
+    lat_u = coords_u[0][1]
+    # convert decimal degrees to radians
+    lon1, lat1, lon2, lat2 = map(radians, [lon_track, lat_track, lon_u, lat_u])
+    # elif node == v:
+    #     coords_v = gdf_nodes[gdf_nodes.index == node][['x', 'y']].values.tolist()
+    #     lon_v = coords_v[0][0]
+    #     lat_v = coords_v[0][1]
+    #     # convert decimal degrees to radians
+    #     lon1, lat1, lon2, lat2 = map(radians, [lon_track, lat_track, lon_v, lat_v])
 
     # haversine formula
     dlon = lon2 - lon1
@@ -268,63 +241,61 @@ def great_circle_measurement_node(node_measurement, node):
     return c * r # Kilometers
 
 
-def great_circle_measurement(u_measurement, v_measurement):
-    # u_measurement = u.measurement
-    # v_measurement = v.measurement
+def great_circle_track(u_track, v_track):
     """
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
     """
-    coords_measurements_u = viasat[viasat.ID == u_measurement].values.tolist()
-    lon_measurement_u = coords_measurements_u[0][1]
-    lat_measurement_u = coords_measurements_u[0][0]
-    coords_measurements_v = viasat[viasat.ID == v_measurement].values.tolist()
-    lon_measurement_v = coords_measurements_v[0][1]
-    lat_measurement_v = coords_measurements_v[0][0]
+    coords_track_u = viasat[viasat.ID == u_track].values.tolist()
+    lon_track_u = coords_track_u[0][1]
+    lat_track_u = coords_track_u[0][0]
+    coords_track_v = viasat[viasat.ID == v_track].values.tolist()
+    lon_track_v = coords_track_v[0][1]
+    lat_track_v = coords_track_v[0][0]
     # convert decimal degrees to radians
-    lon1, lat1, lon2, lat2 = map(radians, [lon_measurement_u, lat_measurement_u, lon_measurement_v, lat_measurement_v])
+    lon1, lat1, lon2, lat2 = map(radians, [lon_track_u, lat_track_u, lon_track_v, lat_track_v])
     # haversine formula
     dlon = lon2 - lon1
     dlat = lat2 - lat1
     a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
     c = 2 * asin(sqrt(a))
     r = 6371 # Radius of earth in kilometers. Use 3956 for miles
-    return c * r  # Kilometers
+    return c * r # Kilometers
 
 
-# calcualtion of "sigma" for the Gaussian distribution that will be defined next
 # "sigma" has been calculated ad the standard deviation of all the distances between viasat measurements and nodes
-'''
-dist = []
-for i in range(len(df_edges)):
-    u = node_u[i]
-    u_measurement = u.measurement
-    DIST_DEGREES = haversine_measurement_node(u_measurement, u)
-    print(DIST_DEGREES)
-    dist.append(DIST_DEGREES)
-SIGMA_Z = np.std(dist)
-'''
-SIGMA_Z = 1.4826*np.median(viasat_uncertainty) # meters
-# SIGMA_Z = SIGMA_Z/1000 #kms
+# SIGMA_Z = 1.4826*np.median(DISTANCES) # meters
+# SIGMA_Z = 1.4826*np.median([x[0] for x in DISTANCES]) # meters
+SIGMA_Z = SIGMA_Z/1000 #km
 
 
 ###############################
 ### emission probability ######
 ###############################
 # A gaussian distribution of all NODES that closer node to its measurement is the measurement that will go to match it
-def emission_prob(u):
+def emission_prob(u_track, u):
     c = 1 / (SIGMA_Z * math.sqrt(2 * math.pi))
-    return c * math.exp(-(great_circle_measurement_node(u.measurement, u))**2)
+    return 1 * math.exp(-0.5*great_circle_track_node(u_track, u)**2)
 
 
 prob = []
-for i in range(len(df_edges)):
-    u = node_u[i]
-    emiss_prob = emission_prob(u)
-    print(emiss_prob)
-    prob.append(emiss_prob)
+for track in df_edges_dict:
+    print(track)
+    u_track = track
+    v_track = track + 1
+    if track + 1 != len(df_edges_dict):
+        u_list = [item[0] for item in df_edges_dict[u_track]]
+        v_list = [item[1] for item in df_edges_dict[v_track]]
+        for u in u_list:
+            print('u', 'u_measurement:',  u, u_track, "===========")
+            print(math.exp(-0.5*great_circle_track_node(u_track, u)**2), "+++++++++++++++++")
+            emiss_prob = emission_prob(u_track, u)
+            prob.append(emiss_prob)
+            print(prob)
 print("max_probability: ", max(prob))
+print("min_probability: ", min(prob))
 
+'''
 #####################################################################
 ### ----------------------------------------------------#############
 # why "cost is a string???
@@ -335,61 +306,55 @@ for u,v,key,attr in grafo.edges(keys=True,data=True):
     attr['cost'] = float(attr['cost'])
     print(type(attr["cost"]))
 
-u = node_u[0]
-v = node_v[10]
-
-nx.shortest_path_length(grafo, u.u, v.v, weight='cost') # why "cost is a string???
-nx.shortest_path_length(grafo, u.u, v.v, weight='length')
-
 ### ----------------------------------------------------#############
 #####################################################################
+'''
 
-u = node_u[0]
-v = node_v[10]
 
 # transition probability (probability that the distance u-->v is from the mesasurements's distances at nodes u and v
-# A empirical distribution
 def transition_prob(u, v):
     BETA = 1
     c = 1 / BETA
     # Calculating route distance is expensive.
     # We will discuss how to reduce the number of calls to this function later.
     # distance on the route
-    delta = abs(nx.shortest_path_length(grafo, u.u, v.v, weight='length')/1000 -
-                great_circle_measurement(u.measurement, v.measurement))  # in Kilometers
+    delta = abs(nx.shortest_path_length(grafo, u, v, weight='length')/1000 -
+                great_circle_track(u_track, v_track))  # in Kilometers
     return c * math.exp(-delta)
 
-# calculate BETA
-betas = []
-len_route = []
-deltaB = []
 
-for i in range(len(df_edges)):
-    u = node_u[i]  # first track
-    v = node_v[i]  # next consecutive track
-    # distance on the route
-    LEN_ROUTE = nx.shortest_path_length(grafo, u.u, v.v, weight='length') / 1000
-    # distance on the sphere (cartesian distance)
-    DIST = great_circle_measurement(u.measurement, v.measurement)
-    delta_beta = abs(DIST - LEN_ROUTE)
-    print(LEN_ROUTE)
-    print(DIST, "=============================")
-    deltaB.append(delta_beta)
-BETA = (1/math.log(2))*np.median(deltaB)
-print("BETA: ", BETA)
+# calculate BETA
+deltaB = []
+for track in df_edges_dict:
+    print(track)
+    u_track = track
+    v_track = track + 1
+    if track + 1 != len(df_edges_dict):
+        u_list = [item[0] for item in df_edges_dict[u_track]]
+        v_list = [item[1] for item in df_edges_dict[u_track]]
+        for u in u_list:
+            for v in v_list:
+                # distance on the route
+                LEN_ROUTE = nx.shortest_path_length(grafo, u, v, weight='length') / 1000  # in Km
+                print(LEN_ROUTE, "#########################")  # in Km
+               # distance on the sphere (cartesian distance)
+                DIST = great_circle_track(u_track, v_track)  # in Km
+                delta = abs(DIST - LEN_ROUTE)
+                print(DIST, "=============================")  # in Km
+                print("DELTA: ", delta)  # in Km
+                deltaB.append(delta)
+        BETA = (1/math.log(2))*np.median(deltaB)
+        print("BETA: ", BETA)
 
 
 trans_prob = []
-# for i in range(len(df_edges)):
-for idx, row in viasat.iterrows():
-    track_idx = idx
-    print(track_idx)
-    u = node_u[track_idx]
-    v = node_v[track_idx+1]
-    t_prob = transition_prob(u, v)
-    print(t_prob)
-    trans_prob.append(t_prob)
+for u in u_list:
+    for v in v_list:
+        t_prob = transition_prob(u, v)
+        print(t_prob)
+        trans_prob.append(t_prob)
 print("max_transition_prob: ", max(trans_prob))
+print("min_transition_prob: ", min(trans_prob))
 
 
 ##################################
@@ -401,24 +366,25 @@ route = [810075284, 4277112580, 4191850164, 3987101865, 2941239107]
 path = list(zip(route,route[1:]))
 ox.plot_graph_route(grafo, route, route_color='green', fig_height=12, fig_width=12)
 
+# define a path as list of edges
+# path proability evaluated over all track measurements
 def path_prob(path):
     assert path
     u, v = path[0]
-    for i in range(len(df_edges)):
-        if node_u[i].u == u and node_v[i].v == v:
-            print("got it!:", i, node_u[i].u)
-            u = node_u[i]
-    joint_prob = emission_prob(u)
+    joint_prob = emission_prob(u_track, u)
     for u, v in path:
         print(u,v)
-        for i in range(len(df_edges)):
-            if node_u[i].u == u and node_v[i].v == v:
-                u = node_u[i]
-                v = node_v[i]
+        for track in df_edges_dict:
+            if track + 1 != len(df_edges_dict):
+                print(track)
+                # u_track = track
+                v_track = track + 1
                 print(u,v)
-        joint_prob *= transition_prob(u, v) * emission_prob(v)
+                joint_prob *= transition_prob(u, v) * emission_prob(v_track, v)
+                print("joint_prob: ", joint_prob)
     return joint_prob
 
+path_prob(path)
 
 ####################################################################################
 ####################################################################################
@@ -426,7 +392,6 @@ def path_prob(path):
 ####################################################################################
 ####################################################################################
 ####################################################################################
-
 
 # build a dataframe indicating how many times a buffer (track) is next to an edge (nodes u, v)
 df1 = pd.DataFrame(df_edges['buffer_ID'].value_counts().values, index=df_edges['buffer_ID'].value_counts().index, columns=['count'])
@@ -434,10 +399,10 @@ df1 = pd.DataFrame(df_edges['buffer_ID'].value_counts().values, index=df_edges['
 df1=df1.sort_index()
 
 
-adjacency_list = dict()
-# adjacency_list = []
 # build ADJACENCY LIST (all possible paths between nodes from u ---> v) (list all paths in between)
 # df_edges adjacent list with GPS tracks ordered by priority of appearance
+adjacency_list = dict()
+all_routes = dict()
 for idx, row in df1.iterrows():
         track_freq = row['count']
         if idx+1 != len(df1):
@@ -460,20 +425,43 @@ for idx, row in df1.iterrows():
             if idx + 1 != len(df1):
                 print('u {} --> v {}'.format(u, v))
                 if u == v:
-                    paths = []
+                    route = []
                     print("path: NONE")
                 else:
-                    paths = nx.shortest_path(grafo, u, v, weight='length')
-                    print("path:", paths)
-                    adjacency_list[u] = paths
+                    route = nx.shortest_path(grafo, u, v, weight='length')
+                    print("route:", route)
+                    path = list(zip(route, route[1:]))
+                    adjacency_list[u] = path
+                    all_routes[u] = route
                     # -----build adjacency list: append all lists of paths-----------------
                     # concatenate all dictionsies....no need??
-                    #adjacency_list.append(pairs)
+                    # adjacency_list.append(pairs)
 print('adjacency_list (list of paths): ', adjacency_list)
 
+
+# define a path as list of edges
+list_routes = []
+for key in all_routes:
+    print(key)
+    route = all_routes.get(key)
+    list_routes.append(route)
+# plot all possible paths
+ox.plot_graph_routes(grafo, list_routes, route_color='green', fig_height=12, fig_width=12)
+
+route = list_routes[3]
+path = list(zip(route,route[1:]))
+PATH_PROBABILITY = path_prob(path)
+
+
 # Generate all paths from s to t recursively
-s = node_u[i].u
-t = node_v[i].v
+s = 1836387053
+t = 3987101865
+
+
+# def maximum_path_prob(adjacency_list, s, t):
+#     max((path_prob(path), path)
+#         for path in all_paths(adjacency_list, s, t),
+#         key=lambda prob, path: prob)
 
 def all_paths(adjacency_list, s, t):
     if s == t: return [[]]
@@ -487,13 +475,12 @@ def all_paths(adjacency_list, s, t):
 
 AAA = all_paths(adjacency_list, s, t)
 
-# https://stackoverflow.com/questions/8966538/syntax-behind-sortedkey-lambda
-def maximum_path_prob(adjacency_list, s, t):
-    return max( (path_prob(path), path) for path in all_paths(adjacency_list, s, t), key=lambda prob, path: prob) # sorted by probability
 
 
 
-
+#######################################################################################
+#######################################################################################
+#######################################################################################
 
 maxdist = 50 # meters
 adjacent_list = []
