@@ -33,6 +33,7 @@ import hashlib
 from pyproj import Proj, transform
 from scipy import spatial
 import math
+import queue
 
 # set of neighbors (viasat measurments) of a node in the graph
 
@@ -136,9 +137,9 @@ print(now2 - now1)
 ## near neighbour edges (near the viasat measurements)
 nn_gdf_edges = gdf_edges[gdf_edges.index.isin(index_edges)]
 ## plot selects edges
-nn_gdf_edges.plot()
+# nn_gdf_edges.plot()
 
-
+'''
 #############################
 # plot in a Folium map ######
 #############################
@@ -161,7 +162,7 @@ folium.PolyLine(points, color="yellow", weight=2, opacity=1).add_to(my_map)
 buffer.to_file(filename='buffer_viasat.geojson', driver='GeoJSON')
 folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
 my_map.save("near_neighbours_Catania.html")
-
+'''
 
 ##########################################################
 ########## VALHALL ALGORITHM MAP MATCHING  ###############
@@ -179,6 +180,7 @@ df_edges.sort_values(['u','v'],ascending=False, inplace=True)
 # remove row in df_edges where u in never in v
 df_edges.sort_values(['u','v'],ascending=False, inplace=True)
 
+# remove edges that do not have (u,v) pairs on the grapho
 idx_rows_to_remove = []
 for i in range(len(df_edges)):
     if int(df_edges[['u']].iloc[i]) in df_edges['v'].values:
@@ -193,6 +195,7 @@ df_edges = df_edges.drop(idx_rows_to_remove, axis='rows')
 len(df_edges)
 
 
+
 # make a dictionary: for each buffer/track/measurement (key) assign u and v
 ID_TRACK = list(df_edges.buffer_ID.unique())
 df_edges_dict = {}
@@ -201,36 +204,32 @@ for track in keys:
         df_edges_dict[track] = df_edges[['u', 'v']][df_edges['buffer_ID']==track ].values.tolist()
 print(df_edges_dict)
 
-'''
+
+
 nodes_u = list(df_edges.u.unique())
 u_dict = {}
 keys = nodes_u
 for u in keys:
         u_dict[u] = df_edges[df_edges['u']==u ].values.tolist()
 print(u_dict)
-# track = u_dict.get(u)[0][2]
-'''
+# u_track = u_dict.get(u)[0][2]
 
-def great_circle_track_node(u_track, u):
+
+# define distance between GPS track (viasat measurements) and node
+def great_circle_track_node(u):
     """
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
     """
+    u_track = u_dict.get(u)[0][2]
     coords_track = viasat[viasat.ID == u_track].values.tolist()
     lon_track = coords_track[0][1]
     lat_track = coords_track[0][0]
-    # if node == u:
     coords_u = gdf_nodes[gdf_nodes.index == u][['x', 'y']].values.tolist()
     lon_u = coords_u[0][0]
     lat_u = coords_u[0][1]
     # convert decimal degrees to radians
     lon1, lat1, lon2, lat2 = map(radians, [lon_track, lat_track, lon_u, lat_u])
-    # elif node == v:
-    #     coords_v = gdf_nodes[gdf_nodes.index == node][['x', 'y']].values.tolist()
-    #     lon_v = coords_v[0][0]
-    #     lat_v = coords_v[0][1]
-    #     # convert decimal degrees to radians
-    #     lon1, lat1, lon2, lat2 = map(radians, [lon_track, lat_track, lon_v, lat_v])
 
     # haversine formula
     dlon = lon2 - lon1
@@ -241,11 +240,15 @@ def great_circle_track_node(u_track, u):
     return c * r # Kilometers
 
 
-def great_circle_track(u_track, v_track):
+# define distance between two GPS tracks (viasat measurements)
+def great_circle_track(u, v):
     """
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
     """
+    u_track = u_dict.get(u)[0][2]
+    # v_track = u_dict.get(v)[0][2]
+    v_track = u_track+1
     coords_track_u = viasat[viasat.ID == u_track].values.tolist()
     lon_track_u = coords_track_u[0][1]
     lat_track_u = coords_track_u[0][0]
@@ -265,33 +268,24 @@ def great_circle_track(u_track, v_track):
 
 # "sigma" has been calculated ad the standard deviation of all the distances between viasat measurements and nodes
 # SIGMA_Z = 1.4826*np.median(DISTANCES) # meters
-# SIGMA_Z = 1.4826*np.median([x[0] for x in DISTANCES]) # meters
-SIGMA_Z = SIGMA_Z/1000 #km
+SIGMA_Z = 1.4826*np.median([x[0] for x in DISTANCES]) # meters
+SIGMA_Z = SIGMA_Z/1000 #Kilometers
 
 
 ###############################
 ### emission probability ######
 ###############################
-# A gaussian distribution of all NODES that closer node to its measurement is the measurement that will go to match it
-def emission_prob(u_track, u):
+# Gaussian distribution of all NODES close to Viasat measurements.
+def emission_prob(u):
     c = 1 / (SIGMA_Z * math.sqrt(2 * math.pi))
-    return 1 * math.exp(-0.5*great_circle_track_node(u_track, u)**2)
+    return c * math.exp(-0.5*(great_circle_track_node(u)/SIGMA_Z)**2)
 
 
 prob = []
-for track in df_edges_dict:
-    print(track)
-    u_track = track
-    v_track = track + 1
-    if track + 1 != len(df_edges_dict):
-        u_list = [item[0] for item in df_edges_dict[u_track]]
-        v_list = [item[1] for item in df_edges_dict[v_track]]
-        for u in u_list:
-            print('u', 'u_measurement:',  u, u_track, "===========")
-            print(math.exp(-0.5*great_circle_track_node(u_track, u)**2), "+++++++++++++++++")
-            emiss_prob = emission_prob(u_track, u)
-            prob.append(emiss_prob)
-            print(prob)
+for u in u_dict:
+    emiss_prob = emission_prob(u)
+    prob.append(emiss_prob)
+    # print(prob)
 print("max_probability: ", max(prob))
 print("min_probability: ", min(prob))
 
@@ -319,37 +313,30 @@ def transition_prob(u, v):
     # We will discuss how to reduce the number of calls to this function later.
     # distance on the route
     delta = abs(nx.shortest_path_length(grafo, u, v, weight='length')/1000 -
-                great_circle_track(u_track, v_track))  # in Kilometers
+                great_circle_track(u, v))  # in Kilometers
     return c * math.exp(-delta)
 
 
 # calculate BETA
 deltaB = []
-for track in df_edges_dict:
-    print(track)
-    u_track = track
-    v_track = track + 1
-    if track + 1 != len(df_edges_dict):
-        u_list = [item[0] for item in df_edges_dict[u_track]]
-        v_list = [item[1] for item in df_edges_dict[u_track]]
-        for u in u_list:
-            for v in v_list:
-                # distance on the route
-                LEN_ROUTE = nx.shortest_path_length(grafo, u, v, weight='length') / 1000  # in Km
-                print(LEN_ROUTE, "#########################")  # in Km
-               # distance on the sphere (cartesian distance)
-                DIST = great_circle_track(u_track, v_track)  # in Km
-                delta = abs(DIST - LEN_ROUTE)
-                print(DIST, "=============================")  # in Km
-                print("DELTA: ", delta)  # in Km
-                deltaB.append(delta)
-        BETA = (1/math.log(2))*np.median(deltaB)
-        print("BETA: ", BETA)
+for u in u_dict:
+    for v in [item[1] for item in u_dict.get(u)]:
+        LEN_ROUTE = nx.shortest_path_length(grafo, u, v, weight='length') / 1000  # in Km
+        print(LEN_ROUTE, "#########################")  # in Km
+        # distance on the sphere (cartesian distance)
+        DIST = great_circle_track(u, v)  # in Km
+        delta = abs(DIST - LEN_ROUTE)
+        print(DIST, "=============================")  # in Km
+        print("DELTA: ", delta)  # in Km
+        deltaB.append(delta)
+    BETA = (1 / math.log(2)) * np.median(deltaB)
+    print("BETA: ", BETA)
+
 
 
 trans_prob = []
-for u in u_list:
-    for v in v_list:
+for u in u_dict:
+    for v in [item[1] for item in u_dict.get(u)]:
         t_prob = transition_prob(u, v)
         print(t_prob)
         trans_prob.append(t_prob)
@@ -362,29 +349,25 @@ print("min_transition_prob: ", min(trans_prob))
 ##################################
 
 # define a path as list of edges
-route = [810075284, 4277112580, 4191850164, 3987101865, 2941239107]
+route = [875602551, 2941259014, 942852028, 1435368856, 1836387053, 2941259032]
 path = list(zip(route,route[1:]))
-ox.plot_graph_route(grafo, route, route_color='green', fig_height=12, fig_width=12)
+# ox.plot_graph_route(grafo, route, route_color='green', fig_height=12, fig_width=12)
 
-# define a path as list of edges
+
+# define a path as list of edges (u, v)
 # path proability evaluated over all track measurements
 def path_prob(path):
-    assert path
-    u, v = path[0]
-    joint_prob = emission_prob(u_track, u)
-    for u, v in path:
-        print(u,v)
-        for track in df_edges_dict:
-            if track + 1 != len(df_edges_dict):
-                print(track)
-                # u_track = track
-                v_track = track + 1
-                print(u,v)
-                joint_prob *= transition_prob(u, v) * emission_prob(v_track, v)
-                print("joint_prob: ", joint_prob)
-    return joint_prob
+    if len(path) !=0:
+        assert path
+        u, v = path[0]
+        joint_prob = emission_prob(u)
+        for u, v in path:
+            # print(u,v)
+            joint_prob *= transition_prob(u, v) * emission_prob(v)
+            # print("joint_prob: ", joint_prob)
+        return joint_prob
 
-path_prob(path)
+CCC = path_prob(path)
 
 ####################################################################################
 ####################################################################################
@@ -431,10 +414,9 @@ for idx, row in df1.iterrows():
                     route = nx.shortest_path(grafo, u, v, weight='length')
                     print("route:", route)
                     path = list(zip(route, route[1:]))
-                    adjacency_list[u] = path
+                    adjacency_list[u] = path   #
                     all_routes[u] = route
                     # -----build adjacency list: append all lists of paths-----------------
-                    # concatenate all dictionsies....no need??
                     # adjacency_list.append(pairs)
 print('adjacency_list (list of paths): ', adjacency_list)
 
@@ -448,40 +430,117 @@ for key in all_routes:
 # plot all possible paths
 ox.plot_graph_routes(grafo, list_routes, route_color='green', fig_height=12, fig_width=12)
 
-route = list_routes[3]
-path = list(zip(route,route[1:]))
-PATH_PROBABILITY = path_prob(path)
-
 
 # Generate all paths from s to t recursively
-s = 1836387053
-t = 3987101865
+s = 4277112580
+t = 1836387053
+
+# s = 1836387053
+# t = 4277112580
+
+# generate all paths from s ---> t recursively
+# def all_paths(adjacency_list, s, t):
+#     if s == t: return [[]]
+#     paths = []
+#     for v in adjacency_list[s]:
+#         print(v)
+#         for path in all_paths(adjacency_list, v, t):
+#             print(path)
+#             paths.append( [(s, v)] + path)
+#     return paths
 
 
-# def maximum_path_prob(adjacency_list, s, t):
-#     max((path_prob(path), path)
-#         for path in all_paths(adjacency_list, s, t),
-#         key=lambda prob, path: prob)
-
+# list all paths in the adjacency list from s-->t
+# paths = []
 def all_paths(adjacency_list, s, t):
     if s == t: return [[]]
     paths = []
-    for v in adjacency_list[s]:
-        print(v)
-        for path in all_paths(adjacency_list, v, t):
-            paths.append([(s, v)] + path)
+    for v in [x[1] for x in adjacency_list.get(s)]:
+        # print(v)
+        if adjacency_list.get(v) is not None:
+            for path in adjacency_list.get(v):
+                # print(path)
+                paths.append([(s,v)] + [path])
     return paths
 
+allPaths = all_paths(adjacency_list, s, t)
+print(allPaths)
 
-AAA = all_paths(adjacency_list, s, t)
+# def maximum_path_prob(adjacency_list, s, t):
+#     return max( (path_prob(path), path)
+#         for path in all_paths(adjacency_list, s, t) ), key=lambda prob, path: prob)
+
+# find the path with the maximum probability (or find the max probability ???)
+def maximum_path_prob(adjacency_list, s, t):
+    list_prob = []
+    list_prob_path = dict()
+    for path in all_paths(adjacency_list, s, t):
+        print(path)
+        prob = path_prob(path)
+        # print("prob:", prob)
+        list_prob.append(prob)
+        list_prob_path[prob] = path
+        max_prob_key = max(list_prob_path.keys())
+        max_path_prob = list_prob_path[max_prob_key]
+    return max_path_prob
+    # return max(list_prob)
+
+maximum_PathProb = maximum_path_prob(adjacency_list, s, t)
+print(maximum_PathProb)
+
+##########################
+# VITERBI algorithm ######
+##########################
+
+s = 4277112580
+t = 1836387053
+
+def viterbi_search(adjacency_list, s, t):
+    # Initialize joint probability for each node
+    joint_prob = {}
+    for u in adjacency_list:
+        joint_prob[u] = 0
+    predecessor = {}
+    q = list()
+    q.append(s)
+    joint_prob[s] = emission_prob(s)
+    predecessor[s] = None
+    while len(q) !=0:
+        # Extract node u
+        u = q.pop()
+    #     # Guarantee the optimal solution to u is found
+    #     # assert joint_prob[u] == maximum_path_prob(adjacency_list, s, u)[0]
+    #     # assert joint_prob[u] == maximum_path_prob(adjacency_list, s, u), "I don't understand what's going on!"
+    #     if u == t: break
+    #     # for v in adjacency_list[u]:
+        for v in [x[1] for x in adjacency_list.get(u)]:
+            if adjacency_list.get(v) is not None:
+                print(v)
+                 # Relaxation
+                new_prob = joint_prob[u] * transition_prob(u, v) * emission_prob(v)
+                if joint_prob[v] <= new_prob:
+                    joint_prob[v] = new_prob
+                    predecessor[v] = u
+                    print("predecessor:", predecessor)
+                    print("joint_prob:", joint_prob)
+                if v not in q:
+                    print(v)
+                    q.append(v)
+        return joint_prob[t]  #, construct_path(predecessor, s, t)
 
 
+VITERBI_path = viterbi_search(adjacency_list, s, t)
+print("joint_porob: ", VITERBI_path)
 
 
 #######################################################################################
 #######################################################################################
 #######################################################################################
+#######################################################################################
+#######################################################################################
+#######################################################################################
 
+'''
 maxdist = 50 # meters
 adjacent_list = []
 distances = []
@@ -509,15 +568,12 @@ adjacent_list = list(filter(None, adjacent_list))
 ######################################################################
 ######################################################################
 
-# buffer approach
-# https://stackoverflow.com/questions/41524081/determine-if-a-two-dimensional-point-falls-within-the-the-unit-circle-python-3
-
-# https://gis.stackexchange.com/questions/314949/creating-square-buffers-around-points-using-shapely
-
-# https://gis.stackexchange.com/questions/314949/creating-square-buffers-around-points-using-shapely
-
+'''
 
 '''
+#####################
+# from Gaetano ######
+#####################
 ############## create stopo-to-stop file with distance
       def create_stopToStopDistance(self, maxdist):
           # read stops
@@ -553,4 +609,6 @@ adjacent_list = list(filter(None, adjacent_list))
               print(liststoopcoo[i][0], '-', liststoopcoo[i][1])
           outfile.close()
 '''
+
+
 
