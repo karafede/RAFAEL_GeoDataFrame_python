@@ -331,11 +331,32 @@ del v
 
 # s = 3987101865
 s = 4277112580
-t = 2941239107
+# t = 2941239107
 # t = 1836387039
 # t = 1836387053
 t = 891536279
-t = 2941259032
+# t = 2941259032
+
+
+# list all paths in the adjacency list from s --> t
+paths = []
+q = []
+if adjacency_list.get(s) is not None:
+    for v in [x[1] for x in adjacency_list.get(s)]:
+        if adjacency_list.get(v) is not None:
+            for path in adjacency_list.get(v):
+                for y in path:
+                    q.append(y)
+else:
+    # jump to the next edge....
+    next_edge = int(df_edges[df_edges['v'] == s]['buffer_ID'] + 1)
+    s = df_edges[df_edges['buffer_ID'] == next_edge].iloc[0]['u']
+    for v in [x[1] for x in adjacency_list.get(s)]:
+        if adjacency_list.get(v) is not None:
+            for path in adjacency_list.get(v):
+                for y in path:
+                    q.append(y)
+
 
 
 def viterbi_search(adjacency_list, s, t):
@@ -343,87 +364,84 @@ def viterbi_search(adjacency_list, s, t):
     joint_prob = {}
     for u in adjacency_list:
         joint_prob[u] = 0
-    # predecessor = {}
     matched_edges = []
-    q = list()
-
-    if adjacency_list.get(s) is not None:
-        q.append(s)
-    else:
-        next_edge = int(df_edges[df_edges['v'] == s]['buffer_ID'] + 1)
-        s = df_edges[df_edges['buffer_ID'] == next_edge].iloc[0]['u']
-        q.append(s)
-
-    # joint_prob[s] = emission_prob(s)
     joint_prob[s] = 1
-    # predecessor[s] = None
     u = s
-    # pred = []
-    for v in [x[1] for x in adjacency_list.get(u)]:
-        if adjacency_list.get(v) is not None:
-            # print(v)
-            q.append(v)
-
-    if adjacency_list.get(t) is not None:
-        q.append(t)
-
     while len(q) !=0:
         u = q.pop()
-
         for v in [x[1] for x in adjacency_list.get(u)]:
-            # print(v)
             if adjacency_list.get(v) is not None:
-                print(v)
-                # pred.append(v)
                 # new_prob = joint_prob[u] * transition_prob(u, v) * emission_prob(v)
                 # new_prob = joint_prob[u] * transition_prob(u, v) * 1
-                # if u == t:
-                #     v = u
-                #     new_prob = transition_prob(u, t) * 1
-                    # new_prob_t = transition_prob(u, v) * 1
-                    # joint_prob[u] = new_prob_t
                 new_prob = transition_prob(u, v) * 1
                 print("new_prob:", u, v, transition_prob(u, v))
                 if joint_prob[v] < new_prob:
                     joint_prob[v] = new_prob
-                    # pred = list(predecessor)
-                    # predecessor[v] = pred.pop()
-                    # print("predecessor:", predecessor)
                     print("joint_prob:", joint_prob)
                     print("u,v:", u, v)
                     edge = (u, v)
-                    # print(edge)
                     matched_edges.append(edge)
     return joint_prob, matched_edges # predecessor
 
 
-# # build the matched path and route
-# def construct_path(predecessor):
-#     matched_route = []
-#     type(predecessor)
-#     for x in predecessor:
-#         # print(x)
-#         matched_route.append(x)
-#     # print(matched_route)
-#     path_matched_route = list(zip(matched_route, matched_route[1:]))
-#     print("matched_path:", path_matched_route)
-#     print("mathced_route:", matched_route)
-#     # print (x, ':', predecessor[x])
-#     # matched_route = [x, predecessor[x]]
-#     # print(matched_route)
-
 VITERBI_probs = viterbi_search(adjacency_list, s, t)
-print(VITERBI_probs)
-
-
-# print("joint_porob: ", VITERBI_probs[0])
-# print("predecessor: ", VITERBI_probs[1])
-
-# path
-# VITERBI_path = construct_path(VITERBI_probs[1])
+print("probabilities:", VITERBI_probs[0])
+print("matched edges:", VITERBI_probs[1])
 
 
 
+# def viterbi_search(adjacency_list, s, t):
+#     # Initialize joint probability for each node
+#     joint_prob = {}
+#     for u in adjacency_list:
+#         joint_prob[u] = 0
+#     # predecessor = {}
+#     matched_edges = []
+#     q = list()
+#
+#     if adjacency_list.get(s) is not None:
+#         q.append(s)
+#     else:
+#         next_edge = int(df_edges[df_edges['v'] == s]['buffer_ID'] + 1)
+#         s = df_edges[df_edges['buffer_ID'] == next_edge].iloc[0]['u']
+#         q.append(s)
+#
+#     # joint_prob[s] = emission_prob(s)
+#     joint_prob[s] = 1
+#     # predecessor[s] = None
+#     u = s
+#     # pred = []
+#     for v in [x[1] for x in adjacency_list.get(u)]:
+#         if adjacency_list.get(v) is not None:
+#             # print(v)
+#             q.append(v)
+#
+#     # if adjacency_list.get(t) is not None:
+#     #     q.append(t)
+#
+#     while len(q) !=0:
+#         u = q.pop()
+#         # if u == t: break
+#         for v in [x[1] for x in adjacency_list.get(u)]:
+#             # print(v)
+#             if adjacency_list.get(v) is not None:
+#                 # print(v)
+#                 # pred.append(v)
+#                 # new_prob = joint_prob[u] * transition_prob(u, v) * emission_prob(v)
+#                 # new_prob = joint_prob[u] * transition_prob(u, v) * 1
+#                 new_prob = transition_prob(u, v) * 1
+#                 print("new_prob:", u, v, transition_prob(u, v))
+#                 if joint_prob[v] < new_prob:
+#                     joint_prob[v] = new_prob
+#                     # pred = list(predecessor)
+#                     # predecessor[v] = pred.pop()
+#                     # print("predecessor:", predecessor)
+#                     print("joint_prob:", joint_prob)
+#                     print("u,v:", u, v)
+#                     edge = (u, v)
+#                     # print(edge)
+#                     matched_edges.append(edge)
+#     return joint_prob, matched_edges # predecessor
 
 
 
