@@ -101,6 +101,14 @@ type(buffer_viasat)
 type(gdf_edges)
 # gdf_edges.plot()
 
+
+# add buffered viasat polygons
+# save first as geojson file
+buffer.to_file(filename='buffer_viasat.geojson', driver='GeoJSON')
+# folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
+my_map.save("matched_route.html")
+
+
 '''
 #### add ANAS catania Network #####################################
 ####################################################################
@@ -238,6 +246,7 @@ for track in keys:
 print(df_edges_dict)
 
 
+
 # nodes associated to tracks
 nodes_u = list(df_edges.u.unique())
 u_dict = {}
@@ -327,7 +336,7 @@ print(SIGMA_Z)
 # Gaussian distribution of all NODES close to Viasat measurements.
 def emission_prob(u):
     c = 1 / (SIGMA_Z * math.sqrt(2 * math.pi))
-    return c * math.exp(-0.5*(great_circle_track_node(u)/SIGMA_Z)**2)
+    return 1 * math.exp(-0.5*(great_circle_track_node(u)/SIGMA_Z)**2)
 
 
 prob = []
@@ -385,7 +394,7 @@ trans_prob = []
 for u in nodes_dict:
     for v, track in [(item[1], item[2]) for item in nodes_dict.get(u)]:
         # print(v)
-        # print('track:', track)
+        print('track:', track)
         t_prob = transition_prob(u, v)
         # print(t_prob)
         trans_prob.append(t_prob)
@@ -393,13 +402,106 @@ print("## max_transition_prob: ", max(trans_prob))
 print("## min_transition_prob: ", min(trans_prob))
 
 
+
+
+
+
+adjacency_list = {}
+for i in range(len(df_edges_dict)):
+    track = df_edges_dict.get(i)
+    unique_list = set(x for l in track for x in l)
+    adjacency_list[i] = unique_list
+
+# if two lists of the adjacency list are identical, then only take the last one...
+
+
+# track = 0
+# joint_prob = {}
+# for u in adjacency_list[track]:
+#     joint_prob[u] = emission_prob(u)
+# for v in adjacency_list[track+1]:
+#     joint_prob[v] = emission_prob(v)
+
+
+
+track_list = list(df_edges.buffer_ID.unique())
+
+# trans_prob = {}
+# emiss_prob = {}
+# shortest_path = {}
+
+
+max_prob_node = []
+
+for track in track_list:
+    print(track)
+    if track+1 == len(track_list):
+        break
+
+    # track = 1
+    trans_prob = {}
+    emiss_prob = {}
+    shortest_path = {}
+
+    for u in adjacency_list[track]:
+        for v in adjacency_list[track+1]:
+            if u != v:
+                print(u,v)
+            try:
+                if u != v:
+                    trans_prob[u] = transition_prob(u, v)
+                    shortest_path[u] = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
+                    print('#u:', u, '#v:', v, 'shortest_path:', nx.shortest_path_length(grafo, u, v, weight='length') / 1000)
+                    emiss_prob[u] = emission_prob(u)
+            except nx.NetworkXNoPath:
+                     print('No path', 'u:', u, 'v:', v, )
+
+    MAX_trans_key = max(trans_prob, key=trans_prob.get)
+    # MAX_emiss_key = max(emiss_prob, key=emiss_prob.get)
+    MAX_trans_value = trans_prob.get(MAX_trans_key)
+    # MAX_emiss_value = emiss_prob.get(MAX_emiss_key)
+    if MAX_trans_value !=0:
+        # MAX_prob = max(MAX_trans_value, MAX_emiss_value)
+        print("max_prob_NODE:", MAX_trans_key)
+        max_prob_node.append(MAX_trans_key)
+
+        # 'MAX_trans_key' must be also in the next set of nodes where there is the next track.
+        # if this is not the case, then 'MAX_trans_key' is not valid!!!
+        if MAX_trans_key not in adjacency_list[track+1]:
+            adjacency_list[track].remove(MAX_trans_key)
+            max_prob_node.remove(MAX_trans_key)
+            # and start calculation again
+            trans_prob = {}
+            emiss_prob = {}
+            shortest_path = {}
+            for u in adjacency_list[track]:
+                for v in adjacency_list[track + 1]:
+                    if u != v:
+                        print(u, v)
+                    try:
+                        if u != v:
+                            trans_prob[u] = transition_prob(u, v)
+                            shortest_path[u] = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
+                            print('#u:', u, '#v:', v, 'shortest_path:',
+                                  nx.shortest_path_length(grafo, u, v, weight='length') / 1000)
+                            emiss_prob[u] = emission_prob(u)
+                    except nx.NetworkXNoPath:
+                        print('No path', 'u:', u, 'v:', v, )
+            MAX_trans_key = max(trans_prob, key=trans_prob.get)
+            MAX_trans_value = trans_prob.get(MAX_trans_key)
+            if MAX_trans_value != 0:
+                print("max_prob_NODE:", MAX_trans_key)
+                max_prob_node.append(MAX_trans_key)
+
+
+'''
 # build ADJACENCY LIST (all possible paths between nodes from u ---> v) (list all paths in between)
 # df_edges adjacent list with GPS tracks ordered by priority of appearance
 adjacency_list = {}
 df_edges.sort_values(by=['buffer_ID'], inplace=True)
 track_list = list(df_edges.buffer_ID.unique())
 for track in track_list:
-    # print(track)
+    print(track)
     # filter dataframe
     df1 = df_edges[df_edges['buffer_ID'] == track][['u', 'v']]
     df2 = df_edges[df_edges['buffer_ID'] == track+1][['u', 'v']]
@@ -424,62 +526,61 @@ for track in track_list:
 # remove empty list
 adjacency_list = {k: v for k, v in adjacency_list.items() if v and v[0]}
 
+
 ## find node with the best Joint probability for map-matching
 
 matched_edges = []
 max_prob_node = []
 new = []
-max_prob_node_predecessor = []
 for track in range(len(adjacency_list)):
     print(track)
     joint_prob = {}
-    # route = adjacency_list[track]
-    route = adjacency_list[1]
+    route = adjacency_list[track]
+    # route = adjacency_list[5]
     for u,v in route:
         joint_prob[u] = emission_prob(u)
         # joint_prob[u] = 1
         joint_prob[v] = 0
-
         try:
             # new_prob = transition_prob(u, v) * 1
             # new_prob = joint_prob[u] * transition_prob(u, v) * 1
             new_prob = joint_prob[u] * transition_prob(u, v) * emission_prob(v)
             # new_prob = transition_prob(u, v) * emission_prob(v)
             shortest_path = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
-            # print("new_prob:",'## u:', u, "v:", v)
+            # print("new_prob:",'## u:', u, '## v:', v, transition_prob(u, v))
         except nx.NetworkXNoPath:
             print('No path', 'u:', u, 'v:',v,)
             new_prob = 0
             shortest_path = None
         if joint_prob[v] < new_prob:
             joint_prob[v] = new_prob
-            # print("joint_prob:", joint_prob)
+            print("joint_prob:", joint_prob)
             print('u:', u, 'v:',v, "new_prob:", new_prob, '## shortest_path (km):', shortest_path)
             edge = (u, v)
             matched_edges.append(edge)
-        # elif shortest_path !=0:
-        #     try:
-        #         # print('no prob available =====')
-        #         print(u, v)
-        #         # print('u:', u, 'v:', v, "new_prob:", transition_prob(u, v) * emission_prob(v), '## shortest_path (km):', shortest_path)
-        #         NEW_PROB = transition_prob(u, v) * emission_prob(v)
-        #         new.append(NEW_PROB)
-        #         new_prob = max(new)
-        #         # joint_prob[v] = new_prob
-        #     except nx.NetworkXNoPath:
-        #         print('No path', 'u:', u, 'v:', v, )
-        #         new_prob = 0
-        #         shortest_path = None
+        elif track == 0 and shortest_path !=0:
+            try:
+                print('no prob available')
+                # print(u, v)
+                # print('u:', u, 'v:', v, "new_prob:", transition_prob(u, v) * emission_prob(v), '## shortest_path (km):', shortest_path)
+                NEW_PROB = transition_prob(u, v) * emission_prob(v)
+                new.append(NEW_PROB)
+                new_prob = max(new)
+                joint_prob[v] = new_prob
+            except nx.NetworkXNoPath:
+                # print('No path', 'u:', u, 'v:', v, )
+                new_prob = 0
+                shortest_path = None
     # get the node with the larger probability
     MAX_prob_key = max(joint_prob, key=joint_prob.get)
     # MAX_prob_value = joint_prob.get(MAX_prob_key)
     print("max_prob_NODE:", MAX_prob_key)
     max_prob_node.append(MAX_prob_key)
-    max_prob_node_predecessor.append(max_prob_node[0])
 
 
-# verify if the next edge node is in the edge of the previous node....
-
+    # remove element with prob == 1
+    # joint_prob = {k: v for k, v in joint_prob.items() if v != 1}
+'''
 
 # get unique values (ordered)
 from collections import OrderedDict
@@ -491,10 +592,7 @@ matched_route = []
 all_matched_edges = []
 for origin, destination in zip(max_prob_node, max_prob_node[1:]):
     # print(origin, destination)
-    try:
-        route = nx.shortest_path(grafo, origin, destination, weight='length')
-    except nx.NetworkXNoPath:
-        print('No path')
+    route = nx.shortest_path(grafo, origin, destination, weight='length')
     path_edges = list(zip(route, route[1:]))
     # print(path_edges)
     all_matched_edges.append(path_edges)

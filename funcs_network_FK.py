@@ -12,6 +12,8 @@ import folium
 from itertools import chain
 from folium_stuff_FK import make_folium_polyline_FK
 from folium_stuff_FK import plot_graph_folium_FK
+from osgeo import ogr
+import geopandas as gpd
 
 # check version of modules osmn and networkx
 # print(nx.__version__)  # version 2.3 ONLY!
@@ -28,19 +30,21 @@ from folium_stuff_FK import plot_graph_folium_FK
 #         # self.stats = stats
 #         # self.extended_stats = extended_stats
 
-def graph(place_country, distance, filter):
+def graph(place_country, distance):  # filter
     # filter out some attributes
     # filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
     #           'raceway|cycleway|steps|construction"]')
     # filter = (
     #     '["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
     #     'raceway|cycleway|steps|construction|primary|secondary|tertiary"]')
-    filter = filter
+
+    # filter = filter
+
     # import grapho (graphml)
     G = ox.graph_from_address(str(place_country),
                               distance=distance,
-                              network_type='drive',
-                              custom_filter=filter)
+                              network_type='drive') # custom_filter=filter
+
 
 
     # import shapefile
@@ -150,7 +154,8 @@ def roads_type_folium(file_graphml, road_type, place_country):
         "tertiary": "blue",
         "motorway_link": "yellow",
         "motorway": "black",
-        "residential": "orange"
+        "residential": "orange",
+        "unclassified": "brown"
     }
     points = []
     # prepare a base_map ###########################################################
@@ -247,6 +252,7 @@ def centrality(file_graphml, road_type, place_country, bc=False, cc=False):
 
 #############################################################
 #############################################################
+
 
 # road_type = "motorway, motorway_link"
 # # road_type = "secondary"

@@ -25,7 +25,7 @@ filter = '["highway"~' + '"' + roads + '"' + "]"
 distance = 60000 # distance from the center of the map (in meters)
 
 # make grapho, save .graphml, save shapefile (node and edges) and get statistics (basic and extended)
-network_city = graph(place_country, distance, filter)
+network_city = graph(place_country, distance) # filter
 
 # assign weight and cost (==time) to the grapho
 file_graphml = 'Catania__Italy.graphml'
