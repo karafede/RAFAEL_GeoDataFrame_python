@@ -1,49 +1,41 @@
 
 import os
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.getcwd()
 
-from datetime import datetime
-import psycopg2
-import db_connect
-from sklearn.metrics import silhouette_score
-from sklearn.datasets import load_iris
-from sklearn.cluster import KMeans
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.spatial.distance import cdist
-import math
 import pandas as pd
 import geopandas as gpd
 from geopandas import GeoDataFrame
 from shapely.geometry import Point
-from shapely.geometry import LineString
-from shapely.geometry import MultiLineString
-import csv
-import datetime
 import folium
 import osmnx as ox
 import networkx as nx
-import matplotlib.cm as cm
-import matplotlib.colors as colors
-from itertools import chain
-from colour import Color
-from funcs_network_FK import roads_type_folium
-import hashlib
-from pyproj import Proj, transform
-from scipy import spatial
 import math
-import queue
-from osgeo import ogr
+from funcs_network_FK import roads_type_folium
 
+# set of neighbors (viasat measurements) of a node in the graph
 
-
-# set of neighbors (viasat measurments) of a node in the graph
-
+# laad grafo
 file_graphml = 'Catania__Italy_cost.graphml'
-# viasat_data = "viasat_max_data.csv"
-viasat_data = "viasat_max_data_short.csv"
 grafo = ox.load_graphml(file_graphml)
 # ox.plot_graph(grafo)
+
+# load Viasat data
+# viasat_data = "viasat_data_5428266.csv"
+# viasat_data = "viasat_data_2739519.csv"
+# viasat_data = "viasat_max_data_short.csv"
+# viasat_data = "viasat_data_3511558.csv"
+# viasat_data = "viasat_data_3219572.csv"
+# viasat_data = "viasat_data_4452493.csv"
+# viasat_data = 'viasat_data_2754384.csv'
+# viasat_data = 'viasat_data_4094485.csv'
+# viasat_data = 'viasat_data_4298830.csv'
+# viasat_data = 'viasat_data_5410997.csv'
+# viasat_data = 'viasat_data_5220538.csv'
+# viasat_data = 'viasat_data_4012647.csv'
+# viasat_data = 'viasat_data_4172466.csv'
+viasat_data = 'viasat_data_5902695.csv'
 
 # make a geodataframe from the grapho
 gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
@@ -82,20 +74,12 @@ viasat_gdf = GeoDataFrame(viasat, crs=crs, geometry=geometry)
 # viasat_gdf.plot()
 
 # Buffer the points by some units (unit is kilometer)
-buffer = viasat_gdf.buffer(0.00025)  #50 meters # this is a geoseries
+buffer = viasat_gdf.buffer(0.00025)  # 25 meters # this is a geoseries
 # buffer.plot()
 # make a dataframe
 buffer_viasat = pd.DataFrame(buffer)
 buffer_viasat.columns = ['geometry']
 type(buffer_viasat)
-# transform a geoseries into a geodataframe
-# https://gis.stackexchange.com/questions/266098/how-to-convert-a-geoserie-to-a-geodataframe-with-geopandas
-
-## circumscript the area of the track (buffer zone)
-# union = buffer.unary_union
-# envelope = union.envelope
-# rectangle_viasat = gpd.GeoDataFrame(geometry=gpd.GeoSeries(envelope))
-# rectangle_viasat.plot()
 
 # geodataframe with edges
 type(gdf_edges)
@@ -105,30 +89,9 @@ type(gdf_edges)
 # add buffered viasat polygons
 # save first as geojson file
 buffer.to_file(filename='buffer_viasat.geojson', driver='GeoJSON')
-# folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
+folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
 my_map.save("matched_route.html")
 
-
-'''
-#### add ANAS catania Network #####################################
-####################################################################
-# load shp file
-path = 'C:/ENEA_CAS_WORK/Catania_RAFAEL/files_ANAS/'
-stralcio_ANAS_shape = gpd.read_file(path + "stralcio_grafo_ANAS.shp")
-postazioni_ANAS_shape = gpd.read_file((path + "postazioni_area_catania.shp"))
-
-
-my_map= folium.Map([37.53988692816245, 15.044971594798902], zoom_start=11, tiles='cartodbpositron')
-# save first as geojson file
-stralcio_ANAS_shape.to_file(filename='ANAS_stralcio.geojson', driver='GeoJSON')
-postazioni_ANAS_shape.to_file(filename='postazioni_ANAS.geojson', driver='GeoJSON')
-folium.GeoJson('ANAS_stralcio.geojson').add_to((my_map))
-folium.GeoJson('postazioni_ANAS.geojson').add_to((my_map))
-my_map.save("ANAS_stralcio_map.html")
-
-####################################################################
-####################################################################
-'''
 
 # 1 = 100 km
 # 0.1 = 10 km
@@ -143,6 +106,7 @@ my_map.save("ANAS_stralcio_map.html")
 
 from datetime import datetime
 
+# find all edges intersect by the buffers defined above
 buff = []
 index_edges = []
 index_buff = []
@@ -218,21 +182,6 @@ from math import radians, cos, sin, asin, sqrt
 df_edges = pd.DataFrame(edge)
 df_edges.columns = ['u', 'v', 'buffer_ID']
 df_edges.sort_values(by=['buffer_ID'], inplace=True)
-
-# # remove edges that do not have (u,v) pairs on the grapho
-# idx_rows_to_remove = []
-# for i in range(len(df_edges)):
-#     if int(df_edges[['u']].iloc[i]) in df_edges['v'].values:
-#         print("OK")
-#         print(i)
-#     else:
-#         print("============================================")
-#         print(i)
-#         idx = df_edges.iloc[i].name
-#         idx_rows_to_remove.append(idx)
-# df_edges = df_edges.drop(idx_rows_to_remove, axis='rows')
-# len(df_edges)
-
 
 # sort df by u and v
 # df_edges.sort_values(['u','v'],ascending=False, inplace=True)
@@ -402,184 +351,118 @@ print("## max_transition_prob: ", max(trans_prob))
 print("## min_transition_prob: ", min(trans_prob))
 
 
+####################################################
+####################################################
+
+'''
 # define the adjaceny list
 adjacency_list = {}
 for i in range(len(df_edges_dict)):
     track = df_edges_dict.get(i)
     unique_list = set(x for l in track for x in l)
     adjacency_list[i] = unique_list
+'''
 
-# if two lists of the adjacency list are identical, then only take the last one...
+# define the adjaceny list
+adjacency_list = {}
+for key in df_edges_dict.keys():
+    print(key)
+    track = df_edges_dict.get(key)
+    print(track)
+    unique_list = set(x for l in track for x in l)
+    adjacency_list[key] = unique_list
+
+# if two lists of the adjacency list are identical, then take only the last one...
 result = {}
 for key,value in adjacency_list.items():
     if value not in result.values():
         result[key] = value
-
 adjacency_list = result
 
-# track_list = list(df_edges.buffer_ID.unique())
-track_list = list(set(adjacency_list))
+# get all keys names from the adjacency list
+from operator import itemgetter
+def getList(dict):
+    return list(map(itemgetter(0), dict.items()))
+track_list = getList(adjacency_list)
+# track_list = list(set(adjacency_list))
 
-max_prob_node = []
-for i in range(len(track_list)):
-    print(track_list[i])
-    if track_list[i] == max(track_list):
-        break
+#######################
+### MAP MATCHING ######
+#######################
 
-# for track in track_list:
-#     print(track)
-#     if track+1 == len(track_list):
-#         break
 
-    # track = 1
-    trans_prob = {}
-    emiss_prob = {}
-    shortest_path = {}
+if len(track_list) > 1:
+    max_prob_node = []
+    for i in range(len(track_list)):
+        print(track_list[i])
+        if track_list[i] == max(track_list):
+            break
+    # for track in track_list:
+    #     print(track)
+    #     if track+1 == len(track_list):
+    #         break
+        # track = 1
+        trans_prob = {}
+        emiss_prob = {}
+        shortest_path = {}
 
-    # for u in adjacency_list[track]:
-    #     for v in adjacency_list[track+1]:
-    # for i in range(len(track_list)):
+        # for u in adjacency_list[track]:
+        #     for v in adjacency_list[track+1]:
+        # for i in range(len(track_list)):
 
-    for u in adjacency_list[track_list[i]]:
-        for v in adjacency_list[track_list[i+1]]:
+        for u in adjacency_list[track_list[i]]:
+            for v in adjacency_list[track_list[i+1]]:
 
-            if u != v:
-                print(u,v)
-            try:
                 if u != v:
-                    trans_prob[u] = transition_prob(u, v)
-                    shortest_path[u] = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
-                    print('#u:', u, '#v:', v, 'shortest_path:', nx.shortest_path_length(grafo, u, v, weight='length') / 1000)
-                    emiss_prob[u] = emission_prob(u)
-            except nx.NetworkXNoPath:
-                     print('No path', 'u:', u, 'v:', v, )
-
-    MAX_trans_key = max(trans_prob, key=trans_prob.get)
-    # MAX_emiss_key = max(emiss_prob, key=emiss_prob.get)
-    MAX_trans_value = trans_prob.get(MAX_trans_key)
-    # MAX_emiss_value = emiss_prob.get(MAX_emiss_key)
-    if MAX_trans_value !=0:
-        # MAX_prob = max(MAX_trans_value, MAX_emiss_value)
-        print("max_prob_NODE:", MAX_trans_key)
-        max_prob_node.append(MAX_trans_key)
-
-
-        # 'MAX_trans_key' must be also in the next set of nodes where there is the next track.
-        # if this is not the case, then 'MAX_trans_key' is not valid!!!
-        if MAX_trans_key not in adjacency_list[track_list[i+1]]:
-            adjacency_list[track_list[i]].remove(MAX_trans_key)
-            max_prob_node.remove(MAX_trans_key)
-            # and start calculation again
-            trans_prob = {}
-            emiss_prob = {}
-            shortest_path = {}
-            for u in adjacency_list[track_list[i]]:
-                for v in adjacency_list[track_list[i+1]]:
+                    print(u,v)
+                try:
                     if u != v:
-                        print(u, v)
-                    try:
+                        trans_prob[u] = transition_prob(u, v)
+                        shortest_path[u] = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
+                        print('#u:', u, '#v:', v, 'shortest_path:', nx.shortest_path_length(grafo, u, v, weight='length') / 1000)
+                        emiss_prob[u] = emission_prob(u)
+                except nx.NetworkXNoPath:
+                         print('No path', 'u:', u, 'v:', v, )
+
+        MAX_trans_key = max(trans_prob, key=trans_prob.get)
+        # MAX_emiss_key = max(emiss_prob, key=emiss_prob.get)
+        MAX_trans_value = trans_prob.get(MAX_trans_key)
+        # MAX_emiss_value = emiss_prob.get(MAX_emiss_key)
+        if MAX_trans_value !=0:
+            # MAX_prob = max(MAX_trans_value, MAX_emiss_value)
+            print("max_prob_NODE:", MAX_trans_key)
+            max_prob_node.append(MAX_trans_key)
+
+            # 'MAX_trans_key' must be also in the next set of nodes where there is the next track.
+            # if this is not the case, then 'MAX_trans_key' is not valid!!!
+            if MAX_trans_key not in adjacency_list[track_list[i+1]]:
+                adjacency_list[track_list[i]].remove(MAX_trans_key)
+                max_prob_node.remove(MAX_trans_key)
+                # and start calculation again
+                trans_prob = {}
+                emiss_prob = {}
+                shortest_path = {}
+                for u in adjacency_list[track_list[i]]:
+                    for v in adjacency_list[track_list[i+1]]:
                         if u != v:
-                            trans_prob[u] = transition_prob(u, v)
-                            shortest_path[u] = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
-                            print('#u:', u, '#v:', v, 'shortest_path:',
-                                  nx.shortest_path_length(grafo, u, v, weight='length') / 1000)
-                            emiss_prob[u] = emission_prob(u)
-                    except nx.NetworkXNoPath:
-                        print('No path', 'u:', u, 'v:', v, )
-            MAX_trans_key = max(trans_prob, key=trans_prob.get)
-            MAX_trans_value = trans_prob.get(MAX_trans_key)
-            if MAX_trans_value != 0:
-                print("max_prob_NODE:", MAX_trans_key)
-                max_prob_node.append(MAX_trans_key)
+                            print(u, v)
+                        try:
+                            if u != v:
+                                trans_prob[u] = transition_prob(u, v)
+                                shortest_path[u] = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
+                                print('#u:', u, '#v:', v, 'shortest_path:',
+                                      nx.shortest_path_length(grafo, u, v, weight='length') / 1000)
+                                emiss_prob[u] = emission_prob(u)
+                        except nx.NetworkXNoPath:
+                            print('No path', 'u:', u, 'v:', v, )
+                MAX_trans_key = max(trans_prob, key=trans_prob.get)
+                MAX_trans_value = trans_prob.get(MAX_trans_key)
+                if MAX_trans_value != 0:
+                    print("max_prob_NODE:", MAX_trans_key)
+                    max_prob_node.append(MAX_trans_key)
+else:
+    max_prob_node = list(adjacency_list[0]) # only one edge
 
-
-'''
-# build ADJACENCY LIST (all possible paths between nodes from u ---> v) (list all paths in between)
-# df_edges adjacent list with GPS tracks ordered by priority of appearance
-adjacency_list = {}
-df_edges.sort_values(by=['buffer_ID'], inplace=True)
-track_list = list(df_edges.buffer_ID.unique())
-for track in track_list:
-    print(track)
-    # filter dataframe
-    df1 = df_edges[df_edges['buffer_ID'] == track][['u', 'v']]
-    df2 = df_edges[df_edges['buffer_ID'] == track+1][['u', 'v']]
-    df_end = df_edges[df_edges['buffer_ID'] == track-1][['u', 'v']]
-    # u_list1 = list(df1.u.unique())
-    # u_list2 = list(df2.u.unique())
-    u_list1 = df1.values.tolist()
-    flattened_u_list1 = [val for sublist in u_list1 for val in sublist]
-    u_list2 = df2.values.tolist()
-    flattened_u_list2 = [val for sublist in u_list2 for val in sublist]
-    # u_list_end = df_end.values.tolist()
-    # flattened_u_list_end = [val for sublist in u_list_end for val in sublist]
-    # if track != len(track_list) - 1:
-    pairs = [(x, y) for x in flattened_u_list1 for y in flattened_u_list2]
-    # else:
-    #     pairs = [(x, y) for x in flattened_u_list1 for y in flattened_u_list_end]
-    # remove duplicates tuples
-    pairs = list(set(pairs))
-    # print('pairs:', pairs)
-    adjacency_list[track] = pairs
-
-# remove empty list
-adjacency_list = {k: v for k, v in adjacency_list.items() if v and v[0]}
-
-
-## find node with the best Joint probability for map-matching
-
-matched_edges = []
-max_prob_node = []
-new = []
-for track in range(len(adjacency_list)):
-    print(track)
-    joint_prob = {}
-    route = adjacency_list[track]
-    # route = adjacency_list[5]
-    for u,v in route:
-        joint_prob[u] = emission_prob(u)
-        # joint_prob[u] = 1
-        joint_prob[v] = 0
-        try:
-            # new_prob = transition_prob(u, v) * 1
-            # new_prob = joint_prob[u] * transition_prob(u, v) * 1
-            new_prob = joint_prob[u] * transition_prob(u, v) * emission_prob(v)
-            # new_prob = transition_prob(u, v) * emission_prob(v)
-            shortest_path = nx.shortest_path_length(grafo, u, v, weight='length') / 1000
-            # print("new_prob:",'## u:', u, '## v:', v, transition_prob(u, v))
-        except nx.NetworkXNoPath:
-            print('No path', 'u:', u, 'v:',v,)
-            new_prob = 0
-            shortest_path = None
-        if joint_prob[v] < new_prob:
-            joint_prob[v] = new_prob
-            print("joint_prob:", joint_prob)
-            print('u:', u, 'v:',v, "new_prob:", new_prob, '## shortest_path (km):', shortest_path)
-            edge = (u, v)
-            matched_edges.append(edge)
-        elif track == 0 and shortest_path !=0:
-            try:
-                print('no prob available')
-                # print(u, v)
-                # print('u:', u, 'v:', v, "new_prob:", transition_prob(u, v) * emission_prob(v), '## shortest_path (km):', shortest_path)
-                NEW_PROB = transition_prob(u, v) * emission_prob(v)
-                new.append(NEW_PROB)
-                new_prob = max(new)
-                joint_prob[v] = new_prob
-            except nx.NetworkXNoPath:
-                # print('No path', 'u:', u, 'v:', v, )
-                new_prob = 0
-                shortest_path = None
-    # get the node with the larger probability
-    MAX_prob_key = max(joint_prob, key=joint_prob.get)
-    # MAX_prob_value = joint_prob.get(MAX_prob_key)
-    print("max_prob_NODE:", MAX_prob_key)
-    max_prob_node.append(MAX_prob_key)
-
-
-    # remove element with prob == 1
-    # joint_prob = {k: v for k, v in joint_prob.items() if v != 1}
-'''
 
 # get unique values (ordered)
 from collections import OrderedDict
@@ -624,140 +507,6 @@ egdes_matched_route.plot()
 egdes_matched_route.geometry.to_file(filename='matched_route.geojson', driver='GeoJSON')
 folium.GeoJson('matched_route.geojson').add_to((my_map))
 my_map.save("matched_route.html")
-
-
-
-'''
-
-##########################
-# VITERBI algorithm ######
-##########################
-
-if 'u' in globals():
-    del u
-
-if 'v' in globals():
-    del v
-
-# s = 3987101865
-s = 4277112580
-# t = 2941239107
-# t = 1836387039
-t = 1836387053
-# t = 891536279
-# t = 2941259032
-
-
-# list all nodes in the adjacency list between s --> t
-q = []
-# if adjacency_list.get(s) is not None:
-for node in adjacency_list.keys():
-    print(node)
-    adjacency_list[node]
-    # make a list of all u and v together
-    for v in [x[1] for x in adjacency_list.get(s)]:
-    # if adjacency_list.get(v) is not None:
-        for path in adjacency_list.get(v):
-            for y in path:
-                q.append(y)
-# else:
-#     # jump to the next edge....
-#     next_edge = int(df_edges[df_edges['v'] == s]['buffer_ID'] + 1)
-#     s = df_edges[df_edges['buffer_ID'] == next_edge].iloc[0]['u']
-#     for v in [x[1] for x in adjacency_list.get(s)]:
-#         if adjacency_list.get(v) is not None:
-#             for path in adjacency_list.get(v):
-#                 for y in path:
-#                     q.append(y)
-
-
-
-def viterbi_search(adjacency_list, s, t):
-    # Initialize joint probability for each node
-    joint_prob = {}
-    for u in adjacency_list:
-        joint_prob[u] = 0
-    matched_edges = []
-    joint_prob[s] = 1
-    u = s
-    while len(q) !=0:
-        u = q.pop()
-        for v in [x[1] for x in adjacency_list.get(u)]:
-            if adjacency_list.get(v) is not None:
-                # new_prob = joint_prob[u] * transition_prob(u, v) * emission_prob(v)
-                # new_prob = joint_prob[u] * transition_prob(u, v) * 1
-                new_prob = transition_prob(u, v) * 1
-                print("new_prob:",'## u:', u, '## v:', v, transition_prob(u, v))
-                if joint_prob[v] < new_prob:
-                    joint_prob[v] = new_prob
-                    # print("joint_prob:", joint_prob)
-                    # print("u,v:", u, v)
-                    edge = (u, v)
-                    matched_edges.append(edge)
-    print("## probabilities @nodes:", joint_prob)
-    print("## matched edges:", matched_edges)
-    return joint_prob, matched_edges
-
-
-VITERBI_probs = viterbi_search(adjacency_list, s, t)
-# print("probabilities:", VITERBI_probs[0])
-# print("matched edges:", VITERBI_probs[1])
-
-'''
-
-# def viterbi_search(adjacency_list, s, t):
-#     # Initialize joint probability for each node
-#     joint_prob = {}
-#     for u in adjacency_list:
-#         joint_prob[u] = 0
-#     # predecessor = {}
-#     matched_edges = []
-#     q = list()
-#
-#     if adjacency_list.get(s) is not None:
-#         q.append(s)
-#     else:
-#         next_edge = int(df_edges[df_edges['v'] == s]['buffer_ID'] + 1)
-#         s = df_edges[df_edges['buffer_ID'] == next_edge].iloc[0]['u']
-#         q.append(s)
-#
-#     # joint_prob[s] = emission_prob(s)
-#     joint_prob[s] = 1
-#     # predecessor[s] = None
-#     u = s
-#     # pred = []
-#     for v in [x[1] for x in adjacency_list.get(u)]:
-#         if adjacency_list.get(v) is not None:
-#             # print(v)
-#             q.append(v)
-#
-#     # if adjacency_list.get(t) is not None:
-#     #     q.append(t)
-#
-#     while len(q) !=0:
-#         u = q.pop()
-#         # if u == t: break
-#         for v in [x[1] for x in adjacency_list.get(u)]:
-#             # print(v)
-#             if adjacency_list.get(v) is not None:
-#                 # print(v)
-#                 # pred.append(v)
-#                 # new_prob = joint_prob[u] * transition_prob(u, v) * emission_prob(v)
-#                 # new_prob = joint_prob[u] * transition_prob(u, v) * 1
-#                 new_prob = transition_prob(u, v) * 1
-#                 print("new_prob:", u, v, transition_prob(u, v))
-#                 if joint_prob[v] < new_prob:
-#                     joint_prob[v] = new_prob
-#                     # pred = list(predecessor)
-#                     # predecessor[v] = pred.pop()
-#                     # print("predecessor:", predecessor)
-#                     print("joint_prob:", joint_prob)
-#                     print("u,v:", u, v)
-#                     edge = (u, v)
-#                     # print(edge)
-#                     matched_edges.append(edge)
-#     return joint_prob, matched_edges # predecessor
-
 
 
 #######################################################################################

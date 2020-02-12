@@ -1,6 +1,6 @@
 
 import os
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 import osmnx as ox
 import networkx as nx
 import numpy as np
@@ -30,7 +30,7 @@ import geopandas as gpd
 #         # self.stats = stats
 #         # self.extended_stats = extended_stats
 
-def graph(place_country, distance):  # filter
+def graph(place_country, distance, filter):  # filter
     # filter out some attributes
     # filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
     #           'raceway|cycleway|steps|construction"]')
@@ -43,25 +43,29 @@ def graph(place_country, distance):  # filter
     # import grapho (graphml)
     G = ox.graph_from_address(str(place_country),
                               distance=distance,
-                              network_type='drive') # custom_filter=filter
+                              network_type='drive', custom_filter=filter) # custom_filter=filter
 
 
 
-    # import shapefile
-    # G_shp = ox.gdf_from_place(place_country)
-    # import shapefile with edges and nodes
-    # as the data is in WGS84 format, we might first want to reproject our data into metric system
-    # so that our map looks better with the projection of the graph data in UTM format
-    # G_projected = ox.project_graph(G)
-    # save street network as ESRI shapefile (includes NODES and EDGES)
+    ## import shapefile
+    G_shp = ox.gdf_from_place(place_country)
+
+    ## import shapefile with edges and nodes
+    ## as the data is in WGS84 format, we might first want to reproject our data into metric system
+    ## so that our map looks better with the projection of the graph data in UTM format
+    G_projected = ox.project_graph(G)
+
+    ## save street network as ESRI shapefile (includes NODES and EDGES)
     name_place_country = re.sub('[/," ",:]', '_', place_country)
-    # ox.save_graph_shapefile(G_projected, filename='network_' + name_place_country + '-shape')
+    ox.save_graph_shapefile(G_projected, filename='network_' + name_place_country + '-shape')
     ox.save_graphml(G, filename = name_place_country + '.graphml')
-    # ox.save_gdf_shapefile(G_shp)
+    ox.save_gdf_shapefile(G_shp)
     ox.plot_graph(G)
-    # export edges and nodes
+
+    ## export edges and nodes
     # edges = G.edges(keys=True, data=True)
-    # get stats and extended stats
+
+    ## get stats and extended stats
     # stats = ox.basic_stats(G_projected)
     # extended_stats = ox.extended_stats(G_projected, ecc=True, bc=True, cc=True) # it takes very long time...
     # extended_stats = ox.extended_stats(G_projected)
@@ -94,7 +98,7 @@ def cost_assignment(file_graphml, place_country):
     # weight/cost assignment
     # u and v are the start and ending point of each edge (== arco).
     for u, v, key, attr in grafo.edges(keys=True, data=True):
-        print(attr["highway"])
+        # print(attr["highway"])
         # select first way type from list
         if type(attr["highway"]) is list:
             # verify if the attribute field is a list (it might happen)
@@ -106,7 +110,7 @@ def cost_assignment(file_graphml, place_country):
             speed = speedlist[0] * 1000 / 3600
             # create a new attribute time == "cost" in the field "highway"
             attr['cost'] = attr.get("length") / speed
-            print(attr.get("highway"), speedlist[0], attr.get("cost"), '^^^^^^^^^^^')
+          #  print(attr.get("highway"), speedlist[0], attr.get("cost"), '^^^^^^^^^^^')
             # add the "attr_dict" to the edge file
             grafo.add_edge(u, v, key, attr_dict=attr)
             continue
@@ -116,20 +120,22 @@ def cost_assignment(file_graphml, place_country):
                 speedList = [int(i) for i in attr.get("maxspeed")]
                 speed = np.mean(speedList) * 1000 / 3600
                 attr['cost'] = attr.get("length") / speed
-                print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"), '========')
+            #    print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"), '========')
             else:
                 speed = float(attr.get("maxspeed")) * 1000 / 3600
                 attr['cost'] = attr.get("length") / speed
-                print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"), '°°°°°°°°°')
+             #   print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"), '°°°°°°°°°')
             grafo.add_edge(u, v, key, attr_dict=attr)
         else:  # read speed from way class dictionary
             speedlist = way_dict.get(attr["highway"])
             speed = speedlist[0] * 1000 / 3600
             attr['cost'] = attr.get("length") / speed
-            print(attr.get("highway"), speedlist[0], attr.get("cost"), '-----------')
+          #  print(attr.get("highway"), speedlist[0], attr.get("cost"), '-----------')
             grafo.add_edge(u, v, key, attr_dict=attr)
     # save shp file AGAIN street network as ESRI shapefile (includes NODES and EDGES and new attributes)
     name_place_country = re.sub('[/," ",:]', '_', place_country)
+    #### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ##################################
+    ### !!! # when I save, the field "cost" becomes a string...wrong!
     ox.save_graphml(grafo, filename=name_place_country + "_cost" + '.graphml')  # when I save, the field "cost" becomes a string...wrong!
     # ox.save_graphml(grafo, filename=name_place_country + '.graphml')
     # ox.save_graph_shapefile(grafo, filename='network_' + name_place_country + '-shape')
@@ -155,8 +161,23 @@ def roads_type_folium(file_graphml, road_type, place_country):
         "motorway_link": "yellow",
         "motorway": "black",
         "residential": "orange",
-        "unclassified": "brown"
+        "unclassified": "brown",
+        "living_street": "orange",
+        "trunk": "black",
+        "trunk_link": "black"
     }
+
+    # 'living_street',
+    # ['tertiary', 'unclassified'],
+    # ['tertiary', 'residential', 'unclassified'],
+    # ['secondary', 'unclassified']
+    # ['secondary', 'tertiary']
+    # ['tertiary', 'residential']
+    # ['secondary', 'residential']
+    # ['residential', 'unclassified']
+    # "trunk
+
+
     points = []
     # prepare a base_map ###########################################################
     gen_network = gdf_edges[(gdf_edges.highway.isin([road_type.split(",")[0]]))]

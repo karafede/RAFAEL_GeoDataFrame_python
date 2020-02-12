@@ -14,18 +14,19 @@ place_country = "Catania, Italy"
 # filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|' \
 #          'raceway|cycleway|steps|construction|primary|tertiary"]')
 
-# define input road types as list
+## define input road types as list
 # road_type = "motorway, motorway_link"
 # road_type = "motorway, motorway_link, secondary"
-road_type = "motorway, motorway_link, secondary, primary, tertiary"
 # road_type = "motorway, motorway_link, secondary, primary, tertiary, residential"
+road_type = "motorway, motorway_link, secondary, primary, tertiary, residential, unclassified, living_street, trunk, trunk_link"
+
 
 roads = road_type.replace(', ', '|')
 filter = '["highway"~' + '"' + roads + '"' + "]"
 distance = 60000 # distance from the center of the map (in meters)
 
 # make grapho, save .graphml, save shapefile (node and edges) and get statistics (basic and extended)
-network_city = graph(place_country, distance) # filter
+network_city = graph(place_country, distance, filter) #
 
 # assign weight and cost (==time) to the grapho
 file_graphml = 'Catania__Italy.graphml'
