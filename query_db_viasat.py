@@ -9,7 +9,7 @@ Created on Tue Jan 14 2020
 """
 
 import os
-os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 
 import psycopg2
 import db_connect
@@ -99,19 +99,7 @@ def viasat_map_data(file_graphml, road_type, place_country):
 
 
     # filter VIASAT data only for the vehicle ID with the larger number of points
-    # track_ID = '5428266'
-    # track_ID = '3511558'
-    # track_ID = '3219572'
-    # track_ID = '4452493'
-    # track_ID = '2754384'
-    # track_ID = '4094485'
-    # track_ID = '4298830'
-    # track_ID = '5410997'
-    # track_ID = '5220538'
-    # track_ID = '4012647'
-    # track_ID = '4172466'
     track_ID = '5902695'
-
     track = pd.read_sql_query(
     ''' SELECT *
         FROM public.viasat_py_temp
