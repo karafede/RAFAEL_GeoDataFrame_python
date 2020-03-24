@@ -13,9 +13,11 @@ import osmnx as ox
 import networkx as nx
 import math
 import momepy
+# from funcs_network_FK import roads_type_folium
 from shapely import geometry
 from shapely.geometry import Point, Polygon
 import psycopg2
+# import db_connect
 import datetime
 import seaborn as sns
 import matplotlib
@@ -26,33 +28,28 @@ from shapely.geometry import Point, LineString, MultiLineString
 from shapely import geometry, ops
 
 
+# laad grafo
+file_graphml = 'Catania__Italy_cost.graphml'
+grafo = ox.load_graphml(file_graphml)
+
 ## reload data (to be used later on...)
-# gdf_all_EDGES = gpd.read_file("all_EDGES.geojson")
-gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
-# gdf_all_EDGES = gpd.read_file("all_EDGES_09032020.geojson")
+gdf_all_EDGES = gpd.read_file("all_EDGES.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_short.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_archived.geojson")
+
 
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
-gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time']]
-
 ###################
 #### GROUP BY #####
 ###################
-
-#######################################################################
-## count how many times an edge ('u', 'v') occur in the geodataframe ##
-#######################################################################
-
+## count how many times an edge ('u', 'v') occur in the geodataframe
 df_all_EDGES_sel = gdf_all_EDGES.groupby(gdf_all_EDGES_sel.columns.tolist()).size().reset_index().rename(columns={0:'records'})
 
 
-
-# make a copy
 df_all_EDGES_records = df_all_EDGES_sel
-threshold = np.average(df_all_EDGES_records.records)
 # select only columns with records > N
-# df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= 15]
-df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= round(threshold,0) + 1]
+df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= 15]
 # add colors based on 'records'
 vmin = min(df_all_EDGES_records.records)
 vmax = max(df_all_EDGES_records.records)
@@ -61,7 +58,7 @@ vmax = max(df_all_EDGES_records.records)
 norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
 mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Reds)  # scales of reds
 df_all_EDGES_records['color'] = df_all_EDGES_records['records'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
-# records = df_all_EDGES_sel[['records']]
+records = df_all_EDGES_sel[['records']]
 
 df_all_EDGES_sel = df_all_EDGES_sel[['u','v']]
 
@@ -71,6 +68,7 @@ index_recover_all_EDGES = gdf_all_EDGES.set_index(keys).index
 index_df_all_EDGES_sel = df_all_EDGES_sel.set_index(keys).index
 clean_edges_matched_route = gdf_all_EDGES[index_recover_all_EDGES.isin(index_df_all_EDGES_sel)]
 
+
 # get same color name according to the same 'u' 'v' pair
 clean_edges_matched_route[['u', 'v']].head()
 # merge records and colors into the geodataframe
@@ -78,191 +76,78 @@ MERGED_clean_EDGES = pd.merge(clean_edges_matched_route, df_all_EDGES_records, o
 # remove duplicates nodes
 MERGED_clean_EDGES.drop_duplicates(['u', 'v'], inplace=True)
 
+
+'''
+AAA = MERGED_clean_EDGES[MERGED_clean_EDGES['u'] == 33589436]
+AAA.u
+AAA.v
+AAA.records
+AAA.color
+'''
+
 #############################################################################################
 # create basemap
 ave_LAT = 37.53988692816245
 ave_LON = 15.044971594798902
 my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 #############################################################################################
+
+'''
+clean_edges_matched_route.geometry.to_file(filename='clean_matched_route.geojson', driver='GeoJSON')
+folium.GeoJson('clean_matched_route.geojson').add_to(my_map)
+my_map.save("clean_matched_route.html")
+'''
 
 # add colors to map
 my_map = plot_graph_folium_FK(MERGED_clean_EDGES, graph_map=None, popup_attribute=None,
-                              zoom=1, fit_bounds=True, edge_width=2, edge_opacity=0.7)
+                              zoom=1, fit_bounds=True, edge_width=3, edge_opacity=1)
 style = {'fillColor': '#00000000', 'color': '#00000000'}
-# add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    MERGED_clean_EDGES[['u','v', 'records', 'length', 'geometry']].to_json(),
+    MERGED_clean_EDGES[['u','v','geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
-    highlight_function=lambda x: {'weight':3,
+    highlight_function=lambda x: {'weight':5,
         'color':'blue',
         'fillOpacity':1
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'length', 'records']
+        fields=['u', 'v']
     ),
 ).add_to(my_map)
 
-my_map.save("clean_matched_route_frequecy.html")
-
-
-#######################################################################
-######### get the time travelled in each edge, when available #########
-#######################################################################
-
-# get average of traveled "time" for each edge
-df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
-df_all_EDGES_time.columns = ["u", "v", "travel_time"]
-# merge with the above "df_all_EDGES_sel" referred to the counts counts
-df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
-df_all_EDGES_time = df_all_EDGES_time.dropna(subset=['travel_time'])
-
-sorted_values = df_all_EDGES_time.sort_values('travel_time')
-df_all_EDGES_time = df_all_EDGES_time[df_all_EDGES_time.travel_time < 1500] #(1000 sec == 16 minutes)
-sorted_values = df_all_EDGES_time.sort_values('travel_time')
-
-# make a copy
-df_all_timeEDGES = df_all_EDGES_time
-# add colors based on 'time' (seconds)
-vmin = min(df_all_timeEDGES.travel_time[df_all_timeEDGES.travel_time > 0])
-vmax = max(df_all_timeEDGES.travel_time)
-AVG = np.average(df_all_timeEDGES.travel_time)
-# Try to map values to colors in hex
-norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
-mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.cool)  # scales of reds (or "coolwarm" , "bwr")
-df_all_timeEDGES['color'] = df_all_timeEDGES['travel_time'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
-
-df_all_EDGES_time = df_all_EDGES_time[['u','v']]
-
-# filter recover_all_EDGES (geo-dataframe) with df_recover_all_EDGES_sel (dataframe)
-keys = list(df_all_EDGES_time.columns.values)
-index_recover_all_EDGES = gdf_all_EDGES.set_index(keys).index
-index_df_all_EDGES_time = df_all_EDGES_time.set_index(keys).index
-
-times_edges_matched_route = gdf_all_EDGES[index_recover_all_EDGES.isin(index_df_all_EDGES_time)]
-
-# get same color name according to the same 'u' 'v' pair
-# merge records and colors into the geodataframe
-TIME_EDGES = pd.merge(times_edges_matched_route, df_all_timeEDGES, on=['u', 'v'], how='inner')
-# remove duplicates nodes
-TIME_EDGES.drop_duplicates(['u', 'v'], inplace=True)
-TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 0)
-
-
-
-#############################################################################################
-# create basemap
-ave_LAT = 37.53988692816245
-ave_LON = 15.044971594798902
-my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
-#############################################################################################
-
-
-# add colors to map
-my_map = plot_graph_folium_FK(TIME_EDGES, graph_map=None, popup_attribute=None,
-                              zoom=1, fit_bounds=True, edge_width=4, edge_opacity=1)
-style = {'fillColor': '#00000000', 'color': '#00000000'}
-# add 'u' and 'v' as highligths for each edge (in blue)
-folium.GeoJson(
-    # data to plot
-    TIME_EDGES[['u','v', 'travel_time','geometry']].to_json(),
-    show=True,
-    style_function=lambda x:style,
-    highlight_function=lambda x: {'weight':3,
-        'color':'blue',
-        'fillOpacity':1
-    },
-    # fields to show
-    tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'travel_time']
-    ),
-).add_to(my_map)
-
-my_map.save("clean_matched_route_travel_time.html")
-
-
-
-'''
-# add "time" to travel each edge (if found) as highligths for each edge (in blue)
-folium.GeoJson(
-    # data to plot
-    MERGED_clean_EDGES[['time', 'geometry']].to_json(),
-    show=True,
-    style_function=lambda x:style,
-    highlight_function=lambda x: {'weight':3,
-        'color':'orange',
-        'fillOpacity':1
-    },
-    # fields to show
-    tooltip=folium.features.GeoJsonTooltip(
-        fields=['time']
-    ),
-).add_to(my_map)
-'''
-
-
-
-######################################################################
-######################## COLORBAR ####################################
-######################################################################
-
-import matplotlib as mpl
-COLORS_by_records = pd.DataFrame( MERGED_clean_EDGES.drop_duplicates(['records', 'color']))[['records', 'color']]
-# sort by ascending order of the column records
-COLORS_by_records = COLORS_by_records.sort_values(by=['records'])
-len(COLORS_by_records)
-# keep same order...
-color_list = COLORS_by_records.color.drop_duplicates().tolist()
-# display colorbar based on hex colors:
-
-fig, ax = plt.subplots(figsize=(6, 1))
-fig.subplots_adjust(bottom=0.5)
-# cmap = matplotlib.colors.ListedColormap(color_list)
-cmap = mpl.cm.Reds
-MAX  = max(COLORS_by_records.records)
-MIN  = min(COLORS_by_records.records)
-cmap.set_over(str(MAX + 5))
-cmap.set_under(str(MIN -5))
-
-cmap.set_over('k')
-cmap.set_under('white')
-
-# make a sequence list of records
-bounds = np.arange(MIN, MAX, 10).tolist()
-
-norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
-cb2 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,
-                                norm=norm,
-                                boundaries=[5] + bounds + [MAX+5],
-                                extend='both',
-                                ticks=bounds,
-                                spacing='uniform',
-                                orientation='horizontal')
-cb2.set_label('travel frequency (a.u.)')
-# fig.show()
-# save colorbar (map-matching frequency)
-fig.savefig('colorbar_map_matched.png')
-
-merc = os.path.join('colorbar_map_matched.png')
-# overlay colorbar to my_map
-folium.raster_layers.ImageOverlay(merc, bounds = [[37.822617, 15.734203], [37.768644,15.391770]], interactive=True, opacity=1).add_to(my_map)
-# re-save map
 my_map.save("clean_matched_route.html")
 
-################################################################
-################################################################
-
-
 '''
-###################################
-##### ORIGINS and DESTINATIONS ####
-###################################
+geoms = []
+# get all the path accross the same edge (u,v)
+for i in range(len(MERGED_clean_EDGES)):
+    U = MERGED_clean_EDGES.u.iloc[i]
+    V = MERGED_clean_EDGES.v.iloc[i]
+    print('u:', U, 'v:', V, '================================================')
+    BBB = gdf_all_EDGES[(gdf_all_EDGES['u'] == U) & (gdf_all_EDGES['v'] == V)]
+    # get all the "story of the track_ID vehicles
+    ID_list = list(BBB.track_ID)
+    # filter gdf_all_EDGES based on a list of index
+    all_paths = gdf_all_EDGES[gdf_all_EDGES.track_ID.isin(ID_list)]
+    # all_paths.plot()
 
-# laad grafo
-# file_graphml = 'Catania__Italy_cost.graphml'
-# grafo = ox.load_graphml(file_graphml)
+    # make an unique linestring
+    LINE = []
+    # combine them into a multi-linestring
+    for j in range(len(all_paths)):
+        line = all_paths.geometry.iloc[j]
+        LINE.append(line)
+
+    multi_line = geometry.MultiLineString(LINE)
+    # merge the lines
+    merged_line = ops.linemerge(multi_line)
+    geoms.append(merged_line)
+
+# newdata = gpd.GeoDataFrame(MERGED_clean_EDGES, geometry=geoms)
+# newdata.geometry.to_file(filename='newdata.geojson', driver='GeoJSON')
+'''
 
 
 # make an empty dataframe to report all ORIGINS from which travels started and that crossed a given edge (u,v)
@@ -374,5 +259,121 @@ for idx, row in all_DESTINATIONS_df.iterrows():
 
 my_map.save("clean_matched_route.html")
 
+########### //////////////////////////////////////////// ####################################
+########### //////////////////////////////////////////// ####################################
+
 '''
+# merge "all_PATHS_gdf" with "MERGED_clean_EDGES'
+PATHS_OD = pd.merge(all_ORIGINS_gdf, MERGED_clean_EDGES, on=['u', 'v'], how='inner')
+# PATHS_OD = PATHS_OD.rename(columns={"geometry_y": "geometry"})
+PATHS_OD['geometry'] = LineString()
+
+for i in range(len(PATHS_OD)):
+    all_coords = []
+    # get out all coordinates and make a nuw linestring
+    for point_y in PATHS_OD.geometry_y.iloc[i].coords:
+        all_coords.append(point_y)
+    for point_x in PATHS_OD.geometry_x.iloc[i].coords:
+        all_coords.append(point_x)
+    # make a linestring
+    PATHS_OD.geometry.iloc[i] = LineString(all_coords)
+
+'''
+
+######################################################################
+######################## COLORBAR ####################################
+######################################################################
+
+import matplotlib as mpl
+COLORS_by_records = pd.DataFrame( MERGED_clean_EDGES.drop_duplicates(['records', 'color']))[['records', 'color']]
+# sort by ascending order of the column records
+COLORS_by_records = COLORS_by_records.sort_values(by=['records'])
+len(COLORS_by_records)
+# keep same order...
+color_list = COLORS_by_records.color.drop_duplicates().tolist()
+# display colorbar based on hex colors:
+
+fig, ax = plt.subplots(figsize=(6, 1))
+fig.subplots_adjust(bottom=0.5)
+# cmap = matplotlib.colors.ListedColormap(color_list)
+cmap = mpl.cm.Reds
+MAX  = max(COLORS_by_records.records)
+MIN  = min(COLORS_by_records.records)
+cmap.set_over(str(MAX + 5))
+cmap.set_under(str(MIN -5))
+
+cmap.set_over('k')
+cmap.set_under('white')
+
+# make a sequence list of records
+bounds = np.arange(MIN, MAX, 10).tolist()
+
+norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+cb2 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,
+                                norm=norm,
+                                boundaries=[5] + bounds + [MAX+5],
+                                extend='both',
+                                ticks=bounds,
+                                spacing='uniform',
+                                orientation='horizontal')
+cb2.set_label('travel frequency (a.u.)')
+# fig.show()
+# save colorbar (map-matching frequency)
+fig.savefig('colorbar_map_matched.png')
+
+merc = os.path.join('colorbar_map_matched.png')
+# overlay colorbar to my_map
+folium.raster_layers.ImageOverlay(merc, bounds = [[37.822617, 15.734203], [37.768644,15.391770]], interactive=True, opacity=1).add_to(my_map)
+# re-save map
+my_map.save("clean_matched_route.html")
+
+
+'''
+# MERGED_clean_EDGES.plot(alpha=0.5,figsize=(20,40),edgecolor='black')
+# remove all the boundaries
+final_EDGES_CATANIA = MERGED_clean_EDGES.dissolve(by ='id')
+final_EDGES_CATANIA = final_EDGES_CATANIA[['geometry']] # keep only 'geometry'
+# final_EDGES_CATANIA.plot(alpha=0.5,edgecolor='black',figsize=(20,40))
+# save as geojson file
+final_EDGES_CATANIA.geometry.to_file(filename='final_EDGES_CATANIA.geojson', driver='GeoJSON')
+'''
+
+
+###########################################################################
+###########################################################################
+###########################################################################
+###### //////////////////////////////////////////// #######################
+###########################################################################
+###########################################################################
+
+'''
+
+# chose a specific ID ID (from all_EDGES)
+AAA = pd.DataFrame(gdf_all_EDGES)
+# which ID crossed the same edge??   (11 records)
+BBB = AAA[(AAA['u']==5147981090) & (AAA['v']==6761010926)]
+# get all the "story of the ID vehicles
+ID_list = list(BBB.track_ID)
+
+# filter gdf_all_EDGES based on a list of index
+CCC = gdf_all_EDGES[gdf_all_EDGES.track_ID.isin( ID_list )]
+CCC.plot()
+
+###########################################################################
+# create basemap
+ave_LAT = 37.53988692816245
+ave_LON = 15.044971594798902
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+#############################################################################
+
+# filter recover_all_EDGES (geo-dataframe) with df_recover_all_EDGES_sel (dataframe)
+CCC.geometry.to_file(filename='trip_by_ID.geojson', driver='GeoJSON')
+folium.GeoJson('trip_by_ID.geojson').add_to(my_map)
+my_map.save("trip_by_ID.html")
+
+'''
+###########################################################################
+###########################################################################
+###########################################################################
+
 

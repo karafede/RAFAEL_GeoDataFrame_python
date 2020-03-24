@@ -1,6 +1,6 @@
 
 import os
-os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
 os.getcwd()
 
 import numpy as np
@@ -28,17 +28,22 @@ from folium_stuff_FK_map_matching import plot_graph_folium_FK
 
 ## reload data (to be used later on...)
 gdf_all_EDGES = gpd.read_file("all_EDGES.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_archived.geojson")
 
+AAA = pd.DataFrame(gdf_all_EDGES)
 
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
+###################
+#### GROUP BY #####
+###################
 ## count how many times an edge ('u', 'v') occur in the geodataframe
 df_all_EDGES_sel = gdf_all_EDGES.groupby(gdf_all_EDGES_sel.columns.tolist()).size().reset_index().rename(columns={0:'records'})
 
 
-df_all_EDGES_records = gdf_all_EDGES.groupby(gdf_all_EDGES_sel.columns.tolist()).size().reset_index().rename(columns={0:'records'})
+df_all_EDGES_records = df_all_EDGES_sel
 # select only columns with records > N
-df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= 15]
+df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= 10]
 # add colors based on 'records'
 vmin = min(df_all_EDGES_records.records)
 vmax = max(df_all_EDGES_records.records)
@@ -83,7 +88,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 
 '''
 clean_edges_matched_route.geometry.to_file(filename='clean_matched_route.geojson', driver='GeoJSON')
-folium.GeoJson('clean_matched_route.geojson').add_to((my_map))
+folium.GeoJson('clean_matched_route.geojson').add_to(my_map)
 my_map.save("clean_matched_route.html")
 '''
 
@@ -130,7 +135,7 @@ cb2 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,
                                 spacing='uniform',
                                 orientation='horizontal')
 cb2.set_label('travel frequency (a.u.)')
-fig.show()
+# fig.show()
 # save colorbar (map-matching frequency)
 fig.savefig('colorbar_map_matched.png')
 
@@ -142,5 +147,57 @@ folium.raster_layers.ImageOverlay(merc, bounds = [[37.822617, 15.734203], [37.76
 my_map.save("clean_matched_route.html")
 
 
-####################################################
-####################################################
+'''
+# MERGED_clean_EDGES.plot(alpha=0.5,figsize=(20,40),edgecolor='black')
+# remove all the boundaries
+final_EDGES_CATANIA = MERGED_clean_EDGES.dissolve(by ='id')
+final_EDGES_CATANIA = final_EDGES_CATANIA[['geometry']] # keep only 'geometry'
+# final_EDGES_CATANIA.plot(alpha=0.5,edgecolor='black',figsize=(20,40))
+# save as geojson file
+final_EDGES_CATANIA.geometry.to_file(filename='final_EDGES_CATANIA.geojson', driver='GeoJSON')
+'''
+
+###########################################################################
+###########################################################################
+###########################################################################
+###### //////////////////////////////////////////// #######################
+###########################################################################
+###########################################################################
+
+'''
+# chose a specific ID ID (from all_EDGES)
+AAA = pd.DataFrame(gdf_all_EDGES)
+# BBB = AAA[AAA.id == '577']
+
+df_all_EDGES_records.head()
+# which ID crossed the same edge??   (11 records)
+BBB = AAA[AAA.u == 33589436]
+BBB = BBB[BBB.v == 254098470]
+# get all the "story of the 11 records
+ID_list = list(BBB.id)
+
+# filter gdf_all_EDGES based on a list of index
+CCC = gdf_all_EDGES[gdf_all_EDGES.index.isin( ID_list )]
+
+###########################################################################
+# create basemap
+ave_LAT = 37.53988692816245
+ave_LON = 15.044971594798902
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+#############################################################################
+
+
+# filter recover_all_EDGES (geo-dataframe) with df_recover_all_EDGES_sel (dataframe)
+
+CCC.geometry.to_file(filename='trip_by_ID.geojson', driver='GeoJSON')
+folium.GeoJson('trip_by_ID.geojson').add_to(my_map)
+my_map.save("trip_by_ID.html")
+'''
+
+###########################################################################
+###########################################################################
+###########################################################################
+###### //////////////////////////////////////////// #######################
+###########################################################################
+###########################################################################
+
