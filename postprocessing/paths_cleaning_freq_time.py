@@ -28,12 +28,17 @@ from shapely import geometry, ops
 
 ## reload data (to be used later on...)
 # gdf_all_EDGES = gpd.read_file("all_EDGES.geojson")
-gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
+
 # gdf_all_EDGES = gpd.read_file("all_EDGES_09032020.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
+gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Mar-27-2020.geojson")
 
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
-gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time']]
+# time --> secs
+# distance --> km
+# speed --> km/h
+gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time', 'distance', 'speed']]
 
 ###################
 #### GROUP BY #####
@@ -44,8 +49,6 @@ gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time']]
 #######################################################################
 
 df_all_EDGES_sel = gdf_all_EDGES.groupby(gdf_all_EDGES_sel.columns.tolist()).size().reset_index().rename(columns={0:'records'})
-
-
 
 # make a copy
 df_all_EDGES_records = df_all_EDGES_sel
@@ -112,13 +115,15 @@ my_map.save("clean_matched_route_frequecy.html")
 ######### get the time travelled in each edge, when available #########
 #######################################################################
 
-# get average of traveled "time" for each edge
+# get average of traveled "time" and travelled "speed" for each edge
 df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
-df_all_EDGES_time.columns = ["u", "v", "travel_time"]
+df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed", ]
 # merge with the above "df_all_EDGES_sel" referred to the counts counts
 df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
+# drop NaN values
 df_all_EDGES_time = df_all_EDGES_time.dropna(subset=['travel_time'])
 
+# sort values by travelled time
 sorted_values = df_all_EDGES_time.sort_values('travel_time')
 df_all_EDGES_time = df_all_EDGES_time[df_all_EDGES_time.travel_time < 1500] #(1000 sec == 16 minutes)
 sorted_values = df_all_EDGES_time.sort_values('travel_time')
@@ -149,7 +154,8 @@ TIME_EDGES = pd.merge(times_edges_matched_route, df_all_timeEDGES, on=['u', 'v']
 # remove duplicates nodes
 TIME_EDGES.drop_duplicates(['u', 'v'], inplace=True)
 TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 0)
-
+TIME_EDGES['travel_distance'] = round(TIME_EDGES['travel_distance'], 0)
+TIME_EDGES['travel_speed'] = round(TIME_EDGES['travel_speed'], 0)
 
 
 #############################################################################################
@@ -167,7 +173,7 @@ style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    TIME_EDGES[['u','v', 'travel_time','geometry']].to_json(),
+    TIME_EDGES[['travel_time', 'travel_speed', 'travel_distance', 'geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
@@ -176,7 +182,7 @@ folium.GeoJson(
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'travel_time']
+        fields=['travel_time', 'travel_speed', 'travel_distance']
     ),
 ).add_to(my_map)
 
