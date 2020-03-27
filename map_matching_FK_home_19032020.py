@@ -86,12 +86,12 @@ range_datetime = pd.read_sql_query(
 # viasat_data = 'viasat_data_5902695.csv'  #OK
 # viasat_data = 'viasat_data_5829934.csv'
 # viasat_data = 'viasat_data_2508141.csv'
-viasat_data = 'viasat_data_2508141.csv'
+viasat_data = 'viasat_data_2680600.csv'
 
 # make a geodataframe from the grapho
 # gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
 
-fields = ["longitude", "latitude", "odometer", "speed", "panel", "datetime"]
+fields = ["longitude", "latitude", "odometer", "speed", "panel", "datetime", "grade"]
 viasat = pd.read_csv(viasat_data, usecols=fields)
 
 # transform "datetime" into seconds
@@ -109,7 +109,7 @@ viasat['seconds'] = viasat['datetime'].apply(lambda x: x.second)
 # make one field with time in seconds
 viasat['path_time'] = viasat['hour']*3600 + viasat['minute']*60 + viasat['seconds']
 viasat['path_time'] = viasat['path_time']- viasat['path_time'][0]
-viasat = viasat[["longitude", "latitude", "odometer", "path_time", "speed", "panel"]]
+viasat = viasat[["longitude", "latitude", "odometer", "path_time", "speed", "panel", "grade"]]
 
 dx = max(viasat.longitude) - min(viasat.longitude)
 dy = max(viasat.latitude)- min(viasat.latitude)
@@ -117,6 +117,8 @@ if dx < 0.007:
     buffer_diam = 0.00020
 else:
     buffer_diam = 0.00009
+
+buffer_diam = 0.00009
 
 ## get extent of viasat data
 ext = 0.025
@@ -160,6 +162,7 @@ ox.plot_graph(grafo)
 
 # make a geo-dataframe from the grapho
 gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
+ox.save_graph_shapefile(grafo, filename='partial_Catania__shape')
 
 # select only rows with different reading of the odometer (vehicle is moving on..)
 # viasat.drop_duplicates(['odometer'], inplace= True)
@@ -170,13 +173,17 @@ gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
 # select only rows with different reading of the odometer (vehicle is moving on..)
 viasat.drop_duplicates(['odometer'], inplace=True)
 # remove viasat data with 'panel' == 0  (when the car does not move, the engine is OFF)
-viasat = viasat[viasat['panel'] != 0]
+# viasat = viasat[viasat['panel'] != 0]
 
 # remove data with "speed" ==0  and "odometer" != 0 AT THE SAME TIME!
 viasat = viasat[~((viasat['odometer'] != 0) & (viasat['speed'] == 0))]
 
 # remove duplicate GPS tracks (@ same position)
 viasat.drop_duplicates(['latitude', 'longitude'], inplace= True)
+
+# select only VIASAT point with accuracy ("grade") between 1 and 22
+viasat = viasat[(1 <= viasat['grade']) & (viasat['grade'] < 22)]
+
 
 # reset indices
 viasat.reset_index(drop=True, inplace=True)
@@ -201,7 +208,6 @@ for i in range(len(viasat)):
                         fill_color="black",
                         fill_opacity=1).add_to(my_map)
 my_map.save("matched_route.html")
-
 
 ######################################################
 
@@ -541,6 +547,7 @@ if len(track_list)==2:
 
 # Inititate empty dictionaries to store distances between points and times (secs) between points
 distance_between_points = {}
+speed_between_points = {}
 time_track = {}
 
 if len(track_list) > 1:
@@ -569,6 +576,18 @@ if len(track_list) > 1:
                     (viasat[viasat['ID'] == track_list[i]]).path_time)
                 # add time to a dictionary in function of edge "u"
                 time_track[u] = time_VIASAT
+                # mean speed between two points (tracks)
+
+                if int((viasat[viasat['ID'] == track_list[i + 1]]).speed) == 0:
+                    speed_VIASAT = int((viasat[viasat['ID'] == track_list[i]]).speed)
+                elif int((viasat[viasat['ID'] == track_list[i]]).speed) == 0:
+                    speed_VIASAT = int((viasat[viasat['ID'] == track_list[i+1]]).speed)
+                else:
+                    speed_VIASAT = (int((viasat[viasat['ID'] == track_list[i + 1]]).speed) + int(
+                        (viasat[viasat['ID'] == track_list[i]]).speed)) / 2
+
+                    # add time to a dictionary in function of edge "u"
+                speed_between_points[u] = speed_VIASAT
                 # print(u, v, distance_VIASAT)
                 if u != v:
                     print(u,v)
@@ -633,6 +652,16 @@ if len(track_list) > 1:
                             (viasat[viasat['ID'] == track_list[i]]).path_time)
                         # add time to a dictionary in function of edge "u"
                         time_track[u] = time_VIASAT
+                        # mean speed between two points (tracks)
+                        if int((viasat[viasat['ID'] == track_list[i + 1]]).speed) == 0:
+                            speed_VIASAT = int((viasat[viasat['ID'] == track_list[i]]).speed)
+                        elif int((viasat[viasat['ID'] == track_list[i]]).speed) == 0:
+                            speed_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).speed)
+                        else:
+                            speed_VIASAT = (int((viasat[viasat['ID'] == track_list[i + 1]]).speed) + int(
+                                (viasat[viasat['ID'] == track_list[i]]).speed)) / 2
+                        # add speed to a dictionary in function of edge "u"
+                        speed_between_points[u] = speed_VIASAT
                         # print(u, v, distance_VIASAT)
                         if u != v:
                             print(u, v)
@@ -763,13 +792,12 @@ if len(track_list) > 1:
         max_prob_node.append(last_node)
 
 
-
 ### check that the nodes are on the same direction!!!!! ####
 # remove nodes that are not on the same directions..........
 NODE_TO_REMOVE = []
 for i in range(len(max_prob_node)-2):
     # u, v
-    if (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:,[0]]) or (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:, [1]]):
+    if (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:,[0]]) and (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:, [1]]):
             print( ([max_prob_node[1:(len(max_prob_node) - 1)][i]]), "---> OUT..!")
             node_to_remove = ([max_prob_node[1:(len(max_prob_node) - 1)][i]])[0]
             NODE_TO_REMOVE.append(node_to_remove)
@@ -791,7 +819,8 @@ if nearest_node_first in max_prob_node:
         # move 'nearest_node_first' at the first place
         max_prob_node.insert(0, max_prob_node.pop(idx))
 
-
+# append the very first node to the max_prob_node list
+max_prob_node = [u0] + max_prob_node
 
 # build matched route
 matched_route = []
@@ -859,16 +888,26 @@ if len(filter_edge) !=0:
         edges_matched_route = edges_matched_route[edges_matched_route.index != idx_edge]
 
 ## make a dataframe from the dictionaries "time_track" and "distance_between_points"
-time_dist_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
+# time_dist_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
+# distance_edges = pd.DataFrame.from_dict(distance_between_points, orient='index').reset_index()
+
+# make a dataframe from the dictionaries "time_track" and "distance_between_points"
+time_dist_speed_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
 distance_edges = pd.DataFrame.from_dict(distance_between_points, orient='index').reset_index()
-time_dist_edges['distance'] = distance_edges[0]
-time_dist_edges.columns = ['u', 'time', 'distance']
+speed_edges = pd.DataFrame.from_dict(speed_between_points, orient='index').reset_index()
+
+# time_dist_edges['distance'] = distance_edges[0]
+# time_dist_edges.columns = ['u', 'time', 'distance']
+
+time_dist_speed_edges['distance'] = distance_edges[0]
+time_dist_speed_edges['speed'] = speed_edges[0]
+time_dist_speed_edges.columns = ['u', 'time', 'distance', 'speed']
 
 # merge "time_track and distances" with the "edges_matched_route"
-edges_matched_route = pd.merge(edges_matched_route, time_dist_edges, on=['u'], how='left')
+edges_matched_route = pd.merge(edges_matched_route, time_dist_speed_edges, on=['u'], how='left')
 # !!!both 'u' and 'v' must be in the "time_dist_edges" dataframe['u']!!!!
-list_time_dist_edges = list(time_dist_edges['u'])
-boolean_filter =  edges_matched_route[['u','v']].isin(list_time_dist_edges)
+list_time_dist_speed_edges = list(time_dist_speed_edges['u'])
+boolean_filter =  edges_matched_route[['u','v']].isin(list_time_dist_speed_edges)
 edges_matched_route_bool = edges_matched_route[(boolean_filter['u']==True) & (boolean_filter['v']==True)]
 edges_matched_route.loc[set(edges_matched_route.index) - set(edges_matched_route_bool.index), 'time']=np.nan
 edges_matched_route.loc[set(edges_matched_route.index) - set(edges_matched_route_bool.index), 'distance']=np.nan
@@ -881,6 +920,43 @@ edges_matched_route.plot()
 edges_matched_route.geometry.to_file(filename='matched_route.geojson', driver='GeoJSON')
 folium.GeoJson('matched_route.geojson').add_to((my_map))
 my_map.save("matched_route.html")
+
+'''
+AAA = pd.DataFrame(edges_matched_route)
+BBB = AAA[['u','v']]
+# AAA.drop([2,13], inplace=True)
+# find element with inverse diagonal (from bottom-left to top-right)
+
+# select only roundabouts
+BBB = AAA[AAA.junction == 'roundabout']
+# get the rows with u, v having same 7 digits
+A = (BBB['u'].astype(str).str[:7])
+B = pd.DataFrame(A.value_counts()).reset_index()
+max_idx = B['index'][ B['u']== max(B['u'])]
+A = pd.DataFrame(A).reset_index()
+selected_idxs = A['index'][A['u'] != max_idx[0]]
+
+# remove selected idx from edges_matched_route
+AAA.drop(selected_idxs, inplace=True)
+edges_matched_route.drop(selected_idxs, inplace=True)
+edges_matched_route.plot()
+
+C = (AAA['u'].astype(str).str[:7])
+D = (AAA['v'].astype(str).str[:7])
+boolean =  pd.DataFrame(C == max_idx[0])
+boolean['v'] =  (D == max_idx[0])
+
+intra_roundabouts_idx = list(((AAA[(boolean['u']==True) & (boolean['v']==False)]).index))
+# AAA.drop(intra_roundabouts_idx, inplace=True)
+# edges_matched_route.drop(intra_roundabouts_idx, inplace=True)
+
+
+# edges_matched_route.drop([2,13], inplace=True)
+# edges_matched_route.drop([4,5], inplace=True)
+# edges_matched_route.drop([30], inplace=True)
+# edges_matched_route.plot()
+'''
+
 
 #######################################################################################
 #######################################################################################

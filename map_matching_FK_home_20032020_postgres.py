@@ -20,6 +20,11 @@ import psycopg2
 import db_connect
 import datetime
 from datetime import datetime
+from datetime import date
+
+# today date
+today = date.today()
+today = today.strftime("%b-%d-%Y")
 
 ########################################################################################
 ########## DATABASE OPERATIONS #########################################################
@@ -31,13 +36,13 @@ cur = conn.cursor()
 
 # viasat_data = pd.read_sql_query('''
 #              SELECT * FROM public.dataraw
-#          WHERE date(timedate) = '2019-04-15'
-#                     AND idterm = '2508141' ''', conn)
+#          WHERE date(timedate) = '2019-04-11'
+#                     AND idterm = '2680600' ''', conn)
 # viasat_data.drop_duplicates(['latitude', 'longitude'], inplace=True)
 # viasat_data.drop_duplicates(['progressive'], inplace=True)
 # # remove viasat data with 'panel' == 0  (when the car does not move, the engine is OFF)
 # viasat_data = viasat_data[viasat_data['panel'] != 0]
-# viasat_data.to_csv('viasat_data_2508141.csv')
+# viasat_data.to_csv('viasat_data_2680600.csv')
 
 
 all_EDGES = pd.DataFrame([])
@@ -122,6 +127,9 @@ for idx, row in unique_DATES.iterrows():
         viasat_data = viasat_data[viasat_data['panel'] != 0]
         # remove data with "speed" ==0  and "odometer" != 0 AT THE SAME TIME!
         viasat_data = viasat_data[~((viasat_data['progressive'] != 0) & (viasat_data['speed'] == 0))]
+        # select only VIASAT point with accuracy ("grade") between 1 and 22
+        viasat_data = viasat_data[(1 <= viasat_data['grade']) & (viasat_data['grade'] < 22)]
+        # viasat_data = viasat_data[viasat_data['direction'] != 0]
         if len(viasat_data) == 0:
             print('============> no VIASAT data for that day ==========')
 
@@ -138,7 +146,7 @@ for idx, row in unique_DATES.iterrows():
 
 
         if len(viasat_data) > 2:
-            fields = ["longitude", "latitude", "progressive", "timedate"]
+            fields = ["longitude", "latitude", "progressive", "timedate", "speed"]
             # viasat = pd.read_csv(viasat_data, usecols=fields)
             viasat = viasat_data[fields]
 
@@ -158,7 +166,7 @@ for idx, row in unique_DATES.iterrows():
             viasat['path_time'] = viasat['hour'] * 3600 + viasat['minute'] * 60 + viasat['seconds']
             viasat = viasat.reset_index()
             viasat['path_time'] = viasat['path_time'] - viasat['path_time'][0]
-            viasat = viasat[["longitude", "latitude", "progressive", "path_time"]]
+            viasat = viasat[["longitude", "latitude", "progressive", "path_time", "speed"]]
 
             dx = max(viasat.longitude) - min(viasat.longitude)
             dy = max(viasat.latitude) - min(viasat.latitude)
@@ -166,6 +174,8 @@ for idx, row in unique_DATES.iterrows():
                 buffer_diam = 0.00020
             else:
                 buffer_diam = 0.00009
+
+            # buffer_diam = 0.00010
 
             ## get extent of viasat data
             ext = 0.025
@@ -243,7 +253,7 @@ for idx, row in unique_DATES.iterrows():
                                     fill_color="black",
                                     fill_opacity=1).add_to(my_map)
             # my_map.save("matched_route_21032020.html")
-            my_map.save("matched_route_VIASAT_" + DATE + ".html")
+            my_map.save("matched_route_VIASAT_" + DATE + '_' + today + ".html")
 
             ######################################################
 
@@ -582,6 +592,7 @@ for idx, row in unique_DATES.iterrows():
 
                 # Inititate empty dictionaries to store distances between points and times (secs) between points
                 distance_between_points = {}
+                speed_between_points = {}
                 time_track = {}
 
                 if len(track_list) > 1:
@@ -610,6 +621,19 @@ for idx, row in unique_DATES.iterrows():
                                     (viasat[viasat['ID'] == track_list[i]]).path_time)
                                 # add time to a dictionary in function of edge "u"
                                 time_track[u] = time_VIASAT
+
+                                # mean speed between two points (tracks)
+                                if int((viasat[viasat['ID'] == track_list[i + 1]]).speed) == 0:
+                                    speed_VIASAT = int((viasat[viasat['ID'] == track_list[i]]).speed)
+                                elif int((viasat[viasat['ID'] == track_list[i]]).speed) == 0:
+                                    speed_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).speed)
+                                else:
+                                    speed_VIASAT = (int(
+                                        (viasat[viasat['ID'] == track_list[i + 1]]).speed) + int(
+                                        (viasat[viasat['ID'] == track_list[i]]).speed)) / 2
+
+                                # add speed to a dictionary in function of edge "u"
+                                speed_between_points[u] = speed_VIASAT
                                 # print(u, v, distance_VIASAT)
                                 if u != v:
                                     print(u,v)
@@ -667,6 +691,19 @@ for idx, row in unique_DATES.iterrows():
                                             (viasat[viasat['ID'] == track_list[i]]).path_time)
                                         # add time to a dictionary in function of edge "u"
                                         time_track[u] = time_VIASAT
+
+                                        # mean speed between two points (tracks)
+                                        if int((viasat[viasat['ID'] == track_list[i + 1]]).speed) == 0:
+                                            speed_VIASAT = int((viasat[viasat['ID'] == track_list[i]]).speed)
+                                        elif int((viasat[viasat['ID'] == track_list[i]]).speed) == 0:
+                                            speed_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).speed)
+                                        else:
+                                            speed_VIASAT = (int(
+                                                (viasat[viasat['ID'] == track_list[i + 1]]).speed) + int(
+                                                (viasat[viasat['ID'] == track_list[i]]).speed)) / 2
+
+                                        # add speed to a dictionary in function of edge "u"
+                                        speed_between_points[u] = speed_VIASAT
                                         # print(u, v, distance_VIASAT)
                                         if u != v:
                                             print(u, v)
@@ -801,8 +838,6 @@ for idx, row in unique_DATES.iterrows():
                         max_prob_node.append(last_node)
 
 
-
-
                 ### check that the nodes are on the same direction!!!!! ####
                 # remove nodes that are not on the same directions..........
                 NODE_TO_REMOVE = []
@@ -831,6 +866,9 @@ for idx, row in unique_DATES.iterrows():
                         idx = max_prob_node.index(nearest_node_first)
                         # move 'nearest_node_first' at the first place
                         max_prob_node.insert(0, max_prob_node.pop(idx))
+
+                # append the very first node to the max_prob_node list
+                max_prob_node = [u0] + max_prob_node
 
                 ORIGIN = max_prob_node[0]
                 DESTINATION = max_prob_node[-1]
@@ -907,45 +945,72 @@ for idx, row in unique_DATES.iterrows():
                             edges_matched_route = edges_matched_route[~edges_matched_route.index.isin(idx_edge)]
 
                     # make a dataframe from the dictionaries "time_track" and "distance_between_points"
-                    time_dist_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
+                    time_dist_speed_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
                     distance_edges = pd.DataFrame.from_dict(distance_between_points, orient='index').reset_index()
-                    time_dist_edges['distance'] = distance_edges[0]
-                    time_dist_edges.columns = ['u', 'time', 'distance']
+                    speed_edges = pd.DataFrame.from_dict(speed_between_points, orient='index').reset_index()
 
-                    # merge "time_track and distances" with the "edges_matched_route"
-                    edges_matched_route = pd.merge(edges_matched_route, time_dist_edges, on=['u'], how='left')
-                    # !!!both 'u' and 'v' must be in the "time_dist_edges" dataframe['u']!!!!
-                    list_time_dist_edges = list(time_dist_edges['u'])
-                    boolean_filter = edges_matched_route[['u', 'v']].isin(list_time_dist_edges)
-                    edges_matched_route_bool = edges_matched_route[
-                        (boolean_filter['u'] == True) & (boolean_filter['v'] == True)]
-                    edges_matched_route.loc[
-                        set(edges_matched_route.index) - set(edges_matched_route_bool.index), 'time']=np.nan
-                    edges_matched_route.loc[
-                        set(edges_matched_route.index) - set(edges_matched_route_bool.index), 'distance']=np.nan
+                    try:
+                        time_dist_speed_edges['distance'] = distance_edges[0]
+                        time_dist_speed_edges['speed'] = speed_edges[0]
+                        time_dist_speed_edges.columns = ['u', 'time', 'distance', 'speed']
+                        # merge "time_track and distances" with the "edges_matched_route"
+                        edges_matched_route = pd.merge(edges_matched_route, time_dist_speed_edges, on=['u'], how='left')
+                        # !!!both 'u' and 'v' must be in the "time_dist_speed_edges" dataframe['u']!!!!
+                        list_time_dist_speed_edges = list(time_dist_speed_edges['u'])
+                        boolean_filter = edges_matched_route[['u', 'v']].isin(list_time_dist_speed_edges)
+                        edges_matched_route_bool = edges_matched_route[
+                            (boolean_filter['u'] == True) & (boolean_filter['v'] == True)]
+                        edges_matched_route.loc[
+                            set(edges_matched_route.index) - set(edges_matched_route_bool.index), 'time']=np.nan
+                        edges_matched_route.loc[
+                            set(edges_matched_route.index) - set(edges_matched_route_bool.index), 'distance']=np.nan
+                        edges_matched_route.loc[
+                            set(edges_matched_route.index) - set(edges_matched_route_bool.index), 'speed'] = np.nan
 
-                    ## quick plot
-                    # edges_matched_route.plot()
-                    ## append all EDGES in an unique dataframe
-                    edges_matched_route['track_ID'] = track_ID
-                    edges_matched_route['DESTINATION'] = DESTINATION
-                    edges_matched_route['ORIGIN'] = ORIGIN
-                    all_EDGES = all_EDGES.append(edges_matched_route)
-                    ## save data
-                    # all_EDGES.to_csv('all_EDGES.csv')
-                    with open('all_EDGES_' + DATE + '.geojson', 'w') as f:
-                        f.write(all_EDGES.to_json())
+                        ## quick plot
+                        # edges_matched_route.plot()
+                        ## append all EDGES in an unique dataframe
+                        edges_matched_route['track_ID'] = track_ID
+                        edges_matched_route['DESTINATION'] = DESTINATION
+                        edges_matched_route['ORIGIN'] = ORIGIN
 
+                        ########################################################
+                        ######## roundabouts ###################################
+                        # AAA = pd.DataFrame(edges_matched_route)
+                        # BBB = AAA[['u', 'v']]
+                        # # find element with inverse diagonal (from bottom-left to top-right)
+                        # # select only roundabout
+                        # BBB = AAA[AAA.junction == 'roundabout']
+                        # if not BBB.empty:
+                        #     # get the rows with u, v having same 7 digits
+                        #     A = (BBB['u'].astype(str).str[:7])
+                        #     B = pd.DataFrame(A.value_counts()).reset_index()
+                        #     max_idx = B['index'][B['u'] == max(B['u'])]
+                        #     A = pd.DataFrame(A).reset_index()
+                        #     selected_idxs = A['index'][A['u'] != max_idx[0]]
+                        #     # remove selected idx from edges_matched_route
+                        #     edges_matched_route.drop(selected_idxs, inplace=True)
+                        #########################################################
+                        #########################################################
 
-                    ## add plot in Folium map
-                    # save first as geojson file
-                    edges_matched_route.geometry.to_file(filename='matched_route_' + DATE + '.geojson', driver='GeoJSON')
-                    folium.GeoJson('matched_route_' + DATE + '.geojson').add_to((my_map))
-                    my_map.save("matched_route_VIASAT_" + DATE + ".html")
-                    # path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/outputs_catania_28022020/'
-                    # my_map.save(path + track_ID + "_" + DATE + "_matched_route.html")
-                    # path_cloud = 'C:/Users/Federico/ownCloud/Catania_RAFAEL/outputs_catania_28022020/'
-                    # my_map.save(path_cloud + track_ID + "_" + DATE + "_matched_route.html")
+                        all_EDGES = all_EDGES.append(edges_matched_route)
+                        ## save data
+                        # all_EDGES.to_csv('all_EDGES.csv')
+                        with open('all_EDGES_' + DATE + '_' + today + '.geojson', 'w') as f:
+                            f.write(all_EDGES.to_json())
+
+                        ## add plot in Folium map
+                        # save first as geojson file
+                        edges_matched_route.geometry.to_file(filename='matched_route_' + DATE + '_' + today + '.geojson',
+                                                             driver='GeoJSON')
+                        folium.GeoJson('matched_route_' + DATE + '_' + today + '.geojson').add_to((my_map))
+                        my_map.save("matched_route_VIASAT_" + DATE + '_' + today + ".html")
+                        # path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/outputs_catania_28022020/'
+                        # my_map.save(path + track_ID + "_" + DATE + "_matched_route.html")
+                        # path_cloud = 'C:/Users/Federico/ownCloud/Catania_RAFAEL/outputs_catania_28022020/'
+                        # my_map.save(path_cloud + track_ID + "_" + DATE + "_matched_route.html")
+                    except KeyError:
+                        print("no distance_edges")
 
 #######################################################################################
 #######################################################################################
