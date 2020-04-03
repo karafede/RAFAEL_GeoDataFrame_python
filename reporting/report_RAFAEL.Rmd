@@ -1,0 +1,203 @@
+---
+title: "Analisi congiunta di dati di traffico (Floating Car Data - FCD) e sua associazione con la rete stradale nella provincia di Catania"
+author:
+- Federico Karagulian
+date: "ultima versione `r format(Sys.time(), '%d %B %Y, %H:%M')`"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: 
+    reference_docx: word_style_FK.docx
+  number_sections: true
+  bookdown::word_document: default
+---
+
+## 1. Obbiettivi del presente lavoro
+
+Lo scopo principale del seguente lavoro e' un modello previsionale della viabilita' nella provincia di Catania. Tale modello deve essere in grado di quantificare l'intensita' del traffico stradale in funzione di diversi scenari che possono conivolgere la viabilita' di una parte della rete stradale. A scopo di esempio potremmo pensare a come il traffico stradale potrebbe essere ridistribuito se un determinato tratto stradale fosse interrotto. Quali altri tratti stradali verrebbero usati dagli automobilisti? e con quali criteri? (tempo minore? percorso piu' breve?).  
+Un'analisi della **vulnerabilita'** della rete potrebbe aiutare a capire come la rete stessa, caratterizzata dal suo tipico traffico veicolare, reagirebbe a diversi **scenari** che vedono un'alterazione della viabilita'.
+
+Al fine di procedere con un'analisi della vulnerabilita' della rete stradale di Catania, abbiamo utilizzato due tipoligie di dati:
+
+a) dati della rete stradale
+b) dati di veicoli su strada (FCD Viasat data)
+
+Questi dati sono stati eleaborati sia separatamente, sia in modo congiunto per ottenere risultati seguenti:
+
+1) Identificazione delle diverse **tipologie di strade** presenti nella rete stradale della provincia di Catania. Vista lo scopo del lavoro, abbiamo scelto di analizzare tutti i tipi di strade legate alla viabilita' veicolare piuttosto che a quella ciclabile e pedonale.
+2) Analisi della rete stradale per caraterizzare la **centralita'** dei tratti stradali.
+3) Associazione delle posizioni GPS degli autoveicoli (FCD data) a percorsi su strada. Per quanto possibile, sono stati indentificati gli archi consecutivi percorsi da ogni veicolo su strada (**map-matching**). 
+4) Nella fase di post-processing dei dati di *map-matching*, si sono individuati tutti gli archi possibili, percorsi da un numero consistente di veicoli. A questi archi e' stata associata una tipica **distanza di viaggio**, una **velocita' di viaggio** ed un **tempo di viaggio**. E' stata determinata la **frequenza** con cui gli archi sono percorsi dai veicoli. Questi analisi ha permesso di individuare quali sono le strade ad alto e basso flusso di traffico. Questo risultato (ottenuto con dati reali) e' stato paragnato alla *centralita'* degli archi ottenuta con i dati statici della rete stradale.  
+5) Analisi di vulnerabilita'
+
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1.** AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA."}
+
+
+rm(list = ls())
+
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(readr)
+library(broom)
+library(threadr)
+library(dplyr)
+library(dygraphs)
+library(ggpmisc)
+library(plotly)
+library(GGally)
+library(htmlwidgets)
+library(htmltools)
+library(webshot)
+library(ggrepel)
+library(openair)
+library(widgetframe)
+library(geojson)
+library(geojsonio)
+library(mapview)
+library(pander)
+options(scipen=5)
+
+# saving the original graphical parameters
+op <- par(no.readonly = TRUE)
+
+
+# load edges data
+CT_edges <- read.csv("C:/ENEA_CAS_WORK/Catania_RAFAEL/postprocessing/Catania_edges_60km.csv", header = T)
+
+edges_stats <- CT_edges %>%
+  group_by(highway) %>%
+  summarize(sum = length(highway),
+            length = sum(length/1000))  # km
+
+edges_stats <- edges_stats[!grepl(",", edges_stats$highway),]
+edges_stats$sum = round(edges_stats$sum, digits = 0)
+edges_stats$length = round(edges_stats$length, digits = 0)
+
+
+Caption <- paste0("**Table 1.** Number of analyzed....")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(edges_stats, emphasize.strong.cols = 1, missing = "")
+
+
+```
+
+
+
+## 2. Rete stradale per la provincia di Catania
+
+Le reti stradali si possono ottenere attraverso il progetto colloaboratiovo di OpenStreetMap (OSM). Questo progetto e' stato finalizzato allo scopo di creare mappe in tutto il mondo a contenuto libero. I dati geografici raccolti nell'ambito di questo progetto, permetted di potere avere accesso in qualsiasi momento a mappe di sull'intero territorio. Questi dati sono forninti su base volontaria, quindi le strade che vengono mappate in OpenStreetMap possono essere modificate da qualunque persona. 
+La caratteristica di OpenStreetMap, e' quella di fornire delle mappe stradali con informazioni importanti come quelle indicate di seguito:
+
+1. il codice identificativo di ogni tratto stradale (**osmid**)
+2. l'inizio e la fine di un tratto tradale (**arco**), i cui punti estremi **u** e **v** si sono identificati come **nodi**.
+3. il senso di marcia di una strada (**oneway**).
+4. il nome della strada (**name**) (puo' essere una via, piazza)
+5. la sigla identificativa di una strada (*ref*) (nel caso di strade provinciali, regionali, statali, autostrade, ecc.)
+6. la lunghezza dell'arco (*length*)
+7. le coordinate geografiche per georeferenziare l'arco (*geometry*)
+8. il numero di corsie su un arco (*lanes*)
+9. la velocita' massima consentita sull'arco stradale (*maxspeed*)
+10. la presenza di rotatorie (*junction*), *tunnel*, e ponti (*bridges*)
+11. il tipo di strada che e' riportato come categoria del campo *highway*. Ci sono diverse categorie di strade che vanno a coprire le zone urbane, residenziali, pedonali, ciclabili e, a scorrimento veloce. Tutte queste categorie vengo identificate con i seguenti nomi: **unclassified, residential, tertiary, secondary, primary, trunk, trunk_link, living_street, tertiary_link, secondary_link, motorway_link, motorway, trunk**.
+
+Queste informazioni sono periodicamente aggiornate dagli enti che si occupano di reti stradali. Tuttavia, e' importante notare che ci potrebbero omissioni ed incongruenze tra la rete stradale reale e quella riportata da OpenStreetMap. 
+
+
+La rete stradale che copre l'intera provicia di Catania e' stata 
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 4e.** Numero di passaggi totali per ora della settimana e per classe di autoveicoli sul tratto dell'autostrada A2 (km5+004) nella direzione verso Salerno."}
+
+################################
+### summary stats by hour ######
+################################
+
+# transpose data
+edges_stats <- as.data.frame(edges_stats)
+edges_stats <- gather(edges_stats, "stats", "records", 2:3)
+
+p <- ggplot(data = edges_stats,
+              aes(highway, records, fill = highway)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") +
+    facet_wrap( ~ stats, ncol = 4, scales = "free_y") +
+    # facet_grid(stats ~ .) +
+    # facet_grid(corsia ~ classi, scales = "free", space = "free") +
+    guides(fill=FALSE) +
+    # ylim(0, 1100000) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 9)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("records") +            # Set y-axis label
+    theme(axis.title.y = element_text(face="bold", colour="black", size=10),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=9)) +
+    xlab("ora della giornata") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+          axis.text.x  = element_text(angle=45, vjust=1, size=8)) +  
+     # geom_text(aes(label = paste(norm_conteggi, sep = "")), size = 3, hjust = 0.5, col = "#ffffff",  vjust = 1) +
+    ggtitle("Title") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+  p
+  
+
+```
+
+*<br/><br/>*
+
+
+## 2. Dati FCD Viasat 
+
+
+
+**Problemi rilevati su OSM per la provincia di Catania:**
+
+1.  strade troncate. Spesso si vedono strade che non hanno una continuta'. Piu' precisamente, quando si valuta il percorso di un veicolo (track), si verifica che un nodo non e' connesso al nodo sucessivo che a sua volta potrebbe essere attraversato da un arco su cui si trova un dato FCD. Questo crea una discontinuita' nella rete stradale ed anche nella riscostruzione corretta del percorso di un veicolo.
+2. Spesso si nota che la geo-localizazzione di alcuni dati FCD e' situata o sull'estremita' di archi o leggermente al di fuori della traettoria di un arco. Questo si verifica sia su dati aventi un'ottima accuratezza e sia su dati che sono consecutivi uno all'altro lungo un percorso che comprende piu' archi.
+
+
+
+*<br/><br/>*
+
+```{r, echo=FALSE, fig.cap="**Figura 1a**.Postazione ANAS 671 (A2, Km 5+004), sull'autostrada A2.",out.width = '0%'}
+knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5+004).png")
+
+```
+
+*<br/><br/>*
+
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1.** Serie temporale oraria del numero di passaggi per tutti i tipi di autoveicoli sull'autostrada A2 (km5+004) direzione Salerno"}
+
+# load data
+# setwd
+WD <- "C:/ENEA_CAS_WORK/Catania_RAFAEL/"
+setwd(WD)
+
+path <- geojson_read("all_EDGES_2019-04-15_Apr-03-2020.geojson", what = "sp")
+AAA = as.data.frame(path)
+
+
+map <- htmltools::includeHTML("matched_route_VIASAT_2019-04-16_Mar-30-2020.html")
+
+```
+
+<style>iframe{height: 600px;width: 700px}</style>
+<iframe src="matched_route_VIASAT_2019-04-16_Mar-30-2020.html"></iframe>
+
+
+*<br/><br/>*
+
+*<br/><br/>*
+
+
