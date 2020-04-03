@@ -36,13 +36,13 @@ cur = conn.cursor()
 
 # viasat_data = pd.read_sql_query('''
 #              SELECT * FROM public.dataraw
-#          WHERE date(timedate) = '2019-04-11'
-#                     AND idterm = '2680600' ''', conn)
+#          WHERE date(timedate) = '2019-04-15'
+#                     AND idterm = '2839293' ''', conn)
 # viasat_data.drop_duplicates(['latitude', 'longitude'], inplace=True)
 # viasat_data.drop_duplicates(['progressive'], inplace=True)
 # # remove viasat data with 'panel' == 0  (when the car does not move, the engine is OFF)
 # viasat_data = viasat_data[viasat_data['panel'] != 0]
-# viasat_data.to_csv('viasat_data_2680600.csv')
+# viasat_data.to_csv('viasat_data_2839293.csv')
 
 
 all_EDGES = pd.DataFrame([])
@@ -80,8 +80,15 @@ unique_DATES['just_date'] = unique_DATES['dates'].dt.date
 # my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 # #############################################################################################
 
+DATE = '2019-04-15'
+
+# track_ID = '2839293'
+# track_ID = '2508141'
+# track_ID = "2678884"
+
 # DATE = '2019-04-11'
 # track_ID = '3188580'
+
 
 # subset database with only one specific date and one specific TRACK_ID)
 for idx, row in unique_DATES.iterrows():
@@ -118,21 +125,22 @@ for idx, row in unique_DATES.iterrows():
         #             # goes back to top of loop
 
         # remove viasat data with 'progressive' == 0
-        # viasat_data = viasat_data[viasat_data['progressive'] != 0]
+        viasat_data = viasat_data[viasat_data['progressive'] != 0]
         # remove viasat data with 'speed' == 0
-        # viasat_data = viasat_data[viasat_data['speed'] != 0]
+        viasat_data = viasat_data[viasat_data['speed'] != 0]
         # select only rows with different reading of the odometer (vehicle is moving on..)
-        viasat_data.drop_duplicates(['progressive'], inplace= True)
+        # viasat_data.drop_duplicates(['progressive'], inplace= True)
         # remove viasat data with 'panel' == 0  (when the car does not move, the engine is OFF)
         viasat_data = viasat_data[viasat_data['panel'] != 0]
         # remove data with "speed" ==0  and "odometer" != 0 AT THE SAME TIME!
         viasat_data = viasat_data[~((viasat_data['progressive'] != 0) & (viasat_data['speed'] == 0))]
         # select only VIASAT point with accuracy ("grade") between 1 and 22
-        viasat_data = viasat_data[(1 <= viasat_data['grade']) & (viasat_data['grade'] < 22)]
+        viasat_data = viasat_data[(1 <= viasat_data['grade']) & (viasat_data['grade'] <= 15)]
         # viasat_data = viasat_data[viasat_data['direction'] != 0]
         if len(viasat_data) == 0:
             print('============> no VIASAT data for that day ==========')
 
+        # viasat_data = viasat_data[1:(len(viasat_data)-1)]
 ########################################################################################
 ########################################################################################
 ########################################################################################
@@ -175,7 +183,7 @@ for idx, row in unique_DATES.iterrows():
             else:
                 buffer_diam = 0.00009
 
-            # buffer_diam = 0.00010
+            buffer_diam = 0.00005
 
             ## get extent of viasat data
             ext = 0.025
@@ -209,20 +217,16 @@ for idx, row in unique_DATES.iterrows():
             # get graph only within the extension of the rectangular polygon
             # filter some features from the OSM graph
             filter = (
-                '["highway"!~"living_street|abandoned|footway|service|pedestrian|raceway|cycleway|steps|construction|'
-                'service|bus_guideway|corridor|path|escape|rest_area|proposed"]')  #unclassified
-
+                '["highway"!~"living_street|abandoned|footway|pedestrian|raceway|cycleway|steps|construction|'
+                'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
             grafo = ox.graph_from_polygon(viasat_extent.geometry[0], custom_filter=filter)
 
-
-            # ox.save_graphml(grafo, filename='partial_OSM.graphml')
             # ox.plot_graph(grafo)
+            # ox.save_graphml(grafo, filename='partial_OSM.graphml')
+
 
             # make a geo-dataframe from the grapho
             gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
-
-            # select only rows with different reading of the odometer (vehicle is moving on..)
-            # viasat.drop_duplicates(['odometer'], inplace= True)
 
             # reset indices
             viasat.reset_index(drop=True, inplace=True)
@@ -230,24 +234,13 @@ for idx, row in unique_DATES.iterrows():
             # create an index column
             viasat["ID"] = viasat.index
 
-            '''
-            # add 100m at the odometer when two GPS tracks are the same
-            for idx, value in viasat.iterrows():
-                print(idx)
-                if idx == max(viasat.index):
-                    break
-                if viasat.odometer[idx] == viasat.odometer.iloc[idx+1]:
-                    viasat.odometer.iloc[idx+1] = viasat.odometer.iloc[idx] + 100
-            '''
-
-
             ######################################################
 
             # add VIASAT GPS track on the base map (defined above)
             for i in range(len(viasat)):
                 folium.CircleMarker(location=[viasat.latitude.iloc[i], viasat.longitude.iloc[i]],
                                     popup= (track_ID + '_' + str(viasat.ID.iloc[i])),
-                                    radius=2,
+                                    radius=1,
                                     color="black",
                                     fill=True,
                                     fill_color="black",
