@@ -31,7 +31,8 @@ from shapely import geometry, ops
 
 # gdf_all_EDGES = gpd.read_file("all_EDGES_09032020.geojson")
 # gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
-gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Mar-27-2020.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Mar-27-2020.geojson")
+gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-16_Mar-30-2020.geojson")
 
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
@@ -115,12 +116,12 @@ my_map.save("clean_matched_route_frequecy.html")
 ######### get the time travelled in each edge, when available #########
 #######################################################################
 
-# get average of traveled "time" and travelled "speed" for each edge
+### get average of traveled "time" and travelled "speed" for each edge
 df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
 df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed", ]
-# merge with the above "df_all_EDGES_sel" referred to the counts counts
-df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
-# drop NaN values
+### merge with the above "df_all_EDGES_sel" referred to the counts counts
+# df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
+### drop NaN values
 df_all_EDGES_time = df_all_EDGES_time.dropna(subset=['travel_time'])
 
 # sort values by travelled time
@@ -154,7 +155,7 @@ TIME_EDGES = pd.merge(times_edges_matched_route, df_all_timeEDGES, on=['u', 'v']
 # remove duplicates nodes
 TIME_EDGES.drop_duplicates(['u', 'v'], inplace=True)
 TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 0)
-TIME_EDGES['travel_distance'] = round(TIME_EDGES['travel_distance'], 0)
+TIME_EDGES['travel_distance'] = round(abs(TIME_EDGES['travel_distance']), 2)
 TIME_EDGES['travel_speed'] = round(TIME_EDGES['travel_speed'], 0)
 
 
@@ -168,7 +169,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 
 # add colors to map
 my_map = plot_graph_folium_FK(TIME_EDGES, graph_map=None, popup_attribute=None,
-                              zoom=1, fit_bounds=True, edge_width=4, edge_opacity=1)
+                              zoom=1, fit_bounds=True, edge_width=2, edge_opacity=1)
 style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
@@ -186,6 +187,7 @@ folium.GeoJson(
     ),
 ).add_to(my_map)
 
+TIME_EDGES.to_file(filename='TIME_EDGES.geojson', driver='GeoJSON')
 my_map.save("clean_matched_route_travel_time.html")
 
 
@@ -255,7 +257,7 @@ merc = os.path.join('colorbar_map_matched.png')
 # overlay colorbar to my_map
 folium.raster_layers.ImageOverlay(merc, bounds = [[37.822617, 15.734203], [37.768644,15.391770]], interactive=True, opacity=1).add_to(my_map)
 # re-save map
-my_map.save("clean_matched_route.html")
+my_map.save("clean_matched_route_frequecy.html")
 
 ################################################################
 ################################################################
