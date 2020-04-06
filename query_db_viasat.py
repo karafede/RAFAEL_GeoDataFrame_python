@@ -37,6 +37,7 @@ from funcs_network_FK import roads_type_folium
 import hashlib
 
 
+
 def viasat_map_data(file_graphml, road_type, place_country):
     # open db from PostgreSQL
     #Connect to an existing database

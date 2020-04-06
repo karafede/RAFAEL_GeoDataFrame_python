@@ -37,13 +37,15 @@ def graph(place_country, distance):  # filter
     # filter = (
     #     '["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
     #     'raceway|cycleway|steps|construction|primary|secondary|tertiary"]')
-
+    filter = (
+        '["highway"!~"living_street|abandoned|footway|pedestrian|raceway|cycleway|steps|construction|'
+        'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
     # filter = filter
 
     # import grapho (graphml)
     G = ox.graph_from_address(str(place_country),
                               distance=distance,
-                              network_type='drive') # custom_filter=filter
+                              network_type='drive', custom_filter=filter)
 
     # import shapefile
     # G_shp = ox.gdf_from_place(place_country)
@@ -56,7 +58,9 @@ def graph(place_country, distance):  # filter
     # ox.save_graph_shapefile(G_projected, filename='network_' + name_place_country + '-shape')
     ox.save_graphml(G, filename = name_place_country + '.graphml')
     # ox.save_gdf_shapefile(G_shp)
-    ox.plot_graph(G)
+
+    # ox.plot_graph(G)
+
     # export edges and nodes
     # edges = G.edges(keys=True, data=True)
     # get stats and extended stats
@@ -180,7 +184,7 @@ def roads_type_folium(file_graphml, road_type, place_country):
         gen_poly_unlisted = list(chain.from_iterable(points))
         ave_lat = sum(p[0] for p in gen_poly_unlisted) / len(gen_poly_unlisted)
         ave_lon = sum(p[1] for p in gen_poly_unlisted) / len(gen_poly_unlisted)
-    my_map = folium.Map(location=[ave_lat, ave_lon], zoom_start=14, tiles='cartodbpositron') # tiles='cartodbpositron'
+    my_map = folium.Map(location=[ave_lat, ave_lon], zoom_start=13, tiles='cartodbpositron') # tiles='cartodbpositron'
     # my_map.save("Catania_motorway.html")
     # my_map.save("Catania_partial.html")
     ##################################################################################
@@ -213,8 +217,8 @@ def roads_type_folium(file_graphml, road_type, place_country):
             name_place_country = re.sub('[/," ",:]', '_', place_country)
             # roadtype = ' '.join([str(elem) for elem in road_type])
             # roads = re.sub('[/," ",:]', '_', roadtype)
-    my_map.save(name_place_country + "_" + "partial" + ".html")
-    # my_map.save("Catania_partial.html")
+    # my_map.save(name_place_country + "_" + "partial" + ".html")
+    my_map.save("Catania_partial.html")
     return my_map
 
 

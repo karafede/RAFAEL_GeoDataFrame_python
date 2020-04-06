@@ -9,6 +9,7 @@ from funcs_network_FK import roads_type_folium
 from funcs_network_FK import centrality
 # from query_db_viasat import viasat_map_data
 from add_VIASAT_data import viasat_map_data
+import osmnx as ox
 
 # input name of City and Country
 place_country = "Catania, Italy"
@@ -29,11 +30,20 @@ distance = 60000 # distance from the center of the map (in meters)
 ###########################################
 # network_city = graph(place_country, distance) # filter
 
+
 # assign weight and cost (==time) to the grapho
 # file_graphml = 'Catania__Italy.graphml'
 file_graphml = 'partial_OSM.graphml'
-
 cost_assignment(file_graphml, place_country)
+
+'''
+# plot all the networl on the map with folium
+# load file graphml
+Catania = ox.load_graphml('partial_OSM.graphml')
+Catania = ox.plot_graph_folium(Catania, graph_map=None, popup_attribute=None, tiles='cartodbpositron', zoom=10,
+                  fit_bounds=True, edge_width=1, edge_opacity=1)
+Catania.save("partial_OSM.html")
+'''
 
 # select road type and make a map (it returns a my_map, to be used as base map for the viasat data)
 # !!! use the _cost.graphml
@@ -41,9 +51,9 @@ file_graphml = 'Catania__Italy_cost.graphml'
 my_map = roads_type_folium(file_graphml, road_type, place_country)
 
 # edge centrality (make a map) (bc = betweenness centrality; cc = closeness centrality)
-centrality(file_graphml, place_country, bc=True, cc=False)  # road_type
+centrality(file_graphml, place_country, bc=False, cc=True)  # road_type
 
-# viasat data (make a map)
+# OSM map & viasat data (make a map)
 # !!! use the _cost.graphml
 viasat_data = viasat_map_data(file_graphml, road_type, place_country)
 

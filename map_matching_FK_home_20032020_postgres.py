@@ -127,11 +127,11 @@ for idx, row in unique_DATES.iterrows():
         # remove viasat data with 'progressive' == 0
         viasat_data = viasat_data[viasat_data['progressive'] != 0]
         # remove viasat data with 'speed' == 0
-        viasat_data = viasat_data[viasat_data['speed'] != 0]
+        # viasat_data = viasat_data[viasat_data['speed'] != 0]
         # select only rows with different reading of the odometer (vehicle is moving on..)
         # viasat_data.drop_duplicates(['progressive'], inplace= True)
         # remove viasat data with 'panel' == 0  (when the car does not move, the engine is OFF)
-        viasat_data = viasat_data[viasat_data['panel'] != 0]
+        # viasat_data = viasat_data[viasat_data['panel'] != 0]
         # remove data with "speed" ==0  and "odometer" != 0 AT THE SAME TIME!
         viasat_data = viasat_data[~((viasat_data['progressive'] != 0) & (viasat_data['speed'] == 0))]
         # select only VIASAT point with accuracy ("grade") between 1 and 22
@@ -153,7 +153,7 @@ for idx, row in unique_DATES.iterrows():
 # gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
 
 
-        if len(viasat_data) > 2:
+        if len(viasat_data) > 5  and len(viasat_data) < 90:
             fields = ["longitude", "latitude", "progressive", "timedate", "speed"]
             # viasat = pd.read_csv(viasat_data, usecols=fields)
             viasat = viasat_data[fields]
@@ -176,14 +176,15 @@ for idx, row in unique_DATES.iterrows():
             viasat['path_time'] = viasat['path_time'] - viasat['path_time'][0]
             viasat = viasat[["longitude", "latitude", "progressive", "path_time", "speed"]]
 
+            # introduCe a dynamic buffer
             dx = max(viasat.longitude) - min(viasat.longitude)
             dy = max(viasat.latitude) - min(viasat.latitude)
             if dx < 0.007:
                 buffer_diam = 0.00020
             else:
-                buffer_diam = 0.00009
+                buffer_diam = 0.00005
 
-            buffer_diam = 0.00005
+            # buffer_diam = 0.00005
 
             ## get extent of viasat data
             ext = 0.025
@@ -216,9 +217,13 @@ for idx, row in unique_DATES.iterrows():
 
             # get graph only within the extension of the rectangular polygon
             # filter some features from the OSM graph
+            # filter = (
+            #     '["highway"!~"living_street|abandoned|footway|pedestrian|raceway|cycleway|steps|construction|'
+            #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|secondary_link|'
+            #     'tertiary_link"]')
             filter = (
-                '["highway"!~"living_street|abandoned|footway|pedestrian|raceway|cycleway|steps|construction|'
-                'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
+                '["highway"!~"living_street|abandoned|steps|construction|'
+                'bus_guideway|bridleway|corridor|escape|rest_area|track|proposed|path"]')
             grafo = ox.graph_from_polygon(viasat_extent.geometry[0], custom_filter=filter)
 
             # ox.plot_graph(grafo)
