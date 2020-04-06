@@ -115,7 +115,7 @@ def make_folium_polyline_FK(edge, edge_width, edge_opacity, popup_attribute=None
 
     # create a folium polyline with attributes
     pl = folium.PolyLine(locations=locations, popup=popup,
-                         color= colors, weight=edge_width, opacity=edge_opacity)  # color= "#4c2745"
+                         color= colors, weight=edge_width, opacity=edge_opacity, zoom = 13)  # color= "#4c2745"
     return pl
 
 
@@ -197,7 +197,7 @@ def plot_graph_folium(G, graph_map=None, popup_attribute=None,
 
 # tiles='cartodbpositron'
 def plot_graph_folium_FK(gdf_edges, graph_map=None, popup_attribute=None,
-                      tiles='cartodbpositron', zoom=1, fit_bounds=True,
+                      tiles='cartodbpositron', zoom=13, fit_bounds=True,
                       edge_width=5, edge_opacity=1):
     """
     Plot a graph on an interactive folium web map.

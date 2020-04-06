@@ -29,10 +29,11 @@ from shapely import geometry, ops
 ## reload data (to be used later on...)
 # gdf_all_EDGES = gpd.read_file("all_EDGES.geojson")
 
-# gdf_all_EDGES = gpd.read_file("all_EDGES_09032020.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_10032020.geojson")
 # gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
-# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Mar-27-2020.geojson")
-gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-16_Mar-30-2020.geojson")
+gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-03-2020.geojson")
+
+# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-16_Mar-30-2020.geojson")
 
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
@@ -81,22 +82,29 @@ clean_edges_matched_route[['u', 'v']].head()
 MERGED_clean_EDGES = pd.merge(clean_edges_matched_route, df_all_EDGES_records, on=['u', 'v'], how='inner')
 # remove duplicates nodes
 MERGED_clean_EDGES.drop_duplicates(['u', 'v'], inplace=True)
+MERGED_clean_EDGES['records'] = round(MERGED_clean_EDGES['records'], 0)
+MERGED_clean_EDGES['length(km)'] = MERGED_clean_EDGES['length']/1000
+MERGED_clean_EDGES['length(km)'] = round(MERGED_clean_EDGES['length(km)'], 3)
+# compute a relative frequeny (how much the edge was travelled compared to the total number of tracked vehicles...in %)
+max_records = max(MERGED_clean_EDGES['records'])
+MERGED_clean_EDGES['records'] = (MERGED_clean_EDGES['records']/max_records)*100
+MERGED_clean_EDGES['frequency(%)'] = round(MERGED_clean_EDGES['records'], 0)
 
 #############################################################################################
 # create basemap
 ave_LAT = 37.53988692816245
 ave_LON = 15.044971594798902
-my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=14, tiles='cartodbpositron')
 #############################################################################################
 
 # add colors to map
 my_map = plot_graph_folium_FK(MERGED_clean_EDGES, graph_map=None, popup_attribute=None,
-                              zoom=1, fit_bounds=True, edge_width=2, edge_opacity=0.7)
+                              zoom=15, fit_bounds=True, edge_width=2, edge_opacity=0.7)
 style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    MERGED_clean_EDGES[['u','v', 'records', 'length', 'geometry']].to_json(),
+    MERGED_clean_EDGES[['u','v', 'frequency(%)', 'length(km)', 'geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
@@ -105,15 +113,16 @@ folium.GeoJson(
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'length', 'records']
+        fields=['u', 'v', 'length(km)', 'frequency(%)']
     ),
 ).add_to(my_map)
 
-my_map.save("clean_matched_route_frequecy.html")
-
+# my_map.save("clean_matched_route_frequecy.html")
+# my_map.save("clean_matched_route_frequecy_all_EDGES_10032020.html")
+my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-03-2020.html")
 
 #######################################################################
-######### get the time travelled in each edge, when available #########
+######### get the travelled TIME in each edge, when available #########
 #######################################################################
 
 ### get average of traveled "time" and travelled "speed" for each edge
@@ -137,7 +146,7 @@ vmax = max(df_all_timeEDGES.travel_time)
 AVG = np.average(df_all_timeEDGES.travel_time)
 # Try to map values to colors in hex
 norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
-mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.cool)  # scales of reds (or "coolwarm" , "bwr")
+mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.cool)  # scales of reds (or "coolwarm" , "bwr", °cool°)
 df_all_timeEDGES['color'] = df_all_timeEDGES['travel_time'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
 
 df_all_EDGES_time = df_all_EDGES_time[['u','v']]
@@ -155,8 +164,14 @@ TIME_EDGES = pd.merge(times_edges_matched_route, df_all_timeEDGES, on=['u', 'v']
 # remove duplicates nodes
 TIME_EDGES.drop_duplicates(['u', 'v'], inplace=True)
 TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 0)
+TIME_EDGES['travel_time'] = TIME_EDGES['travel_time']/60
+TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 3)
 TIME_EDGES['travel_distance'] = round(abs(TIME_EDGES['travel_distance']), 2)
 TIME_EDGES['travel_speed'] = round(TIME_EDGES['travel_speed'], 0)
+
+TIME_EDGES=TIME_EDGES.rename(columns = {'travel_time':'travel time (min)'})
+TIME_EDGES=TIME_EDGES.rename(columns = {'travel_distance':'travelled distance (km)'})
+TIME_EDGES=TIME_EDGES.rename(columns = {'travel_speed':'travelled speed (km/h)'})
 
 
 #############################################################################################
@@ -174,7 +189,7 @@ style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    TIME_EDGES[['travel_time', 'travel_speed', 'travel_distance', 'geometry']].to_json(),
+    TIME_EDGES[['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)', 'geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
@@ -183,12 +198,100 @@ folium.GeoJson(
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['travel_time', 'travel_speed', 'travel_distance']
+        fields=['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)']
     ),
 ).add_to(my_map)
 
 TIME_EDGES.to_file(filename='TIME_EDGES.geojson', driver='GeoJSON')
-my_map.save("clean_matched_route_travel_time.html")
+# my_map.save("clean_matched_route_travel_time.html")
+my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-03-2020.html")
+
+
+
+#######################################################################
+######### get the travelled SPEED in each edge, when available ########
+#######################################################################
+
+### get average of traveled "time" and travelled "speed" for each edge
+df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
+df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed", ]
+### merge with the above "df_all_EDGES_sel" referred to the counts counts
+# df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
+### drop NaN values
+df_all_EDGES_speed = df_all_EDGES_time.dropna(subset=['travel_speed'])
+
+# sort values by travelled time
+sorted_values = df_all_EDGES_speed.sort_values('travel_speed')
+# df_all_EDGES_speed = df_all_EDGES_speed[df_all_EDGES_time.travel_speed < 1500] #(1000 sec == 16 minutes)
+sorted_values = df_all_EDGES_speed.sort_values('travel_speed')
+
+# make a copy
+df_all_speedEDGES = df_all_EDGES_speed
+# add colors based on 'time' (seconds)
+vmin = min(df_all_EDGES_speed.travel_speed[df_all_EDGES_speed.travel_speed > 0])
+vmax = max(df_all_EDGES_speed.travel_speed)
+AVG = np.average(df_all_EDGES_speed.travel_speed)
+# Try to map values to colors in hex
+norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
+mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.YlGn)  # scales of reds (or "coolwarm" , "bwr")
+df_all_EDGES_speed['color'] = df_all_EDGES_speed['travel_speed'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
+
+df_all_EDGES_speed = df_all_EDGES_speed[['u','v']]
+
+# filter recover_all_EDGES (geo-dataframe) with df_recover_all_EDGES_sel (dataframe)
+keys = list(df_all_EDGES_speed.columns.values)
+index_recover_all_EDGES = gdf_all_EDGES.set_index(keys).index
+index_df_all_EDGES_speed = df_all_EDGES_speed.set_index(keys).index
+
+speeds_edges_matched_route = gdf_all_EDGES[index_recover_all_EDGES.isin(index_df_all_EDGES_speed)]
+
+# get same color name according to the same 'u' 'v' pair
+# merge records and colors into the geodataframe
+SPEED_EDGES = pd.merge(speeds_edges_matched_route, df_all_speedEDGES, on=['u', 'v'], how='inner')
+# remove duplicates nodes
+SPEED_EDGES.drop_duplicates(['u', 'v'], inplace=True)
+SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 0)
+SPEED_EDGES['travel_time'] = SPEED_EDGES['travel_time']/60
+SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 3)
+SPEED_EDGES['travel_distance'] = round(abs(SPEED_EDGES['travel_distance']), 2)
+SPEED_EDGES['travel_speed'] = round(SPEED_EDGES['travel_speed'], 0)
+
+SPEED_EDGES=SPEED_EDGES.rename(columns = {'travel_time':'travel time (min)'})
+SPEED_EDGES=SPEED_EDGES.rename(columns = {'travel_distance':'travelled distance (km)'})
+SPEED_EDGES=SPEED_EDGES.rename(columns = {'travel_speed':'travelled speed (km/h)'})
+
+
+#############################################################################################
+# create basemap
+ave_LAT = 37.53988692816245
+ave_LON = 15.044971594798902
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+#############################################################################################
+
+
+# add colors to map
+my_map = plot_graph_folium_FK(SPEED_EDGES, graph_map=None, popup_attribute=None,
+                              zoom=1, fit_bounds=True, edge_width=2, edge_opacity=1)
+style = {'fillColor': '#00000000', 'color': '#00000000'}
+# add 'u' and 'v' as highligths for each edge (in blue)
+folium.GeoJson(
+    # data to plot
+    SPEED_EDGES[['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)', 'geometry']].to_json(),
+    show=True,
+    style_function=lambda x:style,
+    highlight_function=lambda x: {'weight':3,
+        'color':'blue',
+        'fillOpacity':1
+    },
+    # fields to show
+    tooltip=folium.features.GeoJsonTooltip(
+        fields=['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)']
+    ),
+).add_to(my_map)
+
+SPEED_EDGES.to_file(filename='SPEED_EDGES.geojson', driver='GeoJSON')
+# my_map.save("clean_matched_route_travel_time.html")
+my_map.save("clean_matched_route_travel_speed_all_EDGES_2019-04-15_Apr-03-2020.html")
 
 
 
@@ -217,20 +320,20 @@ folium.GeoJson(
 ######################################################################
 
 import matplotlib as mpl
-COLORS_by_records = pd.DataFrame( MERGED_clean_EDGES.drop_duplicates(['records', 'color']))[['records', 'color']]
+COLORS_by_records = pd.DataFrame( MERGED_clean_EDGES.drop_duplicates(['frequency(%)', 'color']))[['frequency(%)', 'color']]
 # sort by ascending order of the column records
-COLORS_by_records = COLORS_by_records.sort_values(by=['records'])
+COLORS_by_records = COLORS_by_records.sort_values(by=['frequency(%)'])
 len(COLORS_by_records)
 # keep same order...
 color_list = COLORS_by_records.color.drop_duplicates().tolist()
 # display colorbar based on hex colors:
 
-fig, ax = plt.subplots(figsize=(6, 1))
+fig, ax = plt.subplots(figsize=(8, 1))
 fig.subplots_adjust(bottom=0.5)
 # cmap = matplotlib.colors.ListedColormap(color_list)
 cmap = mpl.cm.Reds
-MAX  = max(COLORS_by_records.records)
-MIN  = min(COLORS_by_records.records)
+MAX  = max(COLORS_by_records['frequency(%)'])
+MIN  = min(COLORS_by_records['frequency(%)'])
 cmap.set_over(str(MAX + 5))
 cmap.set_under(str(MIN -5))
 
@@ -248,7 +351,7 @@ cb2 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,
                                 ticks=bounds,
                                 spacing='uniform',
                                 orientation='horizontal')
-cb2.set_label('travel frequency (a.u.)')
+cb2.set_label('travel frequency (%)')
 # fig.show()
 # save colorbar (map-matching frequency)
 fig.savefig('colorbar_map_matched.png')
@@ -257,8 +360,10 @@ merc = os.path.join('colorbar_map_matched.png')
 # overlay colorbar to my_map
 folium.raster_layers.ImageOverlay(merc, bounds = [[37.822617, 15.734203], [37.768644,15.391770]], interactive=True, opacity=1).add_to(my_map)
 # re-save map
-my_map.save("clean_matched_route_frequecy.html")
 
+# my_map.save("clean_matched_route_frequecy.html")
+# my_map.save("clean_matched_route_frequecy_all_EDGES_10032020.html")
+my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-03-2020.html")
 ################################################################
 ################################################################
 
