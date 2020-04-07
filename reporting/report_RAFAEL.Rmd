@@ -32,7 +32,7 @@ Questi dati sono stati eleaborati sia separatamente, sia in modo congiunto per o
 
 
 
-```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1.** AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA."}
+```{r Tabella 1, echo = FALSE, warning = FALSE, cache = FALSE, out.width = "70%", results = 'asis', message = FALSE, comment=FALSE}
 
 
 rm(list = ls())
@@ -60,12 +60,14 @@ library(mapview)
 library(pander)
 options(scipen=5)
 
+
 # saving the original graphical parameters
 op <- par(no.readonly = TRUE)
 
 
 # load edges data
 CT_edges <- read.csv("C:/ENEA_CAS_WORK/Catania_RAFAEL/postprocessing/Catania_edges_60km.csv", header = T)
+VIASAT_data <- read_csv("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/VIASAT_data_row.csv")[-1]
 counts_VIASAT <- read.csv("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/COUNTS_VIASAT_data.csv", header = T)[-1]
 
 edges_stats <- CT_edges %>%
@@ -90,7 +92,7 @@ edges_stats$length_norm <- round(((edges_stats$length)/(max_records$max_length))
 names(edges_stats) <- c("tipologia strada",  "numero totale di strade", "lunghezza (km)", "frazione strade(%)", "frazione lunghezza strade(%)")
 
 
-Caption <- paste0("**Table 1.** Number of analyzed....")
+Caption <- paste0("**Tabella 1.** Classificazione delle strade presenti nella provincia di Catania su un'estensione di 60 km.")
 set.caption(Caption)
 panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
 panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
@@ -131,19 +133,21 @@ La caratteristica di OpenStreetMap, e' quella di fornire delle mappe stradali co
 11. il tipo di strada che e' riportato come categoria del campo *highway*. Ci sono diverse categorie di strade che vanno a coprire le zone urbane, residenziali, pedonali, ciclabili e, a scorrimento veloce. Tutte queste categorie vengo identificate con i seguenti nomi: **unclassified, residential, tertiary, secondary, primary, trunk, trunk_link, living_street, tertiary_link, secondary_link, motorway_link, motorway, trunk, abandoned, footway, pedestrian, raceway, cycleway, steps, construction, bus_guideway, bridleway, corridor, escape, rest_area, track, sidewalk, proposed, path**.
 Tuttavia, per l'analisi congiunta delle informazioni da Open Street Map e per i dati FCD, sono state solo considerate le strade percorse da veicoli (*driving*).
 
-Le informazioni di Open Street Map sopra elencate, sono periodicamente aggiornate dagli enti che si occupano di reti stradali. Tuttavia, e' importante notare che ci potrebbero omissioni ed incongruenze tra la rete stradale reale e quella riportata da OpenStreetMap. 
+Le informazioni di OpenStreetMap sopra elencate, sono periodicamente aggiornate dagli enti che si occupano di reti stradali. Tuttavia, e' importante notare che ci potrebbero omissioni ed incongruenze tra la rete stradale reale e quella riportata da OpenStreetMap. 
 
-La rete stradale che copre l'intera provicia di Catania e' stata ottenuta da 
+La rete stradale che copre l'intera provicia di Catania e' stata quindi ottenuta interrogando il database di OpenStreetMap intorno ad una raggio di 60 Km dal sal capoluogo di Catania in Sicilia. La rete comprende miglia strade e quindi il dataset ottenuta ha delle dimensioni considerevolmente grandi. 
+Per ovviare a problemi di spazio e per garantire un fluida visualizazzione online della rete stradale e dei risultati ottenuti dal confronto con i dati geolocalizzati Viasat, e' stata riportata solo una parte della rete.
+**Figura 1** riporta un grafico riassiuntivo delle principali strade presenti nella provincia di Catania. La lunghezza totale (in Km) ed il numero totale di strade, per tipologia, e' stato riportato assieme alla loro percentuale relativa al numero ed alla lunghezza totale totale di strade.
+
+Come si puo' vedere da Figura 1, il numero piu' grande di strade riguarda quelle *residenziali*, seguite da quelle, *terziare*, *secondarie* e *primarie*. Come si vede c'e' anche un numero consistente di strade *non classificate* la cui lunghezza totale raggiunge circa il 27% della lunghezza totale di tutte le strade.
 
 
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 4e.** Numero di passaggi totali per ora della settimana e per classe di autoveicoli sul tratto dell'autostrada A2 (km5+004) nella direzione verso Salerno."}
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 1.** Ripartizione delle categorie di strade nelle provincia di Catania per un raggio di 60 km attorno al suo capoluogo. I numeri riportati all'interno indicano la percentuale relative al numero ed alla lunghezza totale totale di strade."}
 
 ################################
 ### summary stats by hour ######
 ################################
-
-
 
 p <- ggplot(data = edges_stats_raw,
               aes(`tipologia strada`, records, fill = `tipologia strada`)) + guides(fill=FALSE) +
@@ -174,21 +178,130 @@ p <- ggplot(data = edges_stats_raw,
 
 *<br/><br/>*
 
+**Figura 2** riporta un rappresentazione grafica di una porzione della rete stradale della provincia di Catania. E' possible vedere tutti i nodi che collegano gli archi della rete. Gli archi (strade) sono stati riportati con colori diversi per mostrare la diversa tipologia di strade come sopra descritto. Le strade **secondarie** sono state indicate con il colore **rosso**, quelle **primarie** con il colore **verde**, quelle **terziarie** con il colore **blue**, i **raccordi autostradali** di colore **giallo** le **autostrade** di colore **nero**.  Infine, le **superstade**, le strade **residenziali**,  **non classificate**, i link **terziari e secondary** e le strade di **servizio**, sono state indicate di colore **arancione**.
 
-## 2. Dati FCD Viasat 
 
+```{r, echo=FALSE, fig.cap="**Figura 2**. Porzione della rete stradale della provincia di Catania ottenuta dai dai dati Open Street Map.",out.width = '0%'}
+knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5+004).png")
+
+```
+
+<style>iframe{height: 600px;width: 500px}</style>
+<iframe src="2507530_VIASAT_partial_2019-04-15.html"></iframe>
 
 
 **Problemi rilevati su OSM per la provincia di Catania:**
 
-1.  strade troncate. Spesso si vedono strade che non hanno una continuta'. Piu' precisamente, quando si valuta il percorso di un veicolo (track), si verifica che un nodo non e' connesso al nodo sucessivo che a sua volta potrebbe essere attraversato da un arco su cui si trova un dato FCD. Questo crea una discontinuita' nella rete stradale ed anche nella riscostruzione corretta del percorso di un veicolo.
+Durante la fase di associazione di archi con dati Viasat, sono stati rilevate diverse incogruenze nella rete stradale ottenuta da OpenStreetMap. Queste incongruenze sono probabilmente imputabili ad un mancato aggiornamento del database di OpenStreetMap con lo stato reale della rete stradale.
+Di seguito elenchiamo alcuni di questi problemi:
+
+1.  strade troncate. Spesso si vedono strade che non hanno una continuta'. Piu' precisamente, quando si valuta il percorso di un veicolo (da dati Viasat), si verifica che un nodo non e' connesso al nodo sucessivo che a sua volta potrebbe essere attraversato da un arco su cui si trova un dato FCD. Questo crea una discontinuita' nella rete stradale ed anche nella riscostruzione corretta del percorso di un veicolo.
+
 2. Spesso si nota che la geo-localizazzione di alcuni dati FCD e' situata o sull'estremita' di archi o leggermente al di fuori della traettoria di un arco. Questo si verifica sia su dati aventi un'ottima accuratezza e sia su dati che sono consecutivi uno all'altro lungo un percorso che comprende piu' archi.
+
+
+
+```{r, echo = FALSE, warning = FALSE, cache = FALSE, out.width = "70%", results = 'asis', message = FALSE, comment=FALSE}
+
+VIASAT_data_select <- VIASAT_data %>%
+  select (-id,
+          - geom,
+          - distance,
+          - dates,
+          - new_dates)
+
+DAYS_VIASAT_data <- VIASAT_data_select %>%
+  mutate(DATE = date(timedate)) %>%
+  group_by(DATE) %>%
+  summarise(sum_progressive = sum(progressive)/1000)
+
+DAYS_VIASAT_data <- DAYS_VIASAT_data %>%
+  filter(sum_progressive > 10000)
+
+# get a distributions of speed
+filter <- DAYS_VIASAT_data$DATE
+
+Caption <- paste0("**Tabella 2.** Attributi dei dati geolocalizzati ottenuti da Viasat.")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(head(VIASAT_data_select), emphasize.strong.cols = 1, missing = "")
+
+```
+
+
+
+## 2. Dati FCD Viasat 
+
+Un campione di **`r length(VIASAT_data)`** di dati Viasat  (*floating car data*) e' stato analizzato per fare un'associazioe tra le posizioni registrate da ogni veicolo e la rete stradale di Catania.
+Un'analisi preliminare dei dati Viasat, ha mostrato che la maggior parte dei chilometri percorsi dai veicoli era  principalmente distribuito su **`r nrow(DAYS_VIASAT_data)`** giorni:**`r filter`** (vedi **Figura 2**).   
+
+La struttura principale dei dati Viasat e' riportata in **Tabella 2**. Come di puo' vedere, dati sono caratterizzati dalla presenza di un identificativo anonimo del vicolo **ideterm**, di un *orario* (**timedate**),  della distanza progressiva percorsa da ogni veicolo (**progressive**), dal un segnale *on/off* (**panel**) che indica se il motore e' acceso o spento. Infine, viene anche riportata l'*accuratezza* del dato GPS (**grade**) il cui valore varia da 1 (piu' accurato) a 50 (meno accurato). 
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=6,  fig.cap ="**Figura 2.** Distribuzione dei chilometri percorsi dai veicoli per giorno di geolocalizzazione nella provincia di Catania. Le linee tratteggiate sono riferite ad un valore di circa 4000 e 8000 km, rispettivamente"}
+
+VIASAT_data_filtered <- VIASAT_data %>%
+  mutate(DATE = date(timedate)) %>%
+  filter(DATE %in% c(filter))
+
+p <- VIASAT_data_filtered %>%
+  ggplot(aes( (progressive), fill = as.factor(DATE))) + 
+  geom_density(alpha = 0.5) +
+  scale_x_continuous(trans='log10') +
+  guides(fill=guide_legend(title="Date")) +
+  theme_bw() +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=13),     
+        axis.text.x=element_text(angle=0,hjust=0,vjust=1, size=14)) +
+  # theme(axis.text.x=element_text(size=14,face="bold", colour = "black")) +
+  ylab("densita' (unita' arbitrarie)") +
+  xlab("kilometri percorsi") +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+  geom_vline(xintercept=4000, color="red", linetype="dashed", size=0.5) +
+   geom_vline(xintercept=8000, color="red", linetype="dashed", size=0.5) +
+  ggtitle("Distribuzione dei chilometri percorsi dai veicoli per giorno di geolocalizzazione") +
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+
+```
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=6,  fig.cap ="**Figura 3.** Distribuzione del numero di geolocalizazzioni giornaliere per veicoli circolanti nella provincia di Catania. La linea tratteggiata e' riferita ad un valore di circa 40 km/h"}
+
+
+p <- VIASAT_data_filtered %>%
+  ggplot(aes( (speed), fill = as.factor(DATE))) + 
+  geom_density(alpha = 0.5) +
+  scale_x_continuous(trans='log10') +
+  guides(fill=guide_legend(title="Date")) +
+  theme_bw() +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=13),     
+        axis.text.x=element_text(angle=0,hjust=0,vjust=1, size=14)) +
+  # theme(axis.text.x=element_text(size=14,face="bold", colour = "black")) +
+  ylab("densita' (unita' arbitrarie)") +
+  xlab("velocita' (km/h)") +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+  geom_vline(xintercept=37, color="red", linetype="dashed", size=0.5) +
+  ggtitle("Distribuzione delle velocita' dei veicoli per giorno di geolocalizazzione") +
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+
+```
 
 
 *<br/><br/>*
 
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=6,  fig.cap ="**Figura 2.** Distribuzione del numero delle posizioni dei veicoli per giorno di geolocalizazzione."}
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=6,  fig.cap ="**Figura 2.** Distribuzione del numero di geolocalizazzioni giornaliere per veicoli circolanti nella provincia di Catania."}
 
 ######################################
 ### Distribution of VIASAT data  #####
@@ -225,38 +338,62 @@ p
 
 ```
 
+
 *<br/><br/>*
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1.** Serie temporale oraria del numero di passaggi per tutti i tipi di autoveicoli sull'autostrada A2 (km5+004) direzione Salerno"}
+````{r Tabella 3, echo = FALSE, warning = FALSE, cache = FALSE, out.width = "70%", results = 'asis', message = FALSE, comment=FALSE}
 
-# load data
-# setwd
-# WD <- "C:/ENEA_CAS_WORK/Catania_RAFAEL/"
-# setwd(WD)
-# 
-# path <- geojson_read("all_EDGES_2019-04-15_Apr-03-2020.geojson", what = "sp")
-# AAA = as.data.frame(path)
+# load map-matched data
+all_EDGES_map_matching <- geojson_read("all_EDGES_2019-04-15_Apr-07-2020.geojson", what = "sp")
+all_EDGES_map_matching = as.data.frame(all_EDGES_map_matching)
+all_EDGES_map_matching <- apply(all_EDGES_map_matching,2,as.character)
+write.csv(all_EDGES_map_matching, "all_EDGES_map_matching.csv")
+all_EDGES_map_matching <- read.csv("all_EDGES_map_matching.csv", header = TRUE)[-1]
 
+# sort by distance 
+all_EDGES_map_matching <- all_EDGES_map_matching %>% 
+# desc orders from largest to smallest
+  arrange(desc(distance)) %>%
+  select(- osmid,
+         - service,
+         - width,
+         - access,
+         - area,
+         - key,
+         - id,
+         - junction,
+         - bridge,
+         - tunnel,
+         - lanes)
+
+
+# rename some columns
+colnames(all_EDGES_map_matching)[which(colnames(all_EDGES_map_matching) == 'distance')] <- 'travelled distance (km)'
+colnames(all_EDGES_map_matching)[which(colnames(all_EDGES_map_matching) == 'speed')] <- 'travelled speed (km/h)'
+colnames(all_EDGES_map_matching)[which(colnames(all_EDGES_map_matching) == 'time')] <- 'travelled time (min)'
+
+
+all_EDGES_map_matching_table <- all_EDGES_map_matching[1:10, ]
 # map <- htmltools::includeHTML("matched_route_VIASAT_2019-04-16_Mar-30-2020.html")
 
-```
+all_EDGES_map_matching_table[all_EDGES_map_matching_table=="character(0)"]<- ""
+# str(all_EDGES_map_matching_table)
 
+# all attributes of EGDES
+names_all_EDGES <- names(all_EDGES_map_matching)
 
-
-
-```{r, echo=FALSE, fig.cap="**Figura 3**. Porzione della rete stradale della provincia di Catania ottenuta dai dai dati Open Street Map.",out.width = '0%'}
-knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5+004).png")
-
-```
-
-<style>iframe{height: 600px;width: 500px}</style>
-<iframe src="2507530_VIASAT_partial_2019-04-15.html"></iframe>
-
-
-```{r, echo=FALSE, fig.cap="**Figura 4**. **Betweeness Centrality** di una porzione della rete stradale della provincia di Catania ottenuta dai dai dati Open Street Map.",out.width = '0%'}
-knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5+004).png")
+Caption <- paste0("**Tabella 3.** Attributi della rete stradale OpenStreetMap associata alle traccie GPS (Viasat) di veicoli in movimento.")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(all_EDGES_map_matching_table, emphasize.strong.cols = 1, missing = "")
 
 ```
+
+
+**`r names_all_EDGES`**
+
 
 **Betweenness centrality**
 E’ una misura che indica l’influenza di un nodo rispetto al flusso di traffico tra ogni paio di nodi (con il presupposto che I flussi di traffico  occorrano sui tragitti piu’ corti.
@@ -268,8 +405,31 @@ E’ una misura che indica la lunghezza media del cammino piu’ corto da un det
 Il nodo con la “closeness centrality” piu’ grande, e’ il nodo piu’ vicino a tutti gli altri nodi
 
 
+```{r, echo=FALSE, fig.cap="**Figura 4**. **Betweeness Centrality** di una porzione della rete stradale della provincia di Catania ottenuta dai dai dati Open Street Map.",out.width = '0%'}
+knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5+004).png")
+```
+
+```{r, echo=FALSE, fig.cap="**Figura XXXX**. Centralita'.",out.width = '40%'}
+knitr::include_graphics("colorbar_centrality.png")
+```
+
+
 <style>iframe{height: 600px;width: 500px; zoom: 1.5; -moz-transform: scale(1.5); -moz-transform-origin: 0 0}</style>
 <iframe src="btw_centrality_Catania__Italy.html"></iframe>
+
+*<br/><br/>*
+
+
+```{r, echo=FALSE, fig.cap="**Figura 4a**. **Betweeness Centrality** di una porzione della rete stradale della provincia di Catania ottenuta dai dai dati Open Street Map.",out.width = '0%'}
+knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5+004).png")
+```
+
+```{r, echo=FALSE, fig.cap="**Figura YYYYY**. Centralita'.",out.width = '40%'}
+knitr::include_graphics("colorbar_centrality.png")
+```
+
+<style>iframe{height: 600px;width: 700px}</style>
+<iframe src="close_centrality_Catania__Italy.html"></iframe>
 
 
 
@@ -278,9 +438,9 @@ knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5
 
 ```
 
+
 <style>iframe{height: 600px;width: 700px}</style>
 <iframe src="clean_matched_route_frequecy_all_EDGES_10032020.html"></iframe>
-
 
 
 ```{r, echo=FALSE, fig.cap="**Figura 5a**. Frequenza di percorrenza di ogni arco stradale nella provicnia di Catania. Il dato e' in percentuale relativa al numero massimo di percorrenze.(SMALL DATASET)",out.width = '0%'}
@@ -312,8 +472,5 @@ knitr::include_graphics("C:/ENEA_CAS_WORK/SENTINEL/ANAS/postazione_671 (A2, Km 5
 
 
 *<br/><br/>*
-
-*<br/><br/>*
-
 
 
