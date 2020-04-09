@@ -31,9 +31,8 @@ from shapely import geometry, ops
 
 # gdf_all_EDGES = gpd.read_file("all_EDGES_10032020.geojson")
 # gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
-gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-03-2020.geojson")
+gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-07-2020.geojson")
 
-# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-16_Mar-30-2020.geojson")
 
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
@@ -41,6 +40,9 @@ gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
 # distance --> km
 # speed --> km/h
 gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time', 'distance', 'speed']]
+# fill nans by mean of before and after non-nan values
+gdf_all_EDGES_time['time'] = (gdf_all_EDGES_time['time'].ffill()+gdf_all_EDGES_time['time'].bfill())/2
+gdf_all_EDGES_time['speed'] = (gdf_all_EDGES_time['speed'].ffill()+gdf_all_EDGES_time['speed'].bfill())/2
 
 ###################
 #### GROUP BY #####
@@ -119,7 +121,7 @@ folium.GeoJson(
 
 # my_map.save("clean_matched_route_frequecy.html")
 # my_map.save("clean_matched_route_frequecy_all_EDGES_10032020.html")
-my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-03-2020.html")
+my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-07-2020.html")
 
 #######################################################################
 ######### get the travelled TIME in each edge, when available #########
@@ -164,8 +166,9 @@ TIME_EDGES = pd.merge(times_edges_matched_route, df_all_timeEDGES, on=['u', 'v']
 # remove duplicates nodes
 TIME_EDGES.drop_duplicates(['u', 'v'], inplace=True)
 TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 0)
-TIME_EDGES['travel_time'] = TIME_EDGES['travel_time']/60
+TIME_EDGES['travel_time'] = TIME_EDGES['travel_time']/60  # minutes
 TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 3)
+TIME_EDGES['travel_distance'] = (TIME_EDGES['travel_speed']) * (TIME_EDGES['travel_time']/60)  # (km/h)
 TIME_EDGES['travel_distance'] = round(abs(TIME_EDGES['travel_distance']), 2)
 TIME_EDGES['travel_speed'] = round(TIME_EDGES['travel_speed'], 0)
 
@@ -202,11 +205,7 @@ folium.GeoJson(
     ),
 ).add_to(my_map)
 
-TIME_EDGES.to_file(filename='TIME_EDGES.geojson', driver='GeoJSON')
-# my_map.save("clean_matched_route_travel_time.html")
-my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-03-2020.html")
-
-
+my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-07-2020.html")
 
 #######################################################################
 ######### get the travelled SPEED in each edge, when available ########
@@ -253,6 +252,7 @@ SPEED_EDGES.drop_duplicates(['u', 'v'], inplace=True)
 SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 0)
 SPEED_EDGES['travel_time'] = SPEED_EDGES['travel_time']/60
 SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 3)
+SPEED_EDGES['travel_distance'] = (SPEED_EDGES['travel_speed']) * (SPEED_EDGES['travel_time']/60)  # (km/h)
 SPEED_EDGES['travel_distance'] = round(abs(SPEED_EDGES['travel_distance']), 2)
 SPEED_EDGES['travel_speed'] = round(SPEED_EDGES['travel_speed'], 0)
 
@@ -291,7 +291,7 @@ folium.GeoJson(
 
 SPEED_EDGES.to_file(filename='SPEED_EDGES.geojson', driver='GeoJSON')
 # my_map.save("clean_matched_route_travel_time.html")
-my_map.save("clean_matched_route_travel_speed_all_EDGES_2019-04-15_Apr-03-2020.html")
+my_map.save("clean_matched_route_travel_speed_all_EDGES_2019-04-15_Apr-07-2020.html")
 
 
 
