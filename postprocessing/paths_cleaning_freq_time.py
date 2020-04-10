@@ -29,9 +29,10 @@ from shapely import geometry, ops
 ## reload data (to be used later on...)
 # gdf_all_EDGES = gpd.read_file("all_EDGES.geojson")
 
-# gdf_all_EDGES = gpd.read_file("all_EDGES_10032020.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_10032020.geojson")  # LARGE file
 # gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
 gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-07-2020.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-10-2020.geojson")
 
 
 ## select only columns 'u' and 'v'
@@ -39,10 +40,20 @@ gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
 # time --> secs
 # distance --> km
 # speed --> km/h
+# gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time', 'distance', 'speed', 'hour', 'timedate']]
 gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time', 'distance', 'speed']]
-# fill nans by mean of before and after non-nan values
+## fill nans by mean of before and after non-nan values (for 'time' and 'speed')
 gdf_all_EDGES_time['time'] = (gdf_all_EDGES_time['time'].ffill()+gdf_all_EDGES_time['time'].bfill())/2
 gdf_all_EDGES_time['speed'] = (gdf_all_EDGES_time['speed'].ffill()+gdf_all_EDGES_time['speed'].bfill())/2
+
+## fill nans by values after non-nan values (for 'hour' and 'timedate')
+# gdf_all_EDGES_time['hour'] = gdf_all_EDGES_time['hour'].ffill()
+# gdf_all_EDGES_time['timedate'] = gdf_all_EDGES_time['timedate'].ffill()
+## drop nan values from the column "hour"
+# gdf_all_EDGES_time.dropna(subset = ['hour'], inplace= True)
+
+AAA = pd.DataFrame(gdf_all_EDGES_time)
+AAA.dropna(subset = ['hour'], inplace= True)
 
 ###################
 #### GROUP BY #####
@@ -57,10 +68,12 @@ df_all_EDGES_sel = gdf_all_EDGES.groupby(gdf_all_EDGES_sel.columns.tolist()).siz
 # make a copy
 df_all_EDGES_records = df_all_EDGES_sel
 threshold = np.average(df_all_EDGES_records.records)
-# select only columns with records > N
+
+### select only columns with records > N
 # df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= 15]
-df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= round(threshold,0) + 1]
-# add colors based on 'records'
+# df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= round(threshold,0) + 1]
+
+### add colors based on 'records'
 vmin = min(df_all_EDGES_records.records)
 vmax = max(df_all_EDGES_records.records)
 # df_all_EDGES_records.iloc[-1] = np.nan
@@ -97,7 +110,7 @@ MERGED_clean_EDGES['frequency(%)'] = round(MERGED_clean_EDGES['records'], 0)
 ave_LAT = 37.53988692816245
 ave_LON = 15.044971594798902
 my_map = folium.Map([ave_LAT, ave_LON], zoom_start=14, tiles='cartodbpositron')
-#############################################################################################
+###################################################
 
 # add colors to map
 my_map = plot_graph_folium_FK(MERGED_clean_EDGES, graph_map=None, popup_attribute=None,
@@ -118,10 +131,18 @@ folium.GeoJson(
         fields=['u', 'v', 'length(km)', 'frequency(%)']
     ),
 ).add_to(my_map)
+folium.TileLayer('cartodbdark_matter').add_to(my_map)
+folium.LayerControl().add_to(my_map)
+##########################################
 
-# my_map.save("clean_matched_route_frequecy.html")
+MERGED_clean_EDGES.to_file(filename='MERGED_clean_EDGES.geojson', driver='GeoJSON')
 # my_map.save("clean_matched_route_frequecy_all_EDGES_10032020.html")
 my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-07-2020.html")
+
+### compute the average number of trips between the SAME ORIGIN and DESTINATION
+gdf_all_EDGES_ODs = gdf_all_EDGES[['ORIGIN', 'DESTINATION']]
+df_all_EDGES_ODs = gdf_all_EDGES.groupby(gdf_all_EDGES_ODs.columns.tolist()).size().reset_index().rename(columns={0:'N_trips'})
+edge_with_more_trips = df_all_EDGES_ODs[['ORIGIN','DESTINATION']][ df_all_EDGES_ODs.N_trips == max(df_all_EDGES_ODs.N_trips)]
 
 #######################################################################
 ######### get the travelled TIME in each edge, when available #########
@@ -204,6 +225,8 @@ folium.GeoJson(
         fields=['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)']
     ),
 ).add_to(my_map)
+folium.TileLayer('cartodbdark_matter').add_to(my_map)
+folium.LayerControl().add_to(my_map)
 
 my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-07-2020.html")
 
@@ -288,6 +311,8 @@ folium.GeoJson(
         fields=['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)']
     ),
 ).add_to(my_map)
+folium.TileLayer('cartodbdark_matter').add_to(my_map)
+folium.LayerControl().add_to(my_map)
 
 SPEED_EDGES.to_file(filename='SPEED_EDGES.geojson', driver='GeoJSON')
 # my_map.save("clean_matched_route_travel_time.html")
@@ -368,14 +393,47 @@ my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-03-2020.html"
 ################################################################
 
 
-'''
-###################################
-##### ORIGINS and DESTINATIONS ####
-###################################
 
-# laad grafo
-# file_graphml = 'Catania__Italy_cost.graphml'
-# grafo = ox.load_graphml(file_graphml)
+
+'''
+geoms = []
+# get all the paths accross the same edge (u,v)
+for i in range(len(MERGED_clean_EDGES)):
+    U = MERGED_clean_EDGES.u.iloc[i]
+    V = MERGED_clean_EDGES.v.iloc[i]
+    print('u:', U, 'v:', V, '================================================')
+    BBB = gdf_all_EDGES[(gdf_all_EDGES['u'] == U) & (gdf_all_EDGES['v'] == V)]
+    # get all the "story of the track_ID vehicles
+    ID_list = list(BBB.track_ID)
+    # filter gdf_all_EDGES based on a list of index
+    all_paths = gdf_all_EDGES[gdf_all_EDGES.track_ID.isin(ID_list)]
+    # all_paths.plot()
+
+    # make an unique linestring
+    LINE = []
+    # combine them into a multi-linestring
+    for j in range(len(all_paths)):
+        line = all_paths.geometry.iloc[j]
+        LINE.append(line)
+
+    multi_line = geometry.MultiLineString(LINE)
+    # merge the lines
+    merged_line = ops.linemerge(multi_line)
+    geoms.append(merged_line)
+
+# newdata = gpd.GeoDataFrame(MERGED_clean_EDGES, geometry=geoms)  # this file is too BIG!!!
+# newdata.geometry.to_file(filename='newdata.geojson', driver='GeoJSON')
+'''
+
+
+########################################
+##### ORIGINS and DESTINATIONS #########
+########################################
+
+# load grafo
+file_graphml = 'Catania__Italy_cost.graphml'
+grafo = ox.load_graphml(file_graphml)
+# ox.plot_graph(grafo)
 
 
 # make an empty dataframe to report all ORIGINS from which travels started and that crossed a given edge (u,v)
@@ -386,7 +444,7 @@ all_DESTINATIONS_df = pd.DataFrame([])
 for i in range(len(MERGED_clean_EDGES)):
     U = MERGED_clean_EDGES.u.iloc[i]
     V = MERGED_clean_EDGES.v.iloc[i]
-    print('u:', U, 'v:', V, '================================================')
+    # print('u:', U, 'v:', V, '================================================')
     BBB = gdf_all_EDGES[(gdf_all_EDGES['u'] == U) & (gdf_all_EDGES['v'] == V)]
     # get all the "story of the track_ID vehicles
     ID_list = list(BBB.track_ID)
@@ -455,7 +513,7 @@ crs = {'init': 'epsg:4326'}
 all_ORIGINS_gdf = GeoDataFrame(all_ORIGINS_df, crs=crs, geometry=geometry)
 # save first as geojson file
 all_ORIGINS_gdf.geometry.to_file(filename='all_PATHS_gdf.geojson', driver='GeoJSON')
-all_ORIGINS_gdf.plot()
+# all_ORIGINS_gdf.plot()
 
 all_DESTINATIONS_df.drop_duplicates(['LON_DESTINATION', 'LAT_DESTINATION'], inplace=True)
 #  make a geodataframe from lat, lon
@@ -464,14 +522,14 @@ crs = {'init': 'epsg:4326'}
 all_DESTINATIONS_gdf = GeoDataFrame(all_DESTINATIONS_df, crs=crs, geometry=geometry)
 # save first as geojson file
 all_DESTINATIONS_gdf.geometry.to_file(filename='all_PATHS_gdf.geojson', driver='GeoJSON')
-all_DESTINATIONS_gdf.plot()
+# all_DESTINATIONS_gdf.plot()
 
 
 for idx, row in all_ORIGINS_df.iterrows():
     folium.CircleMarker(location=[row["LAT_ORIGIN"], row["LON_ORIGIN"]],
                                                 # popup=row["deviceid"],
                                                 radius=0.5,
-                                                color="black",
+                                                color="blue",
                                                 # fill=True,
                                                 # fill_color="black",
                                                 fill_opacity=0.1).add_to(my_map)
@@ -480,12 +538,12 @@ for idx, row in all_DESTINATIONS_df.iterrows():
     folium.CircleMarker(location=[row["LAT_DESTINATION"], row["LON_DESTINATION"]],
                                                 # popup=row["deviceid"],
                                                 radius=0.5,
-                                                color="blue",
+                                                color="red",
                                                 # fill=True,
                                                 # fill_color="blue",
                                                 fill_opacity=0.1).add_to(my_map)
 
-my_map.save("clean_matched_route.html")
+my_map.save("clean_matched_route_OD.html")
 
-'''
+
 
