@@ -222,7 +222,7 @@ for idx, row in unique_DATES.iterrows():
             #     'tertiary_link"]')
             filter = (
                 '["highway"!~"living_street|abandoned|steps|construction|'
-                'bus_guideway|bridleway|corridor|escape|rest_area|track|proposed|path"]')
+                'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
             grafo = ox.graph_from_polygon(viasat_extent.geometry[0], custom_filter=filter)
 
             # ox.plot_graph(grafo)
@@ -609,7 +609,7 @@ for idx, row in unique_DATES.iterrows():
                                 # distance travelled from one point to the next one (in km)
                                 distance_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).progressive) - int(
                                     (viasat[viasat['ID'] == track_list[i]]).progressive)
-                                distance_VIASAT = distance_VIASAT / 1000  # in Km
+                                distance_VIASAT = abs(distance_VIASAT) / 1000  # in Km
                                 # add distance to a dictionary in function of edge "u"
                                 distance_between_points[u] = distance_VIASAT
                                 # time spent to travel from one point to te next one (in seconds)
@@ -683,7 +683,7 @@ for idx, row in unique_DATES.iterrows():
                                         # distance travelled from one point to the next one (in km)
                                         distance_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).progressive) - int(
                                             (viasat[viasat['ID'] == track_list[i]]).progressive)
-                                        distance_VIASAT = distance_VIASAT / 1000  # in Km
+                                        distance_VIASAT = abs(distance_VIASAT) / 1000  # in Km
                                         # add distance to a dictionary in function of edge "u"
                                         distance_between_points[u] = distance_VIASAT
                                         # time spent to travel from one point to te next one (in seconds)
