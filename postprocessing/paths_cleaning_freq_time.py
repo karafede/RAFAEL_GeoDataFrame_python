@@ -24,17 +24,25 @@ import matplotlib.colors as mcolors
 from folium_stuff_FK_map_matching import plot_graph_folium_FK
 from shapely.geometry import Point, LineString, MultiLineString
 from shapely import geometry, ops
+import glob
 
 
 ## reload data (to be used later on...)
 # gdf_all_EDGES = gpd.read_file("all_EDGES.geojson")
-
 # gdf_all_EDGES = gpd.read_file("all_EDGES_10032020.geojson")  # LARGE file
 # gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15.geojson")
-gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-07-2020.geojson")
-# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-10-2020.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-07-2020.geojson")
+# gdf_all_EDGES = gpd.read_file("all_EDGES_2019-04-15_Apr-11-2020.geojson")
+
+# match pattern of .GeoJson files
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing\\new_geojsons')
+extension = 'geojson'
+all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
+#combine all files in the list
+gdf_all_EDGES = pd.concat([gpd.read_file(f) for f in all_filenames])
 
 
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
 # time --> secs
@@ -52,8 +60,8 @@ gdf_all_EDGES_time['speed'] = (gdf_all_EDGES_time['speed'].ffill()+gdf_all_EDGES
 ## drop nan values from the column "hour"
 # gdf_all_EDGES_time.dropna(subset = ['hour'], inplace= True)
 
-AAA = pd.DataFrame(gdf_all_EDGES_time)
-AAA.dropna(subset = ['hour'], inplace= True)
+# AAA = pd.DataFrame(gdf_all_EDGES_time)
+# AAA.dropna(subset = ['hour'], inplace= True)
 
 ###################
 #### GROUP BY #####
@@ -135,9 +143,10 @@ folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 ##########################################
 
-MERGED_clean_EDGES.to_file(filename='MERGED_clean_EDGES.geojson', driver='GeoJSON')
+# MERGED_clean_EDGES.to_file(filename='MERGED_clean_EDGES.geojson', driver='GeoJSON')
 # my_map.save("clean_matched_route_frequecy_all_EDGES_10032020.html")
-my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-07-2020.html")
+my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-17-2020.html")
+
 
 ### compute the average number of trips between the SAME ORIGIN and DESTINATION
 gdf_all_EDGES_ODs = gdf_all_EDGES[['ORIGIN', 'DESTINATION']]
@@ -148,18 +157,42 @@ edge_with_more_trips = df_all_EDGES_ODs[['ORIGIN','DESTINATION']][ df_all_EDGES_
 ######### get the travelled TIME in each edge, when available #########
 #######################################################################
 
-### get average of traveled "time" and travelled "speed" for each edge
+
+# LENGHTS = pd.DataFrame(gdf_all_EDGES.length)
+# SUMMARY_times = pd.DataFrame(gdf_all_EDGES_time.time)  # time is in seconds
+# SUMMARY_times = SUMMARY_times.dropna(subset=['time'])
+# SUMMARY_times.reset_index(inplace=True)
+
+# get maximum edge length
+L = []
+for i in range(len(gdf_all_EDGES)):
+    l = gdf_all_EDGES.iloc[i].length
+    L.append(l)
+max_length = max(L) #in meters
+# Out[89]: 11050.723 meters
+# minimum speed: 30kh/h ---> 120 sec for each km of road
+max_possible_time = (1/60)*3600*max_length/1000
+
+# gdf_all_EDGES_time = gdf_all_EDGES_time[gdf_all_EDGES_time.time < max_possible_time]
+# AAA = pd.DataFrame(gdf_all_EDGES_time)
+
+### get AVERAGE of traveled "time" and travelled "speed" for each edge
 df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
 df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed", ]
+df_all_EDGES_time = pd.merge(MERGED_clean_EDGES, df_all_EDGES_time, on=['u', 'v'], how='inner')
+df_all_EDGES_time = pd.DataFrame(df_all_EDGES_time)
+sorted_length = df_all_EDGES_time.sort_values('length')
+df_all_EDGES_time = df_all_EDGES_time[["u", "v", "travel_time", "travel_distance", "length(km)", "travel_speed" ]]
 ### merge with the above "df_all_EDGES_sel" referred to the counts counts
 # df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
 ### drop NaN values
 df_all_EDGES_time = df_all_EDGES_time.dropna(subset=['travel_time'])
+df_all_EDGES_time['travel_time'] = ((df_all_EDGES_time['length(km)']) / (df_all_EDGES_time['travel_speed'])) *3600 # seconds
 
 # sort values by travelled time
-sorted_values = df_all_EDGES_time.sort_values('travel_time')
-df_all_EDGES_time = df_all_EDGES_time[df_all_EDGES_time.travel_time < 1500] #(1000 sec == 16 minutes)
-sorted_values = df_all_EDGES_time.sort_values('travel_time')
+# sorted_values = df_all_EDGES_time.sort_values('travel_time')
+# df_all_EDGES_time = df_all_EDGES_time[df_all_EDGES_time.travel_time < 1500] #(1000 sec == 16 minutes)
+# sorted_values = df_all_EDGES_time.sort_values('travel_time')
 
 # make a copy
 df_all_timeEDGES = df_all_EDGES_time
@@ -174,6 +207,7 @@ df_all_timeEDGES['color'] = df_all_timeEDGES['travel_time'].apply(lambda x: mcol
 
 df_all_EDGES_time = df_all_EDGES_time[['u','v']]
 
+
 # filter recover_all_EDGES (geo-dataframe) with df_recover_all_EDGES_sel (dataframe)
 keys = list(df_all_EDGES_time.columns.values)
 index_recover_all_EDGES = gdf_all_EDGES.set_index(keys).index
@@ -186,14 +220,20 @@ times_edges_matched_route = gdf_all_EDGES[index_recover_all_EDGES.isin(index_df_
 TIME_EDGES = pd.merge(times_edges_matched_route, df_all_timeEDGES, on=['u', 'v'], how='inner')
 # remove duplicates nodes
 TIME_EDGES.drop_duplicates(['u', 'v'], inplace=True)
-TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 0)
-TIME_EDGES['travel_time'] = TIME_EDGES['travel_time']/60  # minutes
-TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 3)
-TIME_EDGES['travel_distance'] = (TIME_EDGES['travel_speed']) * (TIME_EDGES['travel_time']/60)  # (km/h)
-TIME_EDGES['travel_distance'] = round(abs(TIME_EDGES['travel_distance']), 2)
+TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 1)
+# TIME_EDGES['travel_time'] = TIME_EDGES['travel_time']/60  # minutes
+# TIME_EDGES['travel_time'] = round(TIME_EDGES['travel_time'], 3)
+# TIME_EDGES['travel_distance'] = (TIME_EDGES['travel_speed']) * (TIME_EDGES['travel_time']/60)  # (km/h)
+# TIME_EDGES['travel_distance'] = round(abs(TIME_EDGES['travel_distance']), 2)
+
+TIME_EDGES['length(km)'] = TIME_EDGES['length']/1000
+TIME_EDGES['length(km)'] = round(TIME_EDGES['length(km)'], 3)
+
+# TIME_EDGES['travel_distance'] = round(abs(TIME_EDGES["length(km)"]), 2)
+# TIME_EDGES['travel_time'] = round((TIME_EDGES['length(km)'])/(TIME_EDGES['travel_speed']), 0)
 TIME_EDGES['travel_speed'] = round(TIME_EDGES['travel_speed'], 0)
 
-TIME_EDGES=TIME_EDGES.rename(columns = {'travel_time':'travel time (min)'})
+TIME_EDGES=TIME_EDGES.rename(columns = {'travel_time':'travel time (sec)'})
 TIME_EDGES=TIME_EDGES.rename(columns = {'travel_distance':'travelled distance (km)'})
 TIME_EDGES=TIME_EDGES.rename(columns = {'travel_speed':'travelled speed (km/h)'})
 
@@ -205,7 +245,6 @@ ave_LON = 15.044971594798902
 my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 #############################################################################################
 
-
 # add colors to map
 my_map = plot_graph_folium_FK(TIME_EDGES, graph_map=None, popup_attribute=None,
                               zoom=1, fit_bounds=True, edge_width=2, edge_opacity=1)
@@ -213,7 +252,7 @@ style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    TIME_EDGES[['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)', 'geometry']].to_json(),
+    TIME_EDGES[['travel time (sec)', 'travelled speed (km/h)', 'length(km)', 'geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
@@ -222,13 +261,14 @@ folium.GeoJson(
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)']
+        fields=['travel time (sec)', 'travelled speed (km/h)', 'length(km)']
     ),
 ).add_to(my_map)
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 
-my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-07-2020.html")
+TIME_EDGES.to_file(filename='TIME_EDGES.geojson', driver='GeoJSON')
+my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-17-2020.html")
 
 #######################################################################
 ######### get the travelled SPEED in each edge, when available ########
@@ -237,14 +277,17 @@ my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-07-2020.ht
 ### get average of traveled "time" and travelled "speed" for each edge
 df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
 df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed", ]
+df_all_EDGES_time = pd.merge(MERGED_clean_EDGES, df_all_EDGES_time, on=['u', 'v'], how='inner')
+df_all_EDGES_time = pd.DataFrame(df_all_EDGES_time)
+df_all_EDGES_time = df_all_EDGES_time[["u", "v", "travel_time", "travel_distance", "length(km)", "travel_speed" ]]
+
 ### merge with the above "df_all_EDGES_sel" referred to the counts counts
 # df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
 ### drop NaN values
 df_all_EDGES_speed = df_all_EDGES_time.dropna(subset=['travel_speed'])
+df_all_EDGES_time['travel_time'] = ((df_all_EDGES_time['length(km)']) / (df_all_EDGES_time['travel_speed'])) *3600 # seconds
 
 # sort values by travelled time
-sorted_values = df_all_EDGES_speed.sort_values('travel_speed')
-# df_all_EDGES_speed = df_all_EDGES_speed[df_all_EDGES_time.travel_speed < 1500] #(1000 sec == 16 minutes)
 sorted_values = df_all_EDGES_speed.sort_values('travel_speed')
 
 # make a copy
@@ -272,14 +315,18 @@ speeds_edges_matched_route = gdf_all_EDGES[index_recover_all_EDGES.isin(index_df
 SPEED_EDGES = pd.merge(speeds_edges_matched_route, df_all_speedEDGES, on=['u', 'v'], how='inner')
 # remove duplicates nodes
 SPEED_EDGES.drop_duplicates(['u', 'v'], inplace=True)
-SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 0)
-SPEED_EDGES['travel_time'] = SPEED_EDGES['travel_time']/60
-SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 3)
-SPEED_EDGES['travel_distance'] = (SPEED_EDGES['travel_speed']) * (SPEED_EDGES['travel_time']/60)  # (km/h)
-SPEED_EDGES['travel_distance'] = round(abs(SPEED_EDGES['travel_distance']), 2)
+SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 1)
+# SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 0)
+# SPEED_EDGES['travel_time'] = SPEED_EDGES['travel_time']/60
+# SPEED_EDGES['travel_time'] = round(SPEED_EDGES['travel_time'], 3)
+# SPEED_EDGES['travel_distance'] = (SPEED_EDGES['travel_speed']) * (SPEED_EDGES['travel_time']/60)  # (km/h)
+# SPEED_EDGES['travel_distance'] = round(abs(SPEED_EDGES['travel_distance']), 2)
 SPEED_EDGES['travel_speed'] = round(SPEED_EDGES['travel_speed'], 0)
 
-SPEED_EDGES=SPEED_EDGES.rename(columns = {'travel_time':'travel time (min)'})
+SPEED_EDGES['length(km)'] = SPEED_EDGES['length']/1000
+SPEED_EDGES['length(km)'] = round(SPEED_EDGES['length(km)'], 3)
+
+SPEED_EDGES=SPEED_EDGES.rename(columns = {'travel_time':'travel time (sec)'})
 SPEED_EDGES=SPEED_EDGES.rename(columns = {'travel_distance':'travelled distance (km)'})
 SPEED_EDGES=SPEED_EDGES.rename(columns = {'travel_speed':'travelled speed (km/h)'})
 
@@ -299,7 +346,7 @@ style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    SPEED_EDGES[['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)', 'geometry']].to_json(),
+    SPEED_EDGES[['travel time (sec)', 'travelled speed (km/h)', 'length(km)', 'geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
@@ -308,15 +355,15 @@ folium.GeoJson(
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['travel time (min)', 'travelled speed (km/h)', 'travelled distance (km)']
+        fields=['travel time (sec)', 'travelled speed (km/h)', 'length(km)']
     ),
 ).add_to(my_map)
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 
-SPEED_EDGES.to_file(filename='SPEED_EDGES.geojson', driver='GeoJSON')
+# SPEED_EDGES.to_file(filename='SPEED_EDGES.geojson', driver='GeoJSON')
 # my_map.save("clean_matched_route_travel_time.html")
-my_map.save("clean_matched_route_travel_speed_all_EDGES_2019-04-15_Apr-07-2020.html")
+my_map.save("clean_matched_route_travel_speed_all_EDGES_2019-04-15_Apr-17-2020.html")
 
 
 
@@ -426,15 +473,18 @@ for i in range(len(MERGED_clean_EDGES)):
 '''
 
 
-########################################
-##### ORIGINS and DESTINATIONS #########
-########################################
+#########################################################################
+##### ORIGINS and DESTINATIONS accross the same edge (u,v) ##############
+#########################################################################
+
+import os
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
+os.getcwd()
 
 # load grafo
 file_graphml = 'Catania__Italy_cost.graphml'
 grafo = ox.load_graphml(file_graphml)
 # ox.plot_graph(grafo)
-
 
 # make an empty dataframe to report all ORIGINS from which travels started and that crossed a given edge (u,v)
 all_ORIGINS_df = pd.DataFrame([])
@@ -544,6 +594,5 @@ for idx, row in all_DESTINATIONS_df.iterrows():
                                                 fill_opacity=0.1).add_to(my_map)
 
 my_map.save("clean_matched_route_OD.html")
-
 
 

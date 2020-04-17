@@ -110,7 +110,7 @@ def cost_assignment(file_graphml, place_country):
             speedlist = way_dict.get("other")
             speed = speedlist[0] * 1000 / 3600
             # create a new attribute time == "cost" in the field "highway"
-            attr['cost'] = attr.get("length") / speed
+            attr['cost'] = float(attr.get("length") / speed)
           #  print(attr.get("highway"), speedlist[0], attr.get("cost"), '^^^^^^^^^^^')
             # add the "attr_dict" to the edge file
             grafo.add_edge(u, v, key, attr_dict=attr)
@@ -120,17 +120,17 @@ def cost_assignment(file_graphml, place_country):
             if type(attr.get("maxspeed")) is list:
                 speedList = [int(i) for i in attr.get("maxspeed")]
                 speed = np.mean(speedList) * 1000 / 3600
-                attr['cost'] = attr.get("length") / speed
+                attr['cost'] = float(attr.get("length") / speed)
             #    print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"), '========')
             else:
                 speed = float(attr.get("maxspeed")) * 1000 / 3600
-                attr['cost'] = attr.get("length") / speed
+                attr['cost'] = float(attr.get("length") / speed)
              #   print(attr.get("highway"), attr.get("maxspeed"), attr.get("cost"), '°°°°°°°°°')
             grafo.add_edge(u, v, key, attr_dict=attr)
         else:  # read speed from way class dictionary
             speedlist = way_dict.get(attr["highway"])
             speed = speedlist[0] * 1000 / 3600
-            attr['cost'] = attr.get("length") / speed
+            attr['cost'] = float(attr.get("length") / speed)
           #  print(attr.get("highway"), speedlist[0], attr.get("cost"), '-----------')
             grafo.add_edge(u, v, key, attr_dict=attr)
     # save shp file AGAIN street network as ESRI shapefile (includes NODES and EDGES and new attributes)
