@@ -285,7 +285,7 @@ df_all_EDGES_time = df_all_EDGES_time[["u", "v", "travel_time", "travel_distance
 # df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
 ### drop NaN values
 df_all_EDGES_speed = df_all_EDGES_time.dropna(subset=['travel_speed'])
-df_all_EDGES_time['travel_time'] = ((df_all_EDGES_time['length(km)']) / (df_all_EDGES_time['travel_speed'])) *3600 # seconds
+df_all_EDGES_speed['travel_time'] = ((df_all_EDGES_speed['length(km)']) / (df_all_EDGES_speed['travel_speed'])) *3600 # seconds
 
 # sort values by travelled time
 sorted_values = df_all_EDGES_speed.sort_values('travel_speed')
