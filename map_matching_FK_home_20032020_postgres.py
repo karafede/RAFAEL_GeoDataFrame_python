@@ -102,9 +102,9 @@ for idx, row in unique_DATES.iterrows():
     my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
     ################################################################################################
     ## to be used when the query stop. Start from the last saved index
-    last_track_idx = 324+68+10+115
-    for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_ID_TRACKS)]):
-    #for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
+    # last_track_idx = 324+68+10+115
+    # for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_ID_TRACKS)]):
+    for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
         track_ID = str(track_ID)
         print('VIASAT GPS track:', track_ID)
         viasat_data = pd.read_sql_query('''
@@ -250,7 +250,7 @@ for idx, row in unique_DATES.iterrows():
                         #     'tertiary_link"]')
                         filter = (
                             '["highway"!~"living_street|abandoned|steps|construction|'
-                            'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
+                            'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
                         grafo = ox.graph_from_polygon(viasat_extent.geometry[0], custom_filter=filter)
 
                         # ox.plot_graph(grafo)
