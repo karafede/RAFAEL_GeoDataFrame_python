@@ -42,6 +42,22 @@ all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
 gdf_all_EDGES = pd.concat([gpd.read_file(f) for f in all_filenames])
 
 
+# make a .csv file that assigns to each (u,v) pair, the type of road ("highway")
+edges = []
+import json
+for file in all_filenames:
+    # with open("all_EDGES_2019-04-15_Apr-15-2020_0_130.geojson") as f:
+    with open(file) as f:
+        data = json.load(f)
+    for feature in data['features']:
+        print(feature['properties'])
+        edge = [feature['properties']['u'], feature['properties']['v'], feature['properties']['highway']]
+        edges.append((edge))
+edges_highways = pd.DataFrame(edges,  columns=['u', 'v', 'highway'])
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
+edges_highways.to_csv('edges_highways.csv')
+
+
 os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
 ## select only columns 'u' and 'v'
 gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
@@ -53,12 +69,6 @@ gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time', 'distance', 'speed']]
 ## fill nans by mean of before and after non-nan values (for 'time' and 'speed')
 gdf_all_EDGES_time['time'] = (gdf_all_EDGES_time['time'].ffill()+gdf_all_EDGES_time['time'].bfill())/2
 gdf_all_EDGES_time['speed'] = (gdf_all_EDGES_time['speed'].ffill()+gdf_all_EDGES_time['speed'].bfill())/2
-
-## fill nans by values after non-nan values (for 'hour' and 'timedate')
-# gdf_all_EDGES_time['hour'] = gdf_all_EDGES_time['hour'].ffill()
-# gdf_all_EDGES_time['timedate'] = gdf_all_EDGES_time['timedate'].ffill()
-## drop nan values from the column "hour"
-# gdf_all_EDGES_time.dropna(subset = ['hour'], inplace= True)
 
 # AAA = pd.DataFrame(gdf_all_EDGES_time)
 # AAA.dropna(subset = ['hour'], inplace= True)
@@ -110,8 +120,8 @@ MERGED_clean_EDGES['length(km)'] = MERGED_clean_EDGES['length']/1000
 MERGED_clean_EDGES['length(km)'] = round(MERGED_clean_EDGES['length(km)'], 3)
 # compute a relative frequeny (how much the edge was travelled compared to the total number of tracked vehicles...in %)
 max_records = max(MERGED_clean_EDGES['records'])
-MERGED_clean_EDGES['records'] = (MERGED_clean_EDGES['records']/max_records)*100
-MERGED_clean_EDGES['frequency(%)'] = round(MERGED_clean_EDGES['records'], 0)
+MERGED_clean_EDGES['frequency(%)'] = (MERGED_clean_EDGES['records']/max_records)*100
+MERGED_clean_EDGES['frequency(%)'] = round(MERGED_clean_EDGES['frequency(%)'], 0)
 
 #############################################################################################
 # create basemap
@@ -127,7 +137,7 @@ style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    MERGED_clean_EDGES[['u','v', 'frequency(%)', 'length(km)', 'geometry']].to_json(),
+    MERGED_clean_EDGES[['u','v', 'frequency(%)', 'records', 'length(km)', 'geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
@@ -136,14 +146,14 @@ folium.GeoJson(
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'length(km)', 'frequency(%)']
+        fields=['u', 'v', 'length(km)', 'frequency(%)', 'records']
     ),
 ).add_to(my_map)
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 ##########################################
 
-# MERGED_clean_EDGES.to_file(filename='MERGED_clean_EDGES.geojson', driver='GeoJSON')
+MERGED_clean_EDGES.to_file(filename='FREQUENCIES_and_RECORDS_by_EDGES.geojson', driver='GeoJSON')
 # my_map.save("clean_matched_route_frequecy_all_EDGES_10032020.html")
 my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-17-2020.html")
 
@@ -178,11 +188,11 @@ max_possible_time = (1/60)*3600*max_length/1000
 
 ### get AVERAGE of traveled "time" and travelled "speed" for each edge
 df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
-df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed", ]
+df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed"]
 df_all_EDGES_time = pd.merge(MERGED_clean_EDGES, df_all_EDGES_time, on=['u', 'v'], how='inner')
 df_all_EDGES_time = pd.DataFrame(df_all_EDGES_time)
 sorted_length = df_all_EDGES_time.sort_values('length')
-df_all_EDGES_time = df_all_EDGES_time[["u", "v", "travel_time", "travel_distance", "length(km)", "travel_speed" ]]
+df_all_EDGES_time = df_all_EDGES_time[["u", "v", "travel_time", "travel_distance", "length(km)", "travel_speed"]]
 ### merge with the above "df_all_EDGES_sel" referred to the counts counts
 # df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
 ### drop NaN values
@@ -276,10 +286,10 @@ my_map.save("clean_matched_route_travel_time_all_EDGES_2019-04-15_Apr-17-2020.ht
 
 ### get average of traveled "time" and travelled "speed" for each edge
 df_all_EDGES_time = (gdf_all_EDGES_time.groupby(['u', 'v']).mean()).reset_index()
-df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed", ]
+df_all_EDGES_time.columns = ["u", "v", "travel_time", "travel_distance", "travel_speed"]
 df_all_EDGES_time = pd.merge(MERGED_clean_EDGES, df_all_EDGES_time, on=['u', 'v'], how='inner')
 df_all_EDGES_time = pd.DataFrame(df_all_EDGES_time)
-df_all_EDGES_time = df_all_EDGES_time[["u", "v", "travel_time", "travel_distance", "length(km)", "travel_speed" ]]
+df_all_EDGES_time = df_all_EDGES_time[["u", "v", "travel_time", "travel_distance", "length(km)", "travel_speed"]]
 
 ### merge with the above "df_all_EDGES_sel" referred to the counts counts
 # df_all_EDGES_time = pd.merge(df_all_EDGES_time, df_all_EDGES_sel, on=['u', 'v'], how='inner')
