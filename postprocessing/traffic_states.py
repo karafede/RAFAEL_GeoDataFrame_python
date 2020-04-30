@@ -43,6 +43,81 @@ all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
 gdf_all_EDGES = pd.concat([gpd.read_file(f) for f in all_filenames])
 
 
+### function to get consecutive edges...
+def consec_sort(lst):
+    def key(x):
+        nonlocal index
+        if index <= lower_index:
+            index += 1
+            return -1
+        return abs(x[0] - lst[index - 1][1])
+    for lower_index in range(len(lst) - 2):
+        index = 0
+        lst = sorted(lst, key=key)
+    return lst
+
+
+
+### load all map-matching files
+### match pattern of .GeoJson files
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing\\new_geojsons')
+extension = 'geojson'
+all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
+#combine all files in the list
+gdf_all_EDGES = pd.concat([gpd.read_file(f) for f in all_filenames])
+
+
+
+## initialize an empty dataframe to get sorted data by consecutive edges...
+ordered_gdf_all_EDGES = pd.DataFrame([])
+
+## sort by "timedate" for each "track_ID" (and for origin and destination...)
+# list all "track_ID"
+all_ID_TRACKS = list(gdf_all_EDGES.track_ID.unique())
+for track_idx, track_ID in enumerate(all_ID_TRACKS):
+    track_ID = str(track_ID)
+    # print('VIASAT GPS track:', track_ID)
+    BBB = gdf_all_EDGES[gdf_all_EDGES.track_ID == track_ID]
+    BBB.reset_index(inplace=True)
+
+    ## loop over each trip (ORIGIN--->
+    ODs = BBB.drop_duplicates(['ORIGIN', 'DESTINATION'])
+    O = list(ODs.ORIGIN)
+    D = list(ODs.DESTINATION)
+    zipped_OD = zip(O, D)
+    # loop ever each ORIGIN --> DESTINATION pair
+    for (O, D) in zipped_OD:
+        # print(O, D)
+        BBB_OD = BBB[(BBB.ORIGIN == O) & (BBB.DESTINATION == D)]
+        BBB_OD.drop_duplicates(['id'], inplace=True)
+        lista = list(BBB_OD[['u', 'v']].itertuples(index=False, name=None))
+        output = consec_sort(lista)
+        # BBB_OD.plot()
+
+        df_output = pd.DataFrame(output)
+        df_output.columns = ['u', 'v']
+        # merge df_output with BBB
+        MERGED = pd.merge(df_output, BBB_OD,  on=['u', 'v'], how='left')
+        # re-convert to a geodataframe
+        MERGED = gpd.GeoDataFrame(MERGED)
+        # MERGED.plot()
+        MERGED.drop_duplicates(['id'], inplace=True)
+        MERGED.reset_index(inplace=True)
+        # UUU = pd.DataFrame(MERGED)
+
+        ## append ordered geodataframe to a new geodataframe
+        ordered_gdf_all_EDGES = ordered_gdf_all_EDGES.append(MERGED)
+        ordered_gdf_all_EDGES = ordered_gdf_all_EDGES.drop(['level_0'], axis=1)
+        ordered_gdf_all_EDGES.reset_index(inplace=True)
+
+        ## chek the structure...
+        # PPP = pd.DataFrame(ordered_gdf_all_EDGES)
+
+# rename as before.....
+gdf_all_EDGES = ordered_gdf_all_EDGES
+
+AAA = pd.DataFrame(gdf_all_EDGES)
+
 # select speed and timedate
 gdf_all_EDGES_speed = gdf_all_EDGES[['u', 'v', 'speed', 'timedate', 'length']]
 gdf_all_EDGES_speed['speed'] = (gdf_all_EDGES_speed['speed'].ffill()+gdf_all_EDGES_speed['speed'].bfill())/2
@@ -120,7 +195,7 @@ max_speed_dict = {
     }
 
 
-# prepare a base_map ###########################################################
+## assign max speed depending from the type of road
 edges_copy = MERGED_speed_records
 edges_copy = edges_copy['highway'].str.replace(r"\(.*\)", "")
 MERGED_speed_records.highway = edges_copy
@@ -186,8 +261,9 @@ df_flux = df_flux.groupby(['u','v']).mean()
 df_flux = df_flux.reset_index(level=['u', 'v'])
 
 df_flux=df_flux.rename(columns = {'records_per_edge':'flux (vei/hour)'})
+max(df_flux['flux (vei/hour)'])
 
-# merge all data together
+## merge all data together
 MERGED_speed_records = pd.merge(MERGED_speed_records, df_flux, on=['u', 'v'], how='left')
 
 ## merge with the geodataframe to make a geo-dataframe
@@ -195,24 +271,87 @@ len(MERGED_speed_records)
 MERGED_speed_records_geo = pd.merge(gdf_all_EDGES[['u','v','geometry']], MERGED_speed_records, on=['u', 'v'], how='left')
 # MERGED_speed_records_geo.drop_duplicates(['u', 'v', 'speed', 'records_speeds', 'records_per_edge', 'instant_records_by_edge'], inplace=True)
 MERGED_speed_records_geo.drop_duplicates(['u', 'v'], inplace=True)
-len(MERGED_speed_records_geo)
+## fil nan values
+MERGED_speed_records_geo['flux (vei/hour)'] = (MERGED_speed_records_geo['flux (vei/hour)'].ffill()+MERGED_speed_records_geo['flux (vei/hour)'].bfill())/2
+## remove nan values
+MERGED_speed_records_geo = MERGED_speed_records_geo.dropna(subset=['flux (vei/hour)'])  # remove nan values
 MERGED_speed_records_geo.plot()
 
 HHH = pd.DataFrame(MERGED_speed_records_geo)
 
-# build the TRAFFIC STATES LEVELS (Levels Of Service - LOS)
+#############################################################
+###### plot TRAFFIC FLUXES ##################################
+#############################################################
+
+### add colors based on 'records'
+vmin = min(MERGED_speed_records_geo['flux (vei/hour)'])
+vmax = max(MERGED_speed_records_geo['flux (vei/hour)'])
+## map values to colors in hex
+norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
+mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Reds)  # scales of reds
+MERGED_speed_records_geo['color'] = MERGED_speed_records_geo['flux (vei/hour)'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
+
+
+#############################################################################################
+# create basemap
+ave_LAT = 37.53988692816245
+ave_LON = 15.044971594798902
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=14, tiles='cartodbpositron')
+###################################################
+
+# add colors to map
+my_map = plot_graph_folium_FK(MERGED_speed_records_geo, graph_map=None, popup_attribute=None,
+                              zoom=15, fit_bounds=True, edge_width=2, edge_opacity=0.7)
+style = {'fillColor': '#00000000', 'color': '#00000000'}
+# add 'u' and 'v' as highligths for each edge (in blue)
+folium.GeoJson(
+    # data to plot
+    MERGED_speed_records_geo[['u','v', 'flux (vei/hour)', 'geometry']].to_json(),
+    show=True,
+    style_function=lambda x:style,
+    highlight_function=lambda x: {'weight':3,
+        'color':'blue',
+        'fillOpacity':1
+    },
+    # fields to show
+    tooltip=folium.features.GeoJsonTooltip(
+        fields=['u', 'v', 'flux (vei/hour)']
+    ),
+).add_to(my_map)
+folium.TileLayer('cartodbdark_matter').add_to(my_map)
+folium.LayerControl().add_to(my_map)
+##########################################
+
+MERGED_speed_records_geo.to_file(filename='FLUX_by_EDGES.geojson', driver='GeoJSON')
+my_map.save("FLUX_by_EDGES_2019-04-15_Apr-27-2020.html")
+
+
+HHH = pd.DataFrame(MERGED_speed_records_geo)
+
+
+########################################################################
+########################################################################
+# build the TRAFFIC STATES LEVELS (Levels Of Service - LOS) ############
+########################################################################
+
 
 ###################################################################
 ### URBAN TRAFFIC #################################################
 ###################################################################
 
 geo_df = MERGED_speed_records_geo
-geo_df = geo_df[geo_df.maxspeed.isin([50, 90])]
+## fill missing rows
+geo_df['density (vei/km)'] = geo_df['density (vei/km)'].ffill()
+geo_df['maxspeed'] = geo_df['maxspeed'].ffill()
+geo_df['speed'] = geo_df['speed'].ffill()
+KKK = pd.DataFrame(geo_df)
+# geo_df = geo_df[geo_df.maxspeed.isin([50, 90])]
 geo_df.reset_index(inplace=True)
 # create a new field 'LOS"
 geo_df['LOS'] = None
 for i in range(len(geo_df)):
     row = geo_df.iloc[i]
+    ### for URBAN traffic ==================================================
     if (row['time_at_mean_speed(%)'] > 85) and (row['maxspeed'] == 50) or (row['maxspeed'] == 90) and \
             (row['speed'] > 42.2 ) and (row['density (vei/km)'] < 7 ):
         print("OK=============================== Libero ============OK")
@@ -289,9 +428,38 @@ for i in range(len(geo_df)):
         # print(i)
         geo_df.LOS.iloc[i] = "F; Saturato"
 
+    ### for motorways ================================================
+    if (row['time_at_mean_speed(%)'] <= 35) and (row['speed'] > 90):
+        print("OK=============================== Libero ============OK")
+        geo_df.LOS.iloc[i] = "A; Libero"
+    if (row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 35) and\
+            (row['speed'] < 90) and (row['speed'] > 80):
+        print("OK===========================================OK")
+        # print(i)
+        geo_df.LOS.iloc[i] = "B; Libero"
+    if (row['time_at_mean_speed(%)'] < 65) and (row['time_at_mean_speed(%)'] > 50) and \
+            (row['speed'] < 80) and (row['speed'] > 70):
+        print("OK========== Libero =================OK")
+        # print(i)
+        geo_df.LOS.iloc[i] = "C; Stabile"
+    if (40 < row['time_at_mean_speed(%)'] < 80) and (row['time_at_mean_speed(%)'] > 65) and \
+            (row['speed'] < 70) and (row['speed'] > 60):
+        print("OK====================== Stabile ===========OK")
+        # print(i)
+        geo_df.LOS.iloc[i] = "D; Congestionato"
+    if (row['time_at_mean_speed(%)'] > 80) and (row['speed'] < 35) :
+        print("OK====================== Congestionato =======OK")
+        # print(i)
+        geo_df.LOS.iloc[i] = "E; Saturato"
 
-URBAN_traffic_states = pd.DataFrame(geo_df)
-URBAN_traffic_states = URBAN_traffic_states.sort_values('LOS')
+traffic_states = pd.DataFrame(geo_df)
+traffic_states = traffic_states.sort_values('LOS')
+
+
+
+
+
+
 
 
 ########################################################
@@ -330,7 +498,6 @@ for i in range(len(geo_df)):
         print("OK====================== Congestionato =======OK")
         # print(i)
         geo_df.LOS.iloc[i] = "E; Saturato"
-
 
 
 GGG = pd.DataFrame(geo_df)
