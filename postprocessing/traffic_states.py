@@ -275,7 +275,7 @@ MERGED_speed_records_geo.drop_duplicates(['u', 'v'], inplace=True)
 MERGED_speed_records_geo['flux (vei/hour)'] = (MERGED_speed_records_geo['flux (vei/hour)'].ffill()+MERGED_speed_records_geo['flux (vei/hour)'].bfill())/2
 ## remove nan values
 MERGED_speed_records_geo = MERGED_speed_records_geo.dropna(subset=['flux (vei/hour)'])  # remove nan values
-MERGED_speed_records_geo.plot()
+# MERGED_speed_records_geo.plot()
 
 HHH = pd.DataFrame(MERGED_speed_records_geo)
 
@@ -291,39 +291,67 @@ norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
 mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Reds)  # scales of reds
 MERGED_speed_records_geo['color'] = MERGED_speed_records_geo['flux (vei/hour)'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
 
+## add width or weight to each LINESTRING based on the flux
+MERGED_speed_records_geo['stroke-width'] = round(MERGED_speed_records_geo['flux (vei/hour)']/max(MERGED_speed_records_geo['flux (vei/hour)']), 2) *5
+## save GeoJson file
+MERGED_speed_records_geo.to_file(filename='FLUX_by_EDGES.geojson', driver='GeoJSON')
+
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
+# MERGED_speed_records_geo = gpd.read_file("FLUX_by_EDGES.geojson")
 
 #############################################################################################
 # create basemap
 ave_LAT = 37.53988692816245
 ave_LON = 15.044971594798902
-my_map = folium.Map([ave_LAT, ave_LON], zoom_start=14, tiles='cartodbpositron')
-###################################################
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=12, tiles='cartodbpositron')
+##############################################################################################
 
-# add colors to map
-my_map = plot_graph_folium_FK(MERGED_speed_records_geo, graph_map=None, popup_attribute=None,
-                              zoom=15, fit_bounds=True, edge_width=2, edge_opacity=0.7)
-style = {'fillColor': '#00000000', 'color': '#00000000'}
-# add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
-    # data to plot
-    MERGED_speed_records_geo[['u','v', 'flux (vei/hour)', 'geometry']].to_json(),
-    show=True,
-    style_function=lambda x:style,
-    highlight_function=lambda x: {'weight':3,
+MERGED_speed_records_geo[['u','v', 'flux (vei/hour)', 'color', 'stroke-width', 'geometry']].to_json(),
+    style_function=lambda x: {
+        'fillColor': 'black',
+        'color': 'black',
+        'weight':  x['properties']['stroke-width'],
+        'fillOpacity': 1,
+        },
+highlight_function=lambda x: {'weight':3,
         'color':'blue',
         'fillOpacity':1
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'flux (vei/hour)']
-    ),
-).add_to(my_map)
-folium.TileLayer('cartodbdark_matter').add_to(my_map)
-folium.LayerControl().add_to(my_map)
+        fields=['u', 'v', 'flux (vei/hour)', 'stroke-width']),
+    ).add_to(my_map)
+
+
+my_map.save("FLUX_by_EDGES_2019-04-15_Apr-27-2020.html")
+
+
+# add colors to map
+# my_map = plot_graph_folium_FK(MERGED_speed_records_geo, graph_map=None, popup_attribute=None,
+#                               zoom=15, fit_bounds=True, edge_width=2, edge_opacity=0.7)
+# style = {'fillColor': '#00000000', 'color': '#00000000', 'weight': 5}
+# # add 'u' and 'v' as highligths for each edge (in blue)
+# folium.GeoJson(
+#     # data to plot
+#     MERGED_speed_records_geo[['u','v', 'flux (vei/hour)', 'geometry']].to_json(),
+#     show=True,
+#     style_function=lambda x:style,
+#     highlight_function=lambda x: {'weight':3,
+#         'color':'blue',
+#         'fillOpacity':1
+#     },
+#     # fields to show
+#     tooltip=folium.features.GeoJsonTooltip(
+#         fields=['u', 'v', 'flux (vei/hour)']
+#     ),
+# ).add_to(my_map)
+# folium.TileLayer('cartodbdark_matter').add_to(my_map)
+# folium.LayerControl().add_to(my_map)
 ##########################################
 
-MERGED_speed_records_geo.to_file(filename='FLUX_by_EDGES.geojson', driver='GeoJSON')
-my_map.save("FLUX_by_EDGES_2019-04-15_Apr-27-2020.html")
+# MERGED_speed_records_geo.to_file(filename='FLUX_by_EDGES.geojson', driver='GeoJSON')
+# my_map.save("FLUX_by_EDGES_2019-04-15_Apr-27-2020.html")
 
 
 HHH = pd.DataFrame(MERGED_speed_records_geo)
@@ -336,19 +364,33 @@ HHH = pd.DataFrame(MERGED_speed_records_geo)
 
 
 ###################################################################
-### URBAN TRAFFIC #################################################
+### TRAFFIC STATES ################################################
 ###################################################################
+
+# https://didattica-2000.archived.uniroma2.it//TTC/deposito/05_APP_CAP1_DEFLUSSO_ININTERROTTO_2010_COMPLETO.pdf
+
+os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
+MERGED_speed_records_geo = gpd.read_file("FLUX_by_EDGES.geojson")
 
 geo_df = MERGED_speed_records_geo
 ## fill missing rows
 geo_df['density (vei/km)'] = geo_df['density (vei/km)'].ffill()
 geo_df['maxspeed'] = geo_df['maxspeed'].ffill()
 geo_df['speed'] = geo_df['speed'].ffill()
+geo_df['time_at_mean_speed(%)'] = geo_df['time_at_mean_speed(%)'].ffill()
+
+## remove all records with "speed < 30 km/h"
+# geo_df = geo_df[geo_df['speed'] > 30]
+
 KKK = pd.DataFrame(geo_df)
+
 # geo_df = geo_df[geo_df.maxspeed.isin([50, 90])]
 geo_df.reset_index(inplace=True)
-# create a new field 'LOS"
+
+## create a new field for LEVELS of SERVICE 'LOS'
 geo_df['LOS'] = None
+geo_df['LOS_class'] = None
+
 for i in range(len(geo_df)):
     row = geo_df.iloc[i]
     ### for URBAN traffic ==================================================
@@ -356,18 +398,21 @@ for i in range(len(geo_df)):
             (row['speed'] > 42.2 ) and (row['density (vei/km)'] < 7 ):
         print("OK=============================== Libero ============OK")
         geo_df.LOS.iloc[i] = "A; Libero"
+        geo_df.LOS_class.iloc[i] = 1
     if (row['time_at_mean_speed(%)'] > 85) and (row['maxspeed'] == 90 or (row['maxspeed'] == 50)) and \
             (row['speed'] > 76.5) and (row['density (vei/km)'] < 7):
         print("OK=============================== Libero ==========OK")
         # print(i)
         geo_df.LOS.iloc[i] = "A; Libero"
+        geo_df.LOS_class.iloc[i] = 1
     if (row['time_at_mean_speed(%)'] < 85) and (row['time_at_mean_speed(%)'] > 67) and (row['maxspeed'] == 50) or\
             (row['maxspeed'] == 90)and \
             (row['speed'] < 42.2) and (row['speed'] > 33.5) and (row['density (vei/km)'] < 11) \
             and (row['density (vei/km)']> 7):
-        print("OK===========================================OK")
+        print("OK======================== Libero ===================OK")
         # print(i)
         geo_df.LOS.iloc[i] = "B; Libero"
+        geo_df.LOS_class.iloc[i] = 1
     if (row['time_at_mean_speed(%)'] < 85) and (row['time_at_mean_speed(%)'] > 67) and (row['maxspeed'] == 90) or\
             (row['maxspeed'] == 50) and \
             ( row['speed'] < 76.5) and (row['speed'] > 60.3) and (row['density (vei/km)'] < 11) and\
@@ -375,6 +420,7 @@ for i in range(len(geo_df)):
         print("OK========================Libero ====OK")
         # print(i)
         geo_df.LOS.iloc[i] = "B; Libero"
+        geo_df.LOS_class.iloc[i] = 1
     if (row['time_at_mean_speed(%)'] < 67) and (row['time_at_mean_speed(%)'] > 50) and (row['maxspeed'] == 50) or\
             (row['maxspeed'] == 90) and \
             (row['speed'] < 33.5) and (row['speed'] > 25) and (row['density (vei/km)'] < 17) and\
@@ -382,20 +428,23 @@ for i in range(len(geo_df)):
         print("OK========== Libero =================OK")
         # print(i)
         geo_df.LOS.iloc[i] = "C; Stabile"
+        geo_df.LOS_class.iloc[i]= 2
     if (row['time_at_mean_speed(%)'] < 67) and (row['time_at_mean_speed(%)'] > 50 ) and (row['maxspeed'] == 90) or \
             ((row['maxspeed'] == 50)) and \
             (45 < row['speed'] < 60.3) and (row['speed'] > 45) and (row['density (vei/km)'] < 17) and \
             (row['density (vei/km)']> 11):
-        print("OK================================================OK")
+        print("OK======================== Stabile ========================OK")
         # print(i)
         geo_df.LOS.iloc[i] = "C; Stabile"
+        geo_df.LOS_class.iloc[i]= 2
     if (40 < row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 40) and (row['maxspeed'] == 50) or\
             (row['maxspeed'] == 90)and \
             (row['speed'] < 25) and (row['speed'] > 20) and (row['density (vei/km)'] < 22) and\
             (row['density (vei/km)'] > 17):
-        print("OK====================== Stabile ===========OK")
+        print("OK====================== Congestionato ===========OK")
         # print(i)
         geo_df.LOS.iloc[i] = "D; Congestionato"
+        geo_df.LOS_class.iloc[i] = 3
     if (row['time_at_mean_speed(%)'] < 50) and(row['time_at_mean_speed(%)'] > 40) and (row['maxspeed'] == 90) or\
             (row['maxspeed'] == 50) and \
             (row['speed'] < 45) and (row['speed'] > 36) and (row['density (vei/km)'] < 22) and \
@@ -403,13 +452,15 @@ for i in range(len(geo_df)):
         print("OK====================== Congestionato =====OK")
         # print(i)
         geo_df.LOS.iloc[i] = "D; Congestionato"
+        geo_df.LOS_class.iloc[i] = 3
     if (row['time_at_mean_speed(%)'] < 40) and (row['time_at_mean_speed(%)']> 30) and (row['maxspeed'] == 50) or \
             (row['maxspeed'] == 90) and \
             (row['speed'] < 20) and (row['speed'] > 15) and (row['density (vei/km)'] < 28) and\
             (row['density (vei/km)']> 22):
-        print("OK====================== Congestionato =======OK")
+        print("OK====================== Saturato =======OK")
         # print(i)
         geo_df.LOS.iloc[i] = "E; Saturato"
+        geo_df.LOS_class.iloc[i] = 4
     if (row['time_at_mean_speed(%)'] < 40) and (row['time_at_mean_speed(%)'] > 30) and (row['maxspeed'] == 90) or \
             (row['maxspeed'] == 50) and \
             (row['speed'] < 36) and (row['speed'] > 27) and (row['density (vei/km)'] < 28) and \
@@ -417,93 +468,53 @@ for i in range(len(geo_df)):
         print("OK====================== SATURATO ===OK")
         # print(i)
         geo_df.LOS.iloc[i] = "E; Saturato"
+        geo_df.LOS_class.iloc[i] = 4
     if (row['time_at_mean_speed(%)'] < 30) and (row['maxspeed'] == 50) or (row['maxspeed'] == 90) and \
             (row['speed'] < 15) and  (row['density (vei/km)'] > 28):
         print("OK====================== Saturato ===OK")
         # print(i)
         geo_df.LOS.iloc[i] = "F; Saturato"
+        geo_df.LOS_class.iloc[i] = 4
     if (row['time_at_mean_speed(%)'] < 30) and (row['maxspeed'] == 90) or (row['maxspeed'] == 50) and \
             (row['speed'] < 27) and (row['density (vei/km)'] > 28):
         print("OK====================== Saturato ===OK")
         # print(i)
         geo_df.LOS.iloc[i] = "F; Saturato"
+        geo_df.LOS_class.iloc[i] = 4
 
     ### for motorways ================================================
     if (row['time_at_mean_speed(%)'] <= 35) and (row['speed'] > 90):
         print("OK=============================== Libero ============OK")
         geo_df.LOS.iloc[i] = "A; Libero"
+        geo_df.LOS_class.iloc[i] = 1
     if (row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 35) and\
             (row['speed'] < 90) and (row['speed'] > 80):
         print("OK===========================================OK")
         # print(i)
         geo_df.LOS.iloc[i] = "B; Libero"
+        geo_df.LOS_class.iloc[i] = 1
     if (row['time_at_mean_speed(%)'] < 65) and (row['time_at_mean_speed(%)'] > 50) and \
             (row['speed'] < 80) and (row['speed'] > 70):
-        print("OK========== Libero =================OK")
+        print("OK========== Stabile =================OK")
         # print(i)
         geo_df.LOS.iloc[i] = "C; Stabile"
+        geo_df.LOS_class.iloc[i] = 2
     if (40 < row['time_at_mean_speed(%)'] < 80) and (row['time_at_mean_speed(%)'] > 65) and \
             (row['speed'] < 70) and (row['speed'] > 60):
-        print("OK====================== Stabile ===========OK")
+        print("OK====================== Congestionato ===========OK")
         # print(i)
         geo_df.LOS.iloc[i] = "D; Congestionato"
+        geo_df.LOS_class.iloc[i] = 3
     if (row['time_at_mean_speed(%)'] > 80) and (row['speed'] < 35) :
-        print("OK====================== Congestionato =======OK")
+        print("OK====================== Saturato =======OK")
         # print(i)
         geo_df.LOS.iloc[i] = "E; Saturato"
+        geo_df.LOS_class.iloc[i] = 4
 
 traffic_states = pd.DataFrame(geo_df)
 traffic_states = traffic_states.sort_values('LOS')
+traffic_states = traffic_states.sort_values('stroke-width')
+traffic_states = traffic_states.sort_values('maxspeed')
 
-
-
-
-
-
-
-
-########################################################
-##### MOTORWAY TRAFFIC #################################
-########################################################
-
-geo_df = MERGED_speed_records_geo
-geo_df = geo_df[geo_df.maxspeed.isin([130, 100])]  # motorway and motorway_link
-geo_df.reset_index(inplace=True)
-geo_df = pd.DataFrame(geo_df)
-# create a new field 'LOS"
-geo_df['LOS'] = None
-for i in range(len(geo_df)):
-    row = geo_df.iloc[i]
-    if (row['time_at_mean_speed(%)'] <= 35) and (row['speed'] > 90):
-        print("OK=============================== Libero ============OK")
-        geo_df.LOS.iloc[i] = "A; Libero"
-    if (row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 35) and\
-            (row['speed'] < 90) and (row['speed'] > 80):
-        print("OK===========================================OK")
-        # print(i)
-        geo_df.LOS.iloc[i] = "B; Libero"
-    if (row['time_at_mean_speed(%)'] < 65) and (row['time_at_mean_speed(%)'] > 50) and \
-            (row['speed'] < 80) and (row['speed'] > 70):
-        print("OK========== Libero =================OK")
-        # print(i)
-        geo_df.LOS.iloc[i] = "C; Stabile"
-
-    if (40 < row['time_at_mean_speed(%)'] < 80) and (row['time_at_mean_speed(%)'] > 65) and \
-            (row['speed'] < 70) and (row['speed'] > 60):
-        print("OK====================== Stabile ===========OK")
-        # print(i)
-        geo_df.LOS.iloc[i] = "D; Congestionato"
-
-    if (row['time_at_mean_speed(%)'] > 80) and (row['speed'] < 35) :
-        print("OK====================== Congestionato =======OK")
-        # print(i)
-        geo_df.LOS.iloc[i] = "E; Saturato"
-
-
-GGG = pd.DataFrame(geo_df)
-GGG = GGG.sort_values('LOS')
-
-
-
-
-
+traffic_states = traffic_states.dropna(subset=['LOS'])  # remove nan values
+max(traffic_states['speed'])
