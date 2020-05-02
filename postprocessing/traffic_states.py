@@ -513,8 +513,34 @@ for i in range(len(geo_df)):
 
 traffic_states = pd.DataFrame(geo_df)
 traffic_states = traffic_states.sort_values('LOS')
-traffic_states = traffic_states.sort_values('stroke-width')
 traffic_states = traffic_states.sort_values('maxspeed')
 
 traffic_states = traffic_states.dropna(subset=['LOS'])  # remove nan values
-max(traffic_states['speed'])
+geo_df = geo_df.dropna(subset=['LOS'])
+
+
+#############################################################################################
+# create basemap
+ave_LAT = 37.53988692816245
+ave_LON = 15.044971594798902
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=12, tiles='cartodbpositron')
+##############################################################################################
+
+folium.GeoJson(
+geo_df[['u','v', 'LOS_class', 'geometry']].to_json(),
+    style_function=lambda x: {
+        'fillColor': 'black',
+        'color': 'black',
+        'weight':  x['properties']['LOS_class'],
+        'fillOpacity': 1,
+        },
+highlight_function=lambda x: {'weight':3,
+        'color':'blue',
+        'fillOpacity':1
+    },
+    # fields to show
+    tooltip=folium.features.GeoJsonTooltip(
+        fields=['u', 'v', 'LOS_class']),
+    ).add_to(my_map)
+
+my_map.save("TRAFFIC_STATES_by_EDGES_2019-04-15_Apr-27-2020.html")
