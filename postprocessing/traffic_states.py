@@ -42,7 +42,6 @@ all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
 #combine all files in the list
 gdf_all_EDGES = pd.concat([gpd.read_file(f) for f in all_filenames])
 
-
 ### function to get consecutive edges...
 def consec_sort(lst):
     def key(x):
@@ -55,17 +54,6 @@ def consec_sort(lst):
         index = 0
         lst = sorted(lst, key=key)
     return lst
-
-
-
-### load all map-matching files
-### match pattern of .GeoJson files
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing\\new_geojsons')
-extension = 'geojson'
-all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
-#combine all files in the list
-gdf_all_EDGES = pd.concat([gpd.read_file(f) for f in all_filenames])
-
 
 
 ## initialize an empty dataframe to get sorted data by consecutive edges...
@@ -297,7 +285,7 @@ MERGED_speed_records_geo['stroke-width'] = round(MERGED_speed_records_geo['flux 
 MERGED_speed_records_geo.to_file(filename='FLUX_by_EDGES.geojson', driver='GeoJSON')
 
 os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
-# MERGED_speed_records_geo = gpd.read_file("FLUX_by_EDGES.geojson")
+MERGED_speed_records_geo = gpd.read_file("FLUX_by_EDGES.geojson")
 
 #############################################################################################
 # create basemap
@@ -516,7 +504,7 @@ traffic_states = traffic_states.sort_values('LOS')
 traffic_states = traffic_states.sort_values('maxspeed')
 
 traffic_states = traffic_states.dropna(subset=['LOS'])  # remove nan values
-geo_df = geo_df.dropna(subset=['LOS'])
+# geo_df = geo_df.dropna(subset=['LOS'])
 
 
 #############################################################################################
