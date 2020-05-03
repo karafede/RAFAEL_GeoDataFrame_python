@@ -21,6 +21,9 @@ import db_connect
 import datetime
 from datetime import datetime
 from datetime import date
+from geoalchemy2 import Geometry, WKTElement
+from sqlalchemy import *
+import sqlalchemy as sal
 
 # today date
 today = date.today()
@@ -33,6 +36,25 @@ today = today.strftime("%b-%d-%Y")
 # connect to PGadmnin SQL server
 conn = db_connect.connect_viasat()
 cur = conn.cursor()
+
+# Function to generate WKB hex
+def wkb_hexer(line):
+    return line.wkb_hex
+
+
+# Create SQL connection engine
+engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/Octo2015')
+
+# ## create extension postgis on the database Octo2015
+# cur.execute("""
+# CREATE EXTENSION postgis
+# """)
+#
+# cur.execute("""
+# CREATE EXTENSION postgis_topology
+# """)
+#
+# conn.commit()
 
 # viasat_data = pd.read_sql_query('''
 #              SELECT * FROM public.dataraw
@@ -184,7 +206,7 @@ for idx, row in unique_DATES.iterrows():
             diff_time = diff_time.fillna(0)
             row = []
             for i in range(len(diff_time)):
-                if diff_time.iloc[i] >= 3600:
+                if diff_time.iloc[i] >= 900:
                     row.append(i)
             # get next element of the list row
             # row_next = [x+1 for x in row]
@@ -249,7 +271,7 @@ for idx, row in unique_DATES.iterrows():
                         #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|secondary_link|'
                         #     'tertiary_link"]')
                         filter = (
-                            '["highway"!~"living_street|abandoned|steps|construction|'
+                            '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
                             'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
                         grafo = ox.graph_from_polygon(viasat_extent.geometry[0], custom_filter=filter)
 
@@ -1050,6 +1072,15 @@ for idx, row in unique_DATES.iterrows():
                                     # my_map.save(path + track_ID + "_" + DATE + "_matched_route.html")
                                     # path_cloud = 'C:/Users/Federico/ownCloud/Catania_RAFAEL/outputs_catania_28022020/'
                                     # my_map.save(path_cloud + track_ID + "_" + DATE + "_matched_route.html")
+
+                                    ## populate a table in the DataBase
+                                    edges_matched_route['geom'] = edges_matched_route['geometry'].apply(wkb_hexer)
+                                    edges_matched_route.drop('geometry', 1, inplace=True)
+                                    ## append a geo-dataframe for each matched route, for each trip (OD) and for each track_ID
+                                    # with engine.connect() as conn, conn.begin():
+                                    #     # Note use of regular Pandas `to_sql()` method.
+                                    #     edges_matched_route.to_sql("map_matching", con=conn, schema="public",
+                                    #                          if_exists='append', index=False)
                                 except KeyError:
                                     print("no distance_edges")
 
