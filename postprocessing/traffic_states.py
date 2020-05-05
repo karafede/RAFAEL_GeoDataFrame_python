@@ -387,13 +387,13 @@ for i in range(len(geo_df)):
         print("OK=============================== Libero ============OK")
         geo_df.LOS.iloc[i] = "A; Libero"
         geo_df.LOS_class.iloc[i] = 1
-    if (row['time_at_mean_speed(%)'] > 85) and (row['maxspeed'] == 90 or (row['maxspeed'] == 50)) and \
+    elif (row['time_at_mean_speed(%)'] > 85) and (row['maxspeed'] == 90 or (row['maxspeed'] == 50)) and \
             (row['speed'] > 76.5) and (row['density (vei/km)'] < 7):
         print("OK=============================== Libero ==========OK")
         # print(i)
         geo_df.LOS.iloc[i] = "A; Libero"
         geo_df.LOS_class.iloc[i] = 1
-    if (row['time_at_mean_speed(%)'] < 85) and (row['time_at_mean_speed(%)'] > 67) and (row['maxspeed'] == 50) or\
+    elif (row['time_at_mean_speed(%)'] < 85) and (row['time_at_mean_speed(%)'] > 67) and (row['maxspeed'] == 50) or\
             (row['maxspeed'] == 90)and \
             (row['speed'] < 42.2) and (row['speed'] > 33.5) and (row['density (vei/km)'] < 11) \
             and (row['density (vei/km)']> 7):
@@ -401,7 +401,7 @@ for i in range(len(geo_df)):
         # print(i)
         geo_df.LOS.iloc[i] = "B; Libero"
         geo_df.LOS_class.iloc[i] = 1
-    if (row['time_at_mean_speed(%)'] < 85) and (row['time_at_mean_speed(%)'] > 67) and (row['maxspeed'] == 90) or\
+    elif (row['time_at_mean_speed(%)'] < 85) and (row['time_at_mean_speed(%)'] > 67) and (row['maxspeed'] == 90) or\
             (row['maxspeed'] == 50) and \
             ( row['speed'] < 76.5) and (row['speed'] > 60.3) and (row['density (vei/km)'] < 11) and\
             (row['density (vei/km)']>7 ):
@@ -409,7 +409,7 @@ for i in range(len(geo_df)):
         # print(i)
         geo_df.LOS.iloc[i] = "B; Libero"
         geo_df.LOS_class.iloc[i] = 1
-    if (row['time_at_mean_speed(%)'] < 67) and (row['time_at_mean_speed(%)'] > 50) and (row['maxspeed'] == 50) or\
+    elif (row['time_at_mean_speed(%)'] < 67) and (row['time_at_mean_speed(%)'] > 50) and (row['maxspeed'] == 50) or\
             (row['maxspeed'] == 90) and \
             (row['speed'] < 33.5) and (row['speed'] > 25) and (row['density (vei/km)'] < 17) and\
             (row['density (vei/km)'] > 11):
@@ -417,7 +417,7 @@ for i in range(len(geo_df)):
         # print(i)
         geo_df.LOS.iloc[i] = "C; Stabile"
         geo_df.LOS_class.iloc[i]= 2
-    if (row['time_at_mean_speed(%)'] < 67) and (row['time_at_mean_speed(%)'] > 50 ) and (row['maxspeed'] == 90) or \
+    elif (row['time_at_mean_speed(%)'] < 67) and (row['time_at_mean_speed(%)'] > 50 ) and (row['maxspeed'] == 90) or \
             ((row['maxspeed'] == 50)) and \
             (45 < row['speed'] < 60.3) and (row['speed'] > 45) and (row['density (vei/km)'] < 17) and \
             (row['density (vei/km)']> 11):
@@ -425,7 +425,7 @@ for i in range(len(geo_df)):
         # print(i)
         geo_df.LOS.iloc[i] = "C; Stabile"
         geo_df.LOS_class.iloc[i]= 2
-    if (40 < row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 40) and (row['maxspeed'] == 50) or\
+    elif (40 < row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 40) and (row['maxspeed'] == 50) or\
             (row['maxspeed'] == 90)and \
             (row['speed'] < 25) and (row['speed'] > 20) and (row['density (vei/km)'] < 22) and\
             (row['density (vei/km)'] > 17):
@@ -433,7 +433,7 @@ for i in range(len(geo_df)):
         # print(i)
         geo_df.LOS.iloc[i] = "D; Congestionato"
         geo_df.LOS_class.iloc[i] = 3
-    if (row['time_at_mean_speed(%)'] < 50) and(row['time_at_mean_speed(%)'] > 40) and (row['maxspeed'] == 90) or\
+    elif (row['time_at_mean_speed(%)'] < 50) and(row['time_at_mean_speed(%)'] > 40) and (row['maxspeed'] == 90) or\
             (row['maxspeed'] == 50) and \
             (row['speed'] < 45) and (row['speed'] > 36) and (row['density (vei/km)'] < 22) and \
             (row['density (vei/km)']> 17):
@@ -441,63 +441,66 @@ for i in range(len(geo_df)):
         # print(i)
         geo_df.LOS.iloc[i] = "D; Congestionato"
         geo_df.LOS_class.iloc[i] = 3
-    if (row['time_at_mean_speed(%)'] < 40) and (row['time_at_mean_speed(%)']> 30) and (row['maxspeed'] == 50) or \
+    elif (row['time_at_mean_speed(%)'] < 40) and (row['time_at_mean_speed(%)']> 30) and (row['maxspeed'] == 50) or \
             (row['maxspeed'] == 90) and \
             (row['speed'] < 20) and (row['speed'] > 15) and (row['density (vei/km)'] < 28) and\
             (row['density (vei/km)']> 22):
         print("OK====================== Saturato =======OK")
         # print(i)
         geo_df.LOS.iloc[i] = "E; Saturato"
-        geo_df.LOS_class.iloc[i] = 4
-    if (row['time_at_mean_speed(%)'] < 40) and (row['time_at_mean_speed(%)'] > 30) and (row['maxspeed'] == 90) or \
+        geo_df.LOS_class.iloc[i] = 3
+    elif (row['time_at_mean_speed(%)'] < 40) and (row['time_at_mean_speed(%)'] > 30) and (row['maxspeed'] == 90) or \
             (row['maxspeed'] == 50) and \
             (row['speed'] < 36) and (row['speed'] > 27) and (row['density (vei/km)'] < 28) and \
             (row['density (vei/km)']> 22):
-        print("OK====================== SATURATO ===OK")
+        print("OK====================== Saturato ===OK")
         # print(i)
         geo_df.LOS.iloc[i] = "E; Saturato"
-        geo_df.LOS_class.iloc[i] = 4
-    if (row['time_at_mean_speed(%)'] < 30) and (row['maxspeed'] == 50) or (row['maxspeed'] == 90) and \
+        geo_df.LOS_class.iloc[i] = 3
+    elif (row['time_at_mean_speed(%)'] < 30) and (row['maxspeed'] == 50) or (row['maxspeed'] == 90) and \
             (row['speed'] < 15) and  (row['density (vei/km)'] > 28):
         print("OK====================== Saturato ===OK")
         # print(i)
         geo_df.LOS.iloc[i] = "F; Saturato"
-        geo_df.LOS_class.iloc[i] = 4
-    if (row['time_at_mean_speed(%)'] < 30) and (row['maxspeed'] == 90) or (row['maxspeed'] == 50) and \
+        geo_df.LOS_class.iloc[i] = 3
+    elif (row['time_at_mean_speed(%)'] < 30) and (row['maxspeed'] == 90) or (row['maxspeed'] == 50) and \
             (row['speed'] < 27) and (row['density (vei/km)'] > 28):
         print("OK====================== Saturato ===OK")
         # print(i)
         geo_df.LOS.iloc[i] = "F; Saturato"
-        geo_df.LOS_class.iloc[i] = 4
+        geo_df.LOS_class.iloc[i] = 3
 
     ### for motorways ================================================
-    if (row['time_at_mean_speed(%)'] <= 35) and (row['speed'] > 90):
+    elif (row['time_at_mean_speed(%)'] <= 35) and (row['speed'] > 90):
         print("OK=============================== Libero ============OK")
         geo_df.LOS.iloc[i] = "A; Libero"
         geo_df.LOS_class.iloc[i] = 1
-    if (row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 35) and\
+    elif (row['time_at_mean_speed(%)'] < 50) and (row['time_at_mean_speed(%)'] > 35) and\
             (row['speed'] < 90) and (row['speed'] > 80):
         print("OK===========================================OK")
         # print(i)
         geo_df.LOS.iloc[i] = "B; Libero"
         geo_df.LOS_class.iloc[i] = 1
-    if (row['time_at_mean_speed(%)'] < 65) and (row['time_at_mean_speed(%)'] > 50) and \
+    elif (row['time_at_mean_speed(%)'] < 65) and (row['time_at_mean_speed(%)'] > 50) and \
             (row['speed'] < 80) and (row['speed'] > 70):
         print("OK========== Stabile =================OK")
         # print(i)
         geo_df.LOS.iloc[i] = "C; Stabile"
         geo_df.LOS_class.iloc[i] = 2
-    if (40 < row['time_at_mean_speed(%)'] < 80) and (row['time_at_mean_speed(%)'] > 65) and \
+    elif (40 < row['time_at_mean_speed(%)'] < 80) and (row['time_at_mean_speed(%)'] > 65) and \
             (row['speed'] < 70) and (row['speed'] > 60):
         print("OK====================== Congestionato ===========OK")
         # print(i)
         geo_df.LOS.iloc[i] = "D; Congestionato"
         geo_df.LOS_class.iloc[i] = 3
-    if (row['time_at_mean_speed(%)'] > 80) and (row['speed'] < 35) :
+    elif (row['time_at_mean_speed(%)'] > 80) and (row['speed'] < 35) :
         print("OK====================== Saturato =======OK")
         # print(i)
         geo_df.LOS.iloc[i] = "E; Saturato"
-        geo_df.LOS_class.iloc[i] = 4
+        geo_df.LOS_class.iloc[i] = 3
+    else:
+        geo_df.LOS.iloc[i] = "A; Libero"
+        geo_df.LOS_class.iloc[i] = 1
 
 traffic_states = pd.DataFrame(geo_df)
 traffic_states = traffic_states.sort_values('LOS')
@@ -515,7 +518,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=12, tiles='cartodbpositron')
 ##############################################################################################
 
 folium.GeoJson(
-geo_df[['u','v', 'LOS_class', 'geometry']].to_json(),
+geo_df[['u','v', 'LOS_class', 'LOS', 'geometry']].to_json(),
     style_function=lambda x: {
         'fillColor': 'black',
         'color': 'black',
@@ -528,7 +531,7 @@ highlight_function=lambda x: {'weight':3,
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'LOS_class']),
+        fields=['u', 'v', 'LOS']),
     ).add_to(my_map)
 
-my_map.save("TRAFFIC_STATES_by_EDGES_2019-04-15_Apr-27-2020.html")
+my_map.save("TRAFFIC_STATES_by_EDGES_2019-04-15_May-04-2020.html")
