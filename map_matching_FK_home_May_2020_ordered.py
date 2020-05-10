@@ -181,7 +181,7 @@ for idx, row in unique_DATES.iterrows():
 # gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
 
         if len(viasat_data) > 5  and len(viasat_data) < 90:
-            fields = ["longitude", "latitude", "progressive", "timedate", "speed"]
+            fields = ["longitude", "latitude", "progressive", 'panel', "timedate", "speed"]
             # viasat = pd.read_csv(viasat_data, usecols=fields)
             viasat = viasat_data[fields]
 
@@ -201,13 +201,15 @@ for idx, row in unique_DATES.iterrows():
             viasat['path_time'] = viasat['hour'] * 3600 + viasat['minute'] * 60 + viasat['seconds']
             viasat = viasat.reset_index()
             viasat['path_time'] = viasat['path_time'] - viasat['path_time'][0]
-            viasat = viasat[["longitude", "latitude", "progressive", "path_time", "speed", "hour", "timedate"]]
-            ## get only VIASAT data where difference between two consecutive points is > 3600 secx (1 hour)
+            viasat = viasat[["longitude", "latitude", "progressive", "path_time", "panel", "speed", "hour", "timedate"]]
+            ## get only VIASAT data where difference between two consecutive points is > 900 secx (15 minutes)
             ## this is to define the TRIP after a 'long' STOP time
             viasat1 = viasat
             diff_time = viasat.path_time.diff()
             diff_time = diff_time.fillna(0)
+            VIASAT_TRIPS_by_ID = pd.DataFrame([])
             row = []
+            ## define a list with the starting indices of each new TRIP
             for i in range(len(diff_time)):
                 if diff_time.iloc[i] >= 900:
                     row.append(i)
@@ -215,21 +217,42 @@ for idx, row in unique_DATES.iterrows():
             # row_next = [x+1 for x in row]
             if len(row)>0:
                 row.append("end")
+                # split Viasat data by TRIP (for a given ID..."idterm")
                 for idx, j in enumerate(row):
                     print(j)
                     print(idx)
-                    # assign an unique trip ID
+                    # assign an unique TRIP ID
                     TRIP_ID = str(track_ID) + "_" + str(idx)
-                    if j == row[0]:
+                    print(TRIP_ID)
+                    if j == row[0]:  # first TRIP
                         lista = [i for i in range(0,j)]
-                    if (idx > 0 and j != 'end'):
-                        lista = [i for i in range(row[idx - 1], row[idx])]
-                    if j == "end":
-                        lista = [i for i in range(row[idx-1], len(viasat))]
                         print(lista)
+                        ## get  subset of VIasat data for each list:
                         viasat = viasat1.iloc[lista, :]
+                        viasat['TRIP_ID'] = TRIP_ID
+                        print(viasat)
+                        VIASAT_TRIPS_by_ID = VIASAT_TRIPS_by_ID.append(viasat)
+                    if (idx > 0 and j != 'end'):   # intermediate TRIPS
+                        lista = [i for i in range(row[idx - 1], row[idx])]
+                        print(lista)
+                        ## get  subset of VIasat data for each list:
+                        viasat = viasat1.iloc[lista, :]
+                        viasat['TRIP_ID'] = TRIP_ID
+                        print(viasat)
+                        VIASAT_TRIPS_by_ID = VIASAT_TRIPS_by_ID.append(viasat)
+                    if j == "end":  # last trip for that ID
+                        # lista = [i for i in range(row[idx-1], len(viasat))]
+                        lista = [i for i in range(row[idx-1], len(viasat1))]
+                        print(lista)
+                        ## get  subset of VIasat data for each list:
+                        viasat = viasat1.iloc[lista, :]
+                        viasat['TRIP_ID'] = TRIP_ID
+                        print(viasat)
+                        ## append all TRIPS by ID
+                        VIASAT_TRIPS_by_ID = VIASAT_TRIPS_by_ID.append(viasat)
 
-                    if len(viasat_data) > 5:
+
+                    if len(viasat) > 5:
                         ## introduce a dynamic buffer
                         dx = max(viasat.longitude) - min(viasat.longitude)
                         dy = max(viasat.latitude) - min(viasat.latitude)
@@ -238,7 +261,7 @@ for idx, row in unique_DATES.iterrows():
                         else:
                             buffer_diam = 0.00005
 
-                        buffer_diam = 0.00005
+                        buffer_diam = 0.00020   ## best choiche...so far
 
                         ## get extent of viasat data
                         ext = 0.025
@@ -696,7 +719,8 @@ for idx, row in unique_DATES.iterrows():
                                                      print('No path', 'u:', u, 'v:', v, )
                                     if len(trans_prob) != 0:
                                         MAX_trans_key = max(trans_prob, key=trans_prob.get)
-                                        MAX_emiss_key = min(emiss_prob, key=emiss_prob.get)
+                                        # MAX_emiss_key = min(emiss_prob, key=emiss_prob.get)
+                                        MAX_emiss_key = max(emiss_prob, key=emiss_prob.get)
                                         MAX_trans_value = trans_prob.get(MAX_trans_key)
                                         MAX_emiss_value = emiss_prob.get(MAX_emiss_key)
                                     else:
