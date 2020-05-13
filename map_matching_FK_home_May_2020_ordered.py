@@ -69,23 +69,6 @@ all_VIASAT_IDterminals = pd.read_sql_query(
 # make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
 all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
 
-# make a list of unique dates (only dates not times!)
-# select an unique table of dates postgresql
-unique_DATES = pd.read_sql_query(
-    '''SELECT DISTINCT all_dates.dates
-        FROM ( SELECT dates.d AS dates
-               FROM generate_series(
-               (SELECT MIN(timedate) FROM public.dataraw),
-               (SELECT MAX(timedate) FROM public.dataraw),
-              '1 day'::interval) AS dates(d)
-        ) AS all_dates
-        INNER JOIN public.dataraw
-	    ON all_dates.dates BETWEEN public.dataraw.timedate AND public.dataraw.timedate
-        ORDER BY all_dates.dates ''', conn)
-
-# ADD a new field with only date (no time)
-unique_DATES['just_date'] = unique_DATES['dates'].dt.date
-
 # DATE = '2019-04-15'
 track_ID = '2507511'
 # track_ID = '2509123'
@@ -96,10 +79,6 @@ track_ID = '2507511'
 # DATE = '2019-04-11'
 # track_ID = '3188580'
 
-# subset database with only one specific date and one specific TRACK_ID)
-# for idx, row in unique_DATES.iterrows():
-#     DATE = row[1].strftime("%Y-%m-%d")
-#     print(DATE)
 ################################################################################
 # create basemap
 ave_LAT = 37.53988692816245
@@ -112,10 +91,6 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
     track_ID = str(track_ID)
     # print('VIASAT GPS track:', track_ID)
-    # viasat_data = pd.read_sql_query('''
-    #             SELECT * FROM public.dataraw
-    #             WHERE date(timedate) = %s
-    #             AND idterm = %s ''', conn, params=(DATE, track_ID))
     viasat_data = pd.read_sql_query('''
                 SELECT * FROM public.dataraw 
                 WHERE idterm = '%s' ''' % track_ID, conn)
@@ -123,7 +98,6 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
     viasat_data.drop_duplicates(['latitude', 'longitude'], inplace=True)
     # sort data by timedate:
     viasat_data['timedate'] = viasat_data['timedate'].astype('datetime64[ns]')
-
 
     # remove viasat data with 'progressive' == 0
     viasat_data = viasat_data[viasat_data['progressive'] != 0]
@@ -138,12 +112,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
     # select only VIASAT point with accuracy ("grade") between 1 and 22
     viasat_data = viasat_data[(1 <= viasat_data['grade']) & (viasat_data['grade'] <= 15)]
     # viasat_data = viasat_data[viasat_data['direction'] != 0]
-
-
     if len(viasat_data) == 0:
         print('============> no VIASAT data for that day ==========')
 
-    # viasat_data = viasat_data[1:(len(viasat_data)-1)]
 ########################################################################################
 ########################################################################################
 ########################################################################################
@@ -156,7 +127,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 
     if len(viasat_data) > 5  and len(viasat_data) < 90:
     # if len(viasat_data) > 5:
-        fields = ["longitude", "latitude", "progressive", 'panel', 'grade', "timedate", "speed"]
+        fields = ["id", "longitude", "latitude", "progressive", 'panel', 'grade', "timedate", "speed"]
         # viasat = pd.read_csv(viasat_data, usecols=fields)
         viasat = viasat_data[fields]
         ## add a field for "anomalies"
@@ -169,6 +140,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
         viasat['totalseconds'] = pd.to_datetime(viasat['timedate'], format='% M:% S.% f')
         viasat['totalseconds'] = pd.to_datetime(viasat['totalseconds'], format='% M:% S.% f') - base_time
         viasat['totalseconds'] = viasat['totalseconds'].dt.total_seconds()
+        viasat['totalseconds'] = viasat.totalseconds.astype('int')
         # date
         viasat['date'] = viasat['timedate'].apply(lambda x: x.strftime("%Y-%m-%d"))
         # hour
@@ -180,10 +152,10 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
         # make one field with time in seconds
         viasat['path_time'] = viasat['hour'] * 3600 + viasat['minute'] * 60 + viasat['seconds']
         viasat = viasat.reset_index()
-        # make difference in totalaseconds from the start of the first trip of each TRACK_ID
+        # make difference in totalaseconds from the start of the first trip of each TRACK_ID (need this to compute trips)
         viasat['path_time'] = viasat['totalseconds'] - viasat['totalseconds'][0]
-        viasat = viasat[["longitude", "latitude", "progressive", "path_time", "totalseconds", "panel", "grade",
-                         "speed", "hour", "timedate", "anomaly"]]
+        viasat = viasat[["id", "longitude", "latitude", "progressive", "path_time", "totalseconds",
+                         "panel", "grade", "speed", "hour", "timedate", "anomaly"]]
         ## get only VIASAT data where difference between two consecutive points is > 900 secx (15 minutes)
         ## this is to define the TRIP after a 'long' STOP time
         viasat1 = viasat
@@ -215,6 +187,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     ## get  subset of VIasat data for each list:
                     viasat = viasat1.iloc[lista, :]
                     viasat['TRIP_ID'] = TRIP_ID
+                    viasat['idtrajectory'] = viasat.id.iloc[0]
                     print(viasat)
                     VIASAT_TRIPS_by_ID = VIASAT_TRIPS_by_ID.append(viasat)
 
@@ -224,6 +197,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     ## get  subset of VIasat data for each list:
                     viasat = viasat1.iloc[lista, :]
                     viasat['TRIP_ID'] = TRIP_ID
+                    viasat['idtrajectory'] = viasat.id.iloc[0]
                     print(viasat)
                     VIASAT_TRIPS_by_ID = VIASAT_TRIPS_by_ID.append(viasat)
 
@@ -234,6 +208,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     ## get  subset of VIasat data for each list:
                     viasat = viasat1.iloc[lista, :]
                     viasat['TRIP_ID'] = TRIP_ID
+                    viasat['idtrajectory'] = viasat.id.iloc[0]
                     print(viasat)
                     ## append all TRIPS by ID
                     VIASAT_TRIPS_by_ID = VIASAT_TRIPS_by_ID.append(viasat)
@@ -399,7 +374,13 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         #                    if_exists='append')
                         # connection.close()
 
+####################################################################################################
+#### cut here. Save final TRIPS into a DB and reload data..FOR each idterm and FOR each TRIP....####
+####################################################################################################
 
+                ## create a consecutive "ID" for each trip
+                # final_TRIPS = final_TRIPS.reset_index()
+                # final_TRIPS = final_TRIPS.rename(columns={'index': 'ID'})
                 if len(viasat) > 5:
                     ## introduce a dynamic buffer
                     dx = max(viasat.longitude) - min(viasat.longitude)
@@ -614,6 +595,10 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         df_edges = pd.DataFrame(edge)
                         df_edges.columns = ['u', 'v', 'buffer_ID']
                         df_edges.sort_values(by=['buffer_ID'], inplace=True)
+                        ## merge "df_edges" with "viasat" to get the "id"
+                        df_edges_copy = df_edges
+                        df_edges_copy.columns = ['u', 'v', 'ID']
+                        KKK = pd.merge(df_edges_copy, viasat, on=['ID'],how='left')
 
                         # sort df by u and v
                         # df_edges.sort_values(['u','v'],ascending=False, inplace=True)
@@ -1088,14 +1073,64 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         ORIGIN = max_prob_node[0]
                         DESTINATION = max_prob_node[-1]
 
-                        #remove duplicates
+                        ## remove duplicates
                         max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
-                        # AAA = max_prob_node
-                        # max_prob_node = [AAA[0]] + [AAA[1]] + [AAA[-2]] + [AAA[-1]]
+
+                        '''
+                        ##########################################################################################
+                        ## build matched route with a reduced number of max_prob_node ##
+                        reduced_nodes = max_prob_node
+                        max_prob_node_user = [reduced_nodes[0]] + [reduced_nodes[1]] + [reduced_nodes[2]] + [reduced_nodes[3]] + \
+                                              [reduced_nodes[-3]] +[reduced_nodes[-2]] + [reduced_nodes[-1]]
                         ## !!! compare the output path using the abobe nodes WITH the path using all nodes
+                        
+                        matched_route_user = []
+                        all_matched_edges_user = []
+                        for origin, destination in zip(max_prob_node_user, max_prob_node_user[1:]):
+                            try:
+                                # print(origin, destination)
+                                # use full complete graph to build the final path
+                                # route = nx.shortest_path(grafo, origin, destination, weight='length')
+                                route_user = nx.dijkstra_path(grafo, origin, destination, weight='length')
+                                path_edges_user = list(zip(route_user, route_user[1:]))
+                                # print(path_edges)
+                                all_matched_edges_user.append(path_edges_user)
+                                matched_route_user.append(route_user)
+                            except nx.NetworkXNoPath:
+                                print('No path', 'u:', origin, 'v:', destination)
 
+                        ##########///////////////////////////////////////////////////// ##########################################
+                        # if more than 2 element of the matched_route[2] are in matched_route[3], then delete matched_route[3]
+                        len_matched_edges_user = len(all_matched_edges_user)
+                        if len_matched_edges_user > 1:
+                            list1 = all_matched_edges_user[len_matched_edges_user - 2]
+                            list2 = all_matched_edges_user[len_matched_edges_user - 1]
+                            common_nodes_last = [elem for elem in list1 if elem in list2]
+                            if len(common_nodes_last) >= 2:
+                                all_matched_edges_user.remove(list2)
+                        ##########///////////////////////////////////////////////////// ##########################################
 
-                        # build matched route
+                        if len(all_matched_edges_user) > 1:
+                            # isolate edges in the grafo from 'all_matched_edges'
+                            df_nodes_user = []
+                            for i in range(len(all_matched_edges_user)):
+                                # print(all_matched_edges[i])
+                                route = all_matched_edges_user[i]
+                                for nodes in route:
+                                    # print('nodes:',nodes)
+                                    df_nodes_user.append(nodes)
+
+                            df_nodes_user = pd.DataFrame(df_nodes_user)
+                            df_nodes_user.columns = ['u', 'v']
+
+                            ## merge ordered list of nodes with edges from grafo
+                            edges_matched_route_user = pd.merge(df_nodes_user, gdf_edges, on=['u', 'v'], how='left')
+                            edges_matched_route_user = gpd.GeoDataFrame(edges_matched_route_user)
+                            edges_matched_route_user.drop_duplicates(['u', 'v'], inplace=True)
+                        ##########################################################################################
+                        '''
+
+                        #### build matched route with all max_prob_node  #####
                         matched_route = []
                         all_matched_edges = []
                         for origin, destination in zip(max_prob_node, max_prob_node[1:]):
@@ -1147,6 +1182,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                             edges_matched_route = pd.merge(df_nodes, gdf_edges, on=['u', 'v'],how='left')
                             edges_matched_route = gpd.GeoDataFrame(edges_matched_route)
                             edges_matched_route.drop_duplicates(['u', 'v'], inplace=True)
+
+                            # if len(edges_matched_route) > len(edges_matched_route_user):
+                            #     edges_matched_route = edges_matched_route_user
 
                             ## merge with adjacency list to assign corresponding tracks to each edge.....
                             # df_adjaceny = pd.DataFrame(adjacency_list.items())  # get the complete one...
