@@ -357,9 +357,11 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 
                         ### remove columns and add terminal ID
                         VIASAT_TRIP['track_ID'] = track_ID
+                        VIASAT_TRIP['segment'] = VIASAT_TRIP.index
                         VIASAT_TRIP.drop(['last_panel', 'last_lon', 'last_lat', 'last_totalseconds'], axis=1,
                                          inplace=True)
-                        # Connect to database using a context manager
+
+                        #### Connect to database using a context manager and populate the DB ####
                         connection = engine.connect()
                         VIASAT_TRIP.to_sql("routecheck", con=connection, schema="public",
                                            if_exists='append')
@@ -373,6 +375,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 #### add geometry once the DB has been completry populated #######
 ##################################################################
 ##################################################################
+
+conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
+cur_HAIG = conn_HAIG.cursor()
 
 # add geometry WGS84 4286 (Catania, Italy)
 cur_HAIG.execute("""

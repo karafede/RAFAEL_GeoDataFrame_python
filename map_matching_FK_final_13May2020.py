@@ -31,6 +31,12 @@ import geopy.distance
 today = date.today()
 today = today.strftime("%b-%d-%Y")
 
+# ## load grafo
+# file_graphml = 'Catania__Italy.graphml'
+# grafo = ox.load_graphml(file_graphml)
+# ## ox.plot_graph(grafo)
+# gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
+
 ########################################################################################
 ########## DATABASE OPERATIONS #########################################################
 ########################################################################################
@@ -39,13 +45,19 @@ today = today.strftime("%b-%d-%Y")
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
 
+# erase existing table
+# cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching_temp CASCADE")
+# cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching CASCADE")
+# conn_HAIG.commit()
 
 # Function to generate WKB hex
 def wkb_hexer(line):
     return line.wkb_hex
 
-all_EDGES = pd.DataFrame([])
+# Create an SQL connection engine to the output DB
+engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
 
+all_EDGES = pd.DataFrame([])
 
 # get all ID terminal of Viasat data
 all_VIASAT_IDterminals = pd.read_sql_query(
@@ -56,11 +68,11 @@ all_VIASAT_IDterminals = pd.read_sql_query(
 all_ID_TRACKS = list(all_VIASAT_IDterminals.track_ID.unique())
 
 # DATE = '2019-04-15'
-track_ID = '2507511'
+# track_ID = '2507511'
+
+# all_ID_TRACKS = ['2507511']
+
 # track_ID = '2509123'
-
-all_ID_TRACKS = ['2507511']
-
 # track_ID = '2507530'
 # track_ID = "2678884"
 
@@ -94,9 +106,6 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
         ## remove records with the following anomaly:
         viasat = viasat[viasat.anomaly != "IQ2C4V6"]
 
-        ## create a consecutive "ID" for each trip
-        # final_TRIPS = final_TRIPS.reset_index()
-        # final_TRIPS = final_TRIPS.rename(columns={'index': 'ID'})
         if len(viasat) > 5:
             ## introduce a dynamic buffer
             dx = max(viasat.longitude) - min(viasat.longitude)
@@ -137,23 +146,23 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             viasat_extent = gpd.GeoDataFrame(viasat_extent, geometry = 'geometry')
             # viasat_extent.plot()
 
-            # get graph only within the extension of the rectangular polygon
-            # filter some features from the OSM graph
-            # filter = (
-            #     '["highway"!~"living_street|abandoned|footway|pedestrian|raceway|cycleway|steps|construction|'
-            #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|secondary_link|'
-            #     'tertiary_link"]')
+            ## get graph only within the extension of the rectangular polygon
+            ## filter some features from the OSM graph
             filter = (
                 '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
                 'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
             grafo = ox.graph_from_polygon(viasat_extent.geometry[0], custom_filter=filter)
 
-            # ox.plot_graph(grafo)
-            # ox.save_graphml(grafo, filename='partial_OSM.graphml')
-
-
-            # make a geo-dataframe from the grapho
+            ## make a geo-dataframe from the grapho
             gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
+
+
+            # ## clip all edges from the main grafo according to a boundary polygon
+            # xmin, ymin, xmax, ymax = viasat_extent.total_bounds
+            # gdf_nodes = gdf_nodes_ALL.cx[xmin:xmax, ymin:ymax]
+            # ## clip all edges from the main grafo according to a boundary polygon
+            # gdf_edges = gdf_edges_ALL.cx[xmin:xmax, ymin:ymax]
+
 
             # reset indices
             viasat.reset_index(drop=True, inplace=True)
@@ -792,60 +801,6 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                 ## remove duplicates
                 max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
 
-                '''
-                ##########################################################################################
-                ## build matched route with a reduced number of max_prob_node ##
-                reduced_nodes = max_prob_node
-                max_prob_node_user = [reduced_nodes[0]] + [reduced_nodes[1]] + [reduced_nodes[2]] + [reduced_nodes[3]] + \
-                                      [reduced_nodes[-3]] +[reduced_nodes[-2]] + [reduced_nodes[-1]]
-                ## !!! compare the output path using the abobe nodes WITH the path using all nodes
-                
-                matched_route_user = []
-                all_matched_edges_user = []
-                for origin, destination in zip(max_prob_node_user, max_prob_node_user[1:]):
-                    try:
-                        # print(origin, destination)
-                        # use full complete graph to build the final path
-                        # route = nx.shortest_path(grafo, origin, destination, weight='length')
-                        route_user = nx.dijkstra_path(grafo, origin, destination, weight='length')
-                        path_edges_user = list(zip(route_user, route_user[1:]))
-                        # print(path_edges)
-                        all_matched_edges_user.append(path_edges_user)
-                        matched_route_user.append(route_user)
-                    except nx.NetworkXNoPath:
-                        print('No path', 'u:', origin, 'v:', destination)
-    
-                ##########///////////////////////////////////////////////////// ##########################################
-                # if more than 2 element of the matched_route[2] are in matched_route[3], then delete matched_route[3]
-                len_matched_edges_user = len(all_matched_edges_user)
-                if len_matched_edges_user > 1:
-                    list1 = all_matched_edges_user[len_matched_edges_user - 2]
-                    list2 = all_matched_edges_user[len_matched_edges_user - 1]
-                    common_nodes_last = [elem for elem in list1 if elem in list2]
-                    if len(common_nodes_last) >= 2:
-                        all_matched_edges_user.remove(list2)
-                ##########///////////////////////////////////////////////////// ##########################################
-    
-                if len(all_matched_edges_user) > 1:
-                    # isolate edges in the grafo from 'all_matched_edges'
-                    df_nodes_user = []
-                    for i in range(len(all_matched_edges_user)):
-                        # print(all_matched_edges[i])
-                        route = all_matched_edges_user[i]
-                        for nodes in route:
-                            # print('nodes:',nodes)
-                            df_nodes_user.append(nodes)
-    
-                    df_nodes_user = pd.DataFrame(df_nodes_user)
-                    df_nodes_user.columns = ['u', 'v']
-    
-                    ## merge ordered list of nodes with edges from grafo
-                    edges_matched_route_user = pd.merge(df_nodes_user, gdf_edges, on=['u', 'v'], how='left')
-                    edges_matched_route_user = gpd.GeoDataFrame(edges_matched_route_user)
-                    edges_matched_route_user.drop_duplicates(['u', 'v'], inplace=True)
-                ##########################################################################################
-                '''
-
                 #### build matched route with all max_prob_node  #####
                 matched_route = []
                 all_matched_edges = []
@@ -938,48 +893,80 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     ##################################################################################
 
                     ## merge with adjacency list to assign corresponding tracks to each edge.....
-                    # df_adjaceny = pd.DataFrame(adjacency_list.items())  # get the complete one...
-                    AAA = pd.DataFrame(edges_matched_route)
+                    DF_edges_matched_route = pd.DataFrame(edges_matched_route)
                     ## consider using KKK to get the 'idtrace'
                     KKK = KKK.rename(columns={'ID': 'buffer_ID'})
-                    HHH = pd.merge(AAA, df_edges, on=['u', 'v'], how='left')
+                    HHH = pd.merge(DF_edges_matched_route, df_edges, on=['u', 'v'], how='left')
+                    HHH['buffer_ID'] = HHH['buffer_ID'].bfill()
                     HHH.drop_duplicates(['u', 'v'], inplace=True)
                     HHH['buffer_ID'] = HHH['buffer_ID'].ffill()
                     KKK_new = KKK[['u', 'v', 'buffer_ID', 'id', 'progressive', 'totalseconds', 'path_time', 'speed', 'timedate',
                                    'TRIP_ID', 'idtrajectory', 'track_ID', 'anomaly']]
                     edges_matched_route_GV = pd.merge(HHH, KKK_new, on=['u', 'v', 'buffer_ID'], how='left')
                     edges_matched_route_GV['id'] = edges_matched_route_GV['id'].ffill()
+                    edges_matched_route_GV['id'] = edges_matched_route_GV['id'].bfill()
                     edges_matched_route_GV['id'] = edges_matched_route_GV.id.astype('int')
 
                     edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV['idtrajectory'].ffill()
+                    edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV['idtrajectory'].bfill()
                     edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV.idtrajectory.astype('int')
 
                     edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].ffill()
+                    edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].bfill()
                     edges_matched_route_GV['totalseconds'] = edges_matched_route_GV.totalseconds.astype('int')
 
                     # compute the difference between last and first time within the same "progressive" value
                     edges_matched_route_GV['progressive'] = edges_matched_route_GV['progressive'].ffill()
+                    edges_matched_route_GV['progressive'] = edges_matched_route_GV['progressive'].bfill()
                     edges_matched_route_GV['progressive'] = edges_matched_route_GV.progressive.astype('int')
-                    # get last value
-
-                    # edges_matched_route_GV['last_totalseconds'] = edges_matched_route_GV.totalseconds.shift()
-                    last = edges_matched_route_GV.groupby('progressive').nth(-1)
-                    first = edges_matched_route_GV.groupby('progressive').nth(0)
-                    last.reset_index(level=0, inplace=True)
-                    first.reset_index(level=0, inplace=True)
-                    diff_time = last.totalseconds.diff()
-                    diff_progressive = first.progressive.diff()
-                    df_diff = pd.concat([diff_time, diff_progressive], axis=1)
-                    df_diff = df_diff.bfill(axis='rows')
-                    df_diff['mean_speed'] = (df_diff.progressive/1000)/(df_diff.totalseconds/3600)
-
-                    # edges_matched_route_GV = edges_matched_route_GV[edges_matched_route_GV.anomaly != "IQ2C4V6"]
 
                     edges_matched_route_GV = edges_matched_route_GV.rename(columns={'id': 'idtrace'})
                     edges_matched_route_GV['sequenza'] = edges_matched_route_GV.index
-                    # edges_matched_route_GV = gpd.GeoDataFrame(edges_matched_route_GV)
 
+                    # last = edges_matched_route_GV.groupby('progressive').nth(-1)
+                    first = edges_matched_route_GV.groupby('progressive').nth(0)
+                    first_time = first.set_index('idtrace')
+                    first_progressive = first.reset_index(level=0)
+                    diff_time = first_time.totalseconds.diff()
+                    diff_progressive = first_progressive.progressive.diff()
+                    # shift
+                    diff_time = diff_time.shift(-1)
+                    diff_time = pd.DataFrame(diff_time)
+                    diff_time['idtrace'] = diff_time.index
+                    # reset index
+                    diff_time.reset_index(drop=True, inplace=True)
+                    diff_progressive = diff_progressive.shift(-1)
 
+                    # concatenate diff_time with diff_progressive
+                    df_speed = pd.concat([diff_time, diff_progressive], axis=1)
+                    # df_diff = df_diff.bfill(axis='rows')
+                    df_speed['mean_speed'] = (df_speed.progressive/1000)/(df_speed.totalseconds/3600)
+                    # add last instant speed
+                    df_speed["mean_speed"].iloc[len(df_speed)-1] = first.speed.iloc[len(first)-1]
+                    # merge df_speed with main dataframe "edges_matched_route_GV" using "idtrace" as common field
+                    edges_matched_route_GV = pd.merge(edges_matched_route_GV, df_speed, on=['idtrace'], how='left')
+                    edges_matched_route_GV.drop(['totalseconds_y'], axis=1)
+                    edges_matched_route_GV = edges_matched_route_GV.rename(columns={'totalseconds_x': 'totalseconds'})
+                    edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].ffill()
+                    edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
+                    edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].ffill()
+                    edges_matched_route_GV = gpd.GeoDataFrame(edges_matched_route_GV)
+
+                    # populate a DB
+                    final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory', 'geometry',
+                                                                          'u', 'v', 'osmid',
+                                                                          'idtrace', 'sequenza', 'mean_speed',
+                                                                          'timedate', 'totalseconds', 'TRIP_ID',
+                                                                          'length', 'highway', 'name', 'ref']]
+                    final_map_matching_table_GV = gpd.GeoDataFrame(final_map_matching_table_GV)
+
+                    ### Connect to a DB and populate the DB  ###
+                    connection = engine.connect()
+                    final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
+                    final_map_matching_table_GV.drop('geometry', 1, inplace=True)
+                    final_map_matching_table_GV.to_sql("mapmatching_temp", con=connection, schema="public",
+                                       if_exists='append')
+                    connection.close()
 
                     # make a dataframe from the dictionaries "time_track" and "distance_between_points"
                     time_dist_speed_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
@@ -1046,14 +1033,6 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         # path_cloud = 'C:/Users/Federico/ownCloud/Catania_RAFAEL/outputs_catania_28022020/'
                         # my_map.save(path_cloud + track_ID + "_" + DATE + "_matched_route.html")
 
-                        ## populate a table in the DataBase
-                        edges_matched_route['geom'] = edges_matched_route['geometry'].apply(wkb_hexer)
-                        edges_matched_route.drop('geometry', 1, inplace=True)
-                        ## append a geo-dataframe for each matched route, for each trip (OD) and for each track_ID
-                        # with engine.connect() as conn, conn.begin():
-                        #     # Note use of regular Pandas `to_sql()` method.
-                        #     edges_matched_route.to_sql("map_matching", con=conn, schema="public",
-                        #                          if_exists='append', index=False)
                     except KeyError:
                         print("no distance_edges")
 
@@ -1064,6 +1043,21 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 #######################################################################################
 #######################################################################################
 
-## close connection to DATABASE
-conn_HAIG.close()
-cur_HAIG.close()
+
+'''
+# copy temporary table to a permanent table with the right GEOMETRY datatype
+# Create an SQL connection engine to the output DB
+engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
+with engine.connect() as conn, conn.begin():
+    sql = """create table mapmatching as (select * from mapmatching_temp)"""
+    conn.execute(sql)
+
+# Convert the `'geom'` column back to Geometry datatype, from text
+with engine.connect() as conn, conn.begin():
+    print(conn)
+    sql = """ALTER TABLE public.mapmatching
+                                  ALTER COLUMN geom TYPE Geometry(LINESTRING, 4326)
+                                    USING ST_SetSRID(geom::Geometry, 4326)"""
+    conn.execute(sql)
+
+'''
