@@ -1,6 +1,6 @@
 
 import os
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 os.getcwd()
 
 import numpy as np
@@ -36,8 +36,8 @@ today = today.strftime("%b-%d-%Y")
 ########################################################################################
 
 # connect to Viasat row data
-conn = db_connect.connect_viasat()
-# conn = db_connect.connect_EcoTripCT()
+# conn = db_connect.connect_viasat()
+conn = db_connect.connect_EcoTripCT()
 cur = conn.cursor()
 
 # connect to new DB to be populated with Viasat data after route-check
@@ -49,7 +49,7 @@ def wkb_hexer(line):
     return line.wkb_hex
 
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
+engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
 
 
 ## create extension postgis on the database HAIG_Viasat_CT  (only one time)
@@ -77,6 +77,8 @@ all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
 # DATE = '2019-04-15'
 # track_ID = '2507511'
 # track_ID = '2509123'
+
+# track_ID = '2509151'
 
 # all_ID_TRACKS = ['2507511']
 
@@ -115,8 +117,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 ########################################################################################
 ########################################################################################
 
-    if len(viasat_data) > 5  and len(viasat_data) < 90:
-    # if len(viasat_data) > 5:
+    # if len(viasat_data) > 5  and len(viasat_data) < 90:
+    if len(viasat_data) > 5:
         fields = ["id", "longitude", "latitude", "progressive", 'panel', 'grade', "timedate", "speed"]
         # viasat = pd.read_csv(viasat_data, usecols=fields)
         viasat = viasat_data[fields]
@@ -143,10 +145,11 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
         viasat['path_time'] = viasat['hour'] * 3600 + viasat['minute'] * 60 + viasat['seconds']
         viasat = viasat.reset_index()
         # make difference in totalaseconds from the start of the first trip of each TRACK_ID (need this to compute trips)
+        # viasat['last_totalseconds'] = viasat.totalseconds.shift()
         viasat['path_time'] = viasat['totalseconds'] - viasat['totalseconds'][0]
         viasat = viasat[["id", "longitude", "latitude", "progressive", "path_time", "totalseconds",
                          "panel", "grade", "speed", "hour", "timedate", "anomaly"]]
-        ## get only VIASAT data where difference between two consecutive points is > 900 secx (15 minutes)
+        ## get only VIASAT data where difference between two consecutive points is > 600 secx (10 minutes)
         ## this is to define the TRIP after a 'long' STOP time
         viasat1 = viasat
         ## compute difference in seconds between two consecutive tracks
@@ -156,7 +159,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
         row = []
         ## define a list with the starting indices of each new TRIP
         for i in range(len(diff_time)):
-            if diff_time.iloc[i] >= 900:
+            if diff_time.iloc[i] >= 600:
                 row.append(i)
         # get next element of the list row
         # row_next = [x+1 for x in row]
@@ -292,9 +295,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                                 print(VIASAT_TRIP)
                         # final_TRIPS = final_TRIPS.append(VIASAT_TRIP)
 
-                      ####### TRAVEL time > 15 min ###############################################
+                      ####### TRAVEL time > 10 min ###############################################
 
-                            if (row.last_panel ==1 and row.panel ==1 and timeDiff > 15*60):
+                            if (row.last_panel ==1 and row.panel ==1 and timeDiff > 10*60):
                                 s = list(VIASAT_TRIP.iloc[0].anomaly)
                                 s[0] = "S"
                                 s[4] = "T"
@@ -363,7 +366,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 
                         #### Connect to database using a context manager and populate the DB ####
                         connection = engine.connect()
-                        VIASAT_TRIP.to_sql("routecheck", con=connection, schema="public",
+                        VIASAT_TRIP.to_sql("routecheck_temp", con=connection, schema="public",
                                            if_exists='append')
                         connection.close()
 
@@ -376,8 +379,13 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 ##################################################################
 ##################################################################
 
+'''
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
+
+with engine.connect() as conn, conn.begin():
+    sql = """create table routecheck as (select * from routecheck_temp)"""
+    conn.execute(sql)
 
 # add geometry WGS84 4286 (Catania, Italy)
 cur_HAIG.execute("""
@@ -391,3 +399,5 @@ update routecheck set geom = st_setsrid(st_point(longitude,latitude),4326)
 conn_HAIG.commit()
 conn_HAIG.close()
 cur_HAIG.close()
+
+'''

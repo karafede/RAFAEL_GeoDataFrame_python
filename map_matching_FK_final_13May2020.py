@@ -1,6 +1,6 @@
 
 import os
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 os.getcwd()
 
 import numpy as np
@@ -55,7 +55,7 @@ def wkb_hexer(line):
     return line.wkb_hex
 
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
+engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
 
 all_EDGES = pd.DataFrame([])
 
@@ -79,6 +79,9 @@ all_ID_TRACKS = list(all_VIASAT_IDterminals.track_ID.unique())
 # DATE = '2019-04-11'
 # track_ID = '3188580'
 
+# track_ID = '2509151'
+# TRIP_ID = '2509151_3'
+
 ################################################################################
 # create basemap
 ave_LAT = 37.53988692816245
@@ -89,9 +92,9 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 ## read each TRIP from each idterm (TRACK_ID or idtrajectory)
 
 ## to be used when the query stop. Start from the last saved index
-# last_track_idx = 324+68+10+115
-# for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_ID_TRACKS)]):
-for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
+last_track_idx = 89
+for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_ID_TRACKS)]):
+# for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
     track_ID = str(track_ID)
     viasat_data = pd.read_sql_query('''
                 SELECT * FROM public.routecheck 
@@ -900,8 +903,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     HHH['buffer_ID'] = HHH['buffer_ID'].bfill()
                     HHH.drop_duplicates(['u', 'v'], inplace=True)
                     HHH['buffer_ID'] = HHH['buffer_ID'].ffill()
-                    KKK_new = KKK[['u', 'v', 'buffer_ID', 'id', 'progressive', 'totalseconds', 'path_time', 'speed', 'timedate',
-                                   'TRIP_ID', 'idtrajectory', 'track_ID', 'anomaly']]
+                    KKK_new = KKK[['u', 'v', 'buffer_ID', 'id', 'progressive', 'totalseconds', 'path_time', 'speed',
+                                   'timedate', 'TRIP_ID', 'idtrajectory', 'track_ID', 'anomaly']]
                     edges_matched_route_GV = pd.merge(HHH, KKK_new, on=['u', 'v', 'buffer_ID'], how='left')
                     edges_matched_route_GV['id'] = edges_matched_route_GV['id'].ffill()
                     edges_matched_route_GV['id'] = edges_matched_route_GV['id'].bfill()
@@ -914,6 +917,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].ffill()
                     edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].bfill()
                     edges_matched_route_GV['totalseconds'] = edges_matched_route_GV.totalseconds.astype('int')
+
+                    edges_matched_route_GV['timedate'] = edges_matched_route_GV['timedate'].ffill()
+                    edges_matched_route_GV['timedate'] = edges_matched_route_GV['timedate'].bfill()
 
                     # compute the difference between last and first time within the same "progressive" value
                     edges_matched_route_GV['progressive'] = edges_matched_route_GV['progressive'].ffill()
@@ -939,34 +945,45 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 
                     # concatenate diff_time with diff_progressive
                     df_speed = pd.concat([diff_time, diff_progressive], axis=1)
+                    if len(df_speed) == 1:
+                        edges_matched_route_GV['mean_speed'] = edges_matched_route_GV[edges_matched_route_GV.speed.notnull()]['speed']
                     # df_diff = df_diff.bfill(axis='rows')
-                    df_speed['mean_speed'] = (df_speed.progressive/1000)/(df_speed.totalseconds/3600)
-                    # add last instant speed
-                    df_speed["mean_speed"].iloc[len(df_speed)-1] = first.speed.iloc[len(first)-1]
+                    else:
+                        df_speed['mean_speed'] = (df_speed.progressive/1000)/(df_speed.totalseconds/3600)
+                        # add last instant speed
+                        df_speed["mean_speed"].iloc[len(df_speed)-1] = first.speed.iloc[len(first)-1]
                     # merge df_speed with main dataframe "edges_matched_route_GV" using "idtrace" as common field
                     edges_matched_route_GV = pd.merge(edges_matched_route_GV, df_speed, on=['idtrace'], how='left')
                     edges_matched_route_GV.drop(['totalseconds_y'], axis=1)
                     edges_matched_route_GV = edges_matched_route_GV.rename(columns={'totalseconds_x': 'totalseconds'})
+
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].ffill()
+                    edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].bfill()
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
                     edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].ffill()
+                    ## remove rows with negative "mean_speed"...for now....
+                    edges_matched_route_GV = edges_matched_route_GV[edges_matched_route_GV['mean_speed'] > 0]
                     edges_matched_route_GV = gpd.GeoDataFrame(edges_matched_route_GV)
 
                     # populate a DB
-                    final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory', 'geometry',
-                                                                          'u', 'v', 'osmid',
-                                                                          'idtrace', 'sequenza', 'mean_speed',
-                                                                          'timedate', 'totalseconds', 'TRIP_ID',
-                                                                          'length', 'highway', 'name', 'ref']]
-                    final_map_matching_table_GV = gpd.GeoDataFrame(final_map_matching_table_GV)
+                    try:
+                        final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory', 'geometry',
+                                                                              'u', 'v', 'osmid',
+                                                                              'idtrace', 'sequenza', 'mean_speed',
+                                                                              'timedate', 'totalseconds', 'TRIP_ID',
+                                                                              'length', 'highway', 'name', 'ref']]
 
-                    ### Connect to a DB and populate the DB  ###
-                    connection = engine.connect()
-                    final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
-                    final_map_matching_table_GV.drop('geometry', 1, inplace=True)
-                    final_map_matching_table_GV.to_sql("mapmatching_temp", con=connection, schema="public",
-                                       if_exists='append')
-                    connection.close()
+                        final_map_matching_table_GV = gpd.GeoDataFrame(final_map_matching_table_GV)
+
+                        ### Connect to a DB and populate the DB  ###
+                        connection = engine.connect()
+                        final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
+                        final_map_matching_table_GV.drop('geometry', 1, inplace=True)
+                        final_map_matching_table_GV.to_sql("mapmatching_temp", con=connection, schema="public",
+                                           if_exists='append')
+                        connection.close()
+                    except KeyError:
+                        print("['ref'] not in OSM edge")
 
                     # make a dataframe from the dictionaries "time_track" and "distance_between_points"
                     time_dist_speed_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
@@ -1045,14 +1062,14 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 
 
 '''
-# copy temporary table to a permanent table with the right GEOMETRY datatype
-# Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
+## copy temporary table to a permanent table with the right GEOMETRY datatype
+## Create an SQL connection engine to the output DB
+engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
 with engine.connect() as conn, conn.begin():
     sql = """create table mapmatching as (select * from mapmatching_temp)"""
     conn.execute(sql)
 
-# Convert the `'geom'` column back to Geometry datatype, from text
+## Convert the `'geom'` column back to Geometry datatype, from text
 with engine.connect() as conn, conn.begin():
     print(conn)
     sql = """ALTER TABLE public.mapmatching
