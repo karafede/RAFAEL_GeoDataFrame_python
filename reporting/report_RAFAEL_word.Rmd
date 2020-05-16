@@ -363,7 +363,7 @@ inversamente proporzionale alla capacità attrattiva del nodo determinata da un 
 knitr::include_graphics("btw_and_closeness_centrality_Catania_all.png")
 ```
 
-**Figura 4a** e **Figura 4b** mostrano la la *betweenness* e *closeness* centrality su una porzione della rete stradale di Catania. In quest caso, abbiamo tenuto in considerazione tutta la rete stradale con l'inclusione di strade residenziali e non classificate. E' importante ricordare che la *centralita'* viene modellizzata grazie a tutti i parametri contenuti nel grafo (rete stradale) ottenuto da OpenStreetMap. Infatti, grandezze come la lunghezza di ciascun arco, le intersezioni, i sensi unici, le giunzioni, il numero di corsie ecc. contribuiscono a definire tutte le caratteristeche (statiche) delle strade all'interno di una determinata area.
+**Figura 4a** e **Figura 4b** mostrano la *betweenness* e *closeness* centrality su una porzione della rete stradale di Catania. In quest caso, abbiamo tenuto in considerazione tutta la rete stradale con l'inclusione di strade residenziali e non classificate. E' importante ricordare che la *centralita'* viene modellizzata grazie a tutti i parametri contenuti nel grafo (rete stradale) ottenuto da OpenStreetMap. Infatti, grandezze come la lunghezza di ciascun arco, le intersezioni, i sensi unici, le giunzioni, il numero di corsie ecc. contribuiscono a definire tutte le caratteristeche (statiche) delle strade all'interno di una determinata area.
 
 
 ```{r, echo=FALSE, fig.cap="**Figura 4a**. **Betweeness Centrality** di una porzione della rete stradale della provincia di Catania ottenuta dai dai dati Open Street Map.",out.width = '50%'}
@@ -378,6 +378,7 @@ knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/betweeness_ce
 knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/closeness_centrality_Catania_partial.png")
 ```
 
+*<br/><br/>*
 
 ## 4. Mappatura delle traettorie di dati Viasat (Map-Matching)
 
@@ -441,7 +442,7 @@ Chiaramente, i tempo di sosta sono molto indicativi per determinare se un *viagg
 **Limitazioni**
 L'algoritmo di Map-Matching, ha delle limitazioni che non sono facili da ovviare. 
 Questo algoritmo usa fondamentalmente due valori di probablita'. Tuttavia le probabilita' non danno mai dei valori con un'esattezza assoluta.
-I dati open-source (la rete stradale OSM) e le osservazioni GPS hanno delle incertezze ed accuratezze che non permettono un'accurata rappresentazione della realta'. Inoltre, e' stato osservato che la struttura della rete stradale e' molto complessa e non basta l'uso di probabilita' per determinare quale sia l'arco piu' probabile. Per ovviare questo problema, sono state cosiderate una serie di "eccezzioni" che hanno tenuto conto della complessita' della rete stradale. 
+I dati open-source (la rete stradale OSM) e le osservazioni GPS hanno delle incertezze ed accuratezze che non permettono un'accurata rappresentazione della realta'. Inoltre, e' stato osservato che la struttura della rete stradale e' molto complessa e non basta l'uso di probabilita' per determinare quale sia l'arco piu' probabile. Per ovviare questo problema, sono state cosiderate una serie di "eccezioni" che hanno tenuto conto della complessita' della rete stradale. 
 
 *<br/><br/>*
 
@@ -506,6 +507,7 @@ b) il **tempo medio di viaggio** su ogni arco. Questo e' un valore del tempo *me
 c) la **velocita' media di viaggio** su ogni arco. Questo valore e' stato calcolato facendo la *media* di tutte le velocita' istantanee dei veicoli che attraversano lo stesso arco. 
 d) la **distanza media di viaggio** su ogni arco. Questo valore indica la distanza *media* percorsa da tutti i veicoli che attraversano un arco. Questo valore non sempre e' corretto poiche' dipende dalla distanza progressiva ottenuta dai dati Viasat che, spesso non e' esatta.  In teoria, la **distanza media di viaggio** su ogni arco attraversato, dovrebbe corrispondere alla *lunghezza* dell'arco stesso.
 
+Nella fase di pre-processing si e' dapprima provveduto ad **ordinare in modo consecutivo tutti gli archi**. Infatti, poiche' la struttura finale dei dati di map-matching e' stata ottenuta filtrando i dati georeferenziati di OpenSteetMap, l'ordine dei nodi non e' in sequenza spaziale. Quindi, nel geodataframe finale ottenuto dal map-matching, gli archi sono stati tutti raggruppati in maniera consecutiva. Questo ha poi permesso di riempire dati mancati (come i timestamps) tra archi in cui non c'erano tracce VIASAT. 
 
 
 ```{r, echo=FALSE, fig.cap="**Figura 6**. Frequenza di percorrenza di ogni arco stradale nella provincia di Catania. Il dato e' in percentuale relativa al numero massimo di percorrenze(BIG DATASET). La mappa e' interattiva; i valori di output su ogni arco possono essere visualizzati con il cursore del mouse.",out.width = '50%'}
@@ -548,7 +550,7 @@ knitr::include_graphics("clean_matched_route_travel_time_all_EDGES_2019-04-15_Ap
 
 *<br/><br/>*
 
-## 6. Vulnerabilita' e Criticita' (.....in progress.....)
+## 6. Vulnerabilita' 
 
 La **vulnerabilita'** di un arco presente nella rete stradale e' intesa come la combinazione tra la probabilita' che un'evento accada e le conseguenze (impatto) da esso derivate (**vulnerabilita' = probabilita' x conseguenza**).
 Il caso piu' comune e' quando un arco di strada viene chiuso per un certo intervallo di tempo. La **probabilita'** che questo accada *p(u,v)* e' data dalla relazione tra il numero di viaggi che intercorrono tra due determinate zone geografiche *(r-->r')* ed il numero di nodi presenti in ciascuna delle due zone. 
@@ -562,7 +564,7 @@ Per definire una scala di vulnerabilita' e' quindi fondamentale calcolare i temp
 
 *<br/><br/>*
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 9.** Sovrapposizione di una griglia esagonale ai percorsi ottenuti con il Map-Matching di dati VIASAT."}
+````{r,  message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=7,  fig.cap ="**Figura 9.** Sovrapposizione di una griglia esagonale ai percorsi ottenuti con il Map-Matching di dati VIASAT. Ogni griglai ha un diametro di 1800m."}
 
 knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/hex_cells_assignation.png")
 
@@ -585,18 +587,169 @@ knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/element_and_l
 *<br/><br/>*
 
 Il percorso piu' breve tra un'ORIGINE ed una DESTINAZIONE e' da intendersi come il percorso con la **durata minima** tra una coppia OD. La rete stradale di OpenStreetMap, non fornisce le velocita' medie dei singoli archi. 
-Come illustrato di sopra, questa informazione e' stata ottenuta analizzando i dati VIASAT associati ai percorsi stradali *(Map-Matching)*. Quindi, il **tempo di viaggio** (o **costo**) tipico per ogni arco di tutta la rete stradale della provincia di Catania, e' stato ottenuto utilizzando la media delle velocita' reali delle traccie GPS e la lunghezza dei singoli archi. I tempi di viaggio cosi' ottenuti, sono stati integrati nel *grafo* di OpenStreetMap per calcolare i percorsi temporali piu' brevi tra coppie ODs.
+Come illustrato di sopra, questa informazione e' stata ottenuta analizzando i dati VIASAT associati ai percorsi stradali *(Map-Matching)*. Quindi, il **tempo di viaggio** (o **costo**) tipico per ogni arco di tutta la rete stradale della provincia di Catania, e' stato ottenuto utilizzando la media delle velocita' reali delle traccie GPS Viasat e la lunghezza dei singoli archi. I tempi di viaggio cosi' ottenuti, sono stati integrati nel *grafo* di OpenStreetMap per calcolare i percorsi temporali piu' brevi tra coppie ODs.
 
-La chiusura di un determinato arco che si trova lungo un percorso tra un'ORIGINE ed una DESTINAZIONE, e' stato simulato aggiungendo una **penalita' temporale** molto grande sull'arco stesso. Il tempo di percorrenza di quell'arco e' stato quindi aumentato di una quantita' abbastanza granda da indurre l'utente a fare una deviazione del suo percorso usuale per raggiungere la DESTINAZIONE. **Figura 11** mostra che chiudendo l'arco di colore rosso, l'utente sara' quindi costretto a fare una deviazione per arrivare alla DESTINAZIONE nel tempo piu' breve possibile.
+La chiusura di un determinato arco che si trova lungo un percorso tra un'ORIGINE ed una DESTINAZIONE, e' stato simulato aggiungendo una **penalita' temporale** molto grande sull'arco stesso. Il tempo di percorrenza di quell'arco e' stato quindi aumentato di una quantita' abbastanza grande (~ 5ore) da indurre l'utente a fare una deviazione del suo percorso usuale per raggiungere la DESTINAZIONE. **Figura 11** mostra che chiudendo l'arco di colore rosso, l'utente sara' quindi costretto a fare una deviazione per arrivare alla DESTINAZIONE nel tempo piu' breve possibile.
+
+**Outputs ottenti per i due percorsi OD con e senza penalità:**
+
+- *km:98.284 h:0.902 vm:109* (scenario [0], usando tempi di viaggio predefiniti)
+- *km:98.291 h:1.308 vm:75* (scenario [0], usado tempi di viaggio ottenuti da dati VIASAT)
+- *km:101.279 h:1.462 vm:69*  (scenario [1], (chiusura di un arco), usado tempi di viaggio ottenuti da dati VIASAT)
+
 
 
 *<br/><br/>*
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 11** Calcolo del cammino minimo (temporale) temporale tra un *ORIGINE* e *DESTINAZIONE*, con aggiunta di una penalita' temporale su un determinato arco."}
+````{r, r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 11** Calcolo del cammino minimo (temporale) temporale tra un *ORIGINE* e *DESTINAZIONE*, con aggiunta di una penalita' temporale su un determinato arco."}
 
 knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/shortest_path_and_penalty.png")
 
 ```
+*<br/><br/>*
 
+L'esempio riportato di sopra e' stato implementato in maniera consistente su tutto il dataset di percorsi trovati dal map-matching. Di seguito sono elencati i passaggi principali:
+
+1) Gli **elementi** sono stati definiti dall'intersezione di una griglia esagonale con un diametro di 900m, e tutti gli archi ottenuti dal map-matching. Per ogni coppia di ORIGINE e DESTINAZIONE e, per ogni elemento (insieme di archi), e' stato calcolato il **tempo minimo** di percorso in uno **scenario NULLO**. Questo significa che per ogni arco compreso tra l'ORIGINE e la DESTINAZIONE, non si e' aggiunta nessuna penalita' temporale (che significa una chiusura dell'arco) (Jenelius et al. 2013).
+
+2) Per ogni coppia di ORIGINE e DESTINAZIONE e, per ogni arco all'interno di un elemento, e' stata aggiunta una penalita' temporale di circa 5 ore. Quindi, il campo **costo** nel grafo di OpenStreetMap, che era stato creato con i tempi di percorrenza di ogni arco trovati dal map-matching, e' stato **riaggiornato con tempi piu' lunghi (di 5 ore)** per quei soli archi appartenenti all'elemento in analisi. Quindi e' stato ricalcolato il **tempo minimo** di un **possibile percorso alternativo** in uno **scenario di chiusura del link** (Jenelius et al. 2013). 
+
+3) L'**impatto di chiusura** e' stato calcolato considerando la differenza dei tempi di viaggio (tra ORIGINE e DESTINAZIONE)  tra lo scenario NULLO e lo scenario di chiusura di un arco all'interno dell'elemento. La differenza del tempo e' stata relazionata al flusso veicolare medio tra ORIGINE e DESTINAZIONE. L'**importanza** di un elemento, e quindi la sua **vulnerabiita' assoluta**, e' stata ottenuta sommando tutti gli impatti di chiusura di ogni arco presente in uno stesso elemento (Jenelius et al. 2013).
+Per convenzione, il **flusso veicolare orario** (veicoli/ora) e' stato calcolato ricampionando il conteggio dei veicoli **ogni 15 minuti** per ogni arco. **Figura 12** riporta un esempio di flusso orario calcolato per circa 1500 veicoli circolanti nella provincia di Catania il giorno 15 Aprile 2019. 
+
+4) Dopo aver calcolato l'impatto/importanza di ogni elemento, tutti gli archi all'interno dell'elemento sono stati riaggiornati con il loro abituale tempo ("costo") di viaggio ottenuto dai dati Viasat.
+
+Come ultima osservazione, ricordiamo che piu' la griglia esagonale e' densa (piccolo diametro), piu' accurata e granulare sara' l'attribuzione dell'importanza di ongi arco.
+
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=7,  fig.cap ="**Figura 12** Media giornaliera del flusso orario (veicoli/ora) calcolata su ogni arco. I dati sono riferiti ad un campione di 1500 veicoli per il giorno 15 Aprile 2019. Lo spessore della linea aumenta con il flusso."}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/flux_catania.png")
+
+```
+
+*<br/><br/>*
+
+L'importanza di ogni elemento all'interno di ogni zona esagonale (vedi Figura 9) e' espressa in unita' di **veicoli x ora**. Questo significa che, in base al tipico flusso veicolare orario all'interno di un determinato elemento, il numero totale di ore "perse" in caso di un'interruzione di uno degli archi all'interno di quell'elemento e' pari numero di **veicoli x ora**. **Figura 13** mostra una mappa di vulnerabilita' calcolata su un campione di 1500 veicolo nella provincia di Catania. Si osserva che solo alcuni archi hanno un'elevata importanza. La maggior parte degl archi in zone residenziali, hanno importanza uguale a zero o molto piccola. Si osserva che l'importanza cresce dove ci sono archi con un alto flusso e nelle intersezioni di strade primarie con autostrade e rampe autostradali.
+
+
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=7,  fig.cap ="**Figura 13**. Importanza di ogni elemento per una chiusura di una durata di circa 5 ore. Gli elementi sono stati definiti attraverso la sovrapposizione di una griglia esagonale con un diametri di 900m. I dati sono riferiti ad un campione di 1500 veicoli per il giorno 15 Aprile 2019. Lo spessore della linea aumenta con l'importanza/vulnerabilita' dell'arco."}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/Vulnerability_map.png")
+
+```
+
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=7,  fig.cap ="**Figura 13a**. Importanza di ogni cella di diametro di 900 m per una chiusura di una durata di circa 5 ore. I dati sono riferiti ad un campione di 1500 veicoli per il giorno 15 Aprile 2019."}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/Vulnerability_map_cells.png")
+
+```
+
+*<br/><br/>*
+
+## 7. Stati del traffico
+
+Gli stati del traffico nelle provincia di Catania sono stati calcolati in base a dei criteri di flusso e densita' riportati in letteratura dal manuale **Highway Capacity Manual** (HCM, 2010). Gli stati del traffico possono essere definiti distintamente per il traffico su autostrade e per quello urbano. Questi tipi di traffico prendono in considerazione tre grandezze principali:
+
+1) il flusso veicolare orario (calcolato su un periodo di 15 minuti e su ogni arco)
+2) la percentuale di tempo a velocita' media (mediata su un arco)
+3) la velocita' media di viaggio (su ogni arco)
+4) la densita' veicolare intesa come il numero di veicoli presenti in ogni km di strada.
+
+Gli stati del traffico quattro: "Libero", "Stabile", "Congestionato" e, "Saturato". Per ogni stato si associa un livello di servizio (LOS) come indicato nelle **Tabelle 4 e 5**. 
+
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 4**. Stati del traffico e Livelli di Servizio (LOS) per traffico urbano."}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/LOS_urbano.png")
+
+```
+
+
+*<br/><br/>*
+ Per flussi di veicoli inferiori a circa 1230 (veicoli/ora) per convenzione si associa uno stato di traffico "Libero" (LOS = A) (HCM, 2010). Questo stato viene assegnato indipendentemente dalla densita', dalla velocita' media di viaggio e dalla percentuale di tempo a velocita' media.
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 5**. Stati del traffico e Livelli di Sevizio (LOS) per traffico su autostrade."}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/LOS_autostrade.png")
+
+```
+
+
+
+Un'analisi degli stati del traffico e' stata fatta su un campione di circa 1500 veicoli nella giornata del 15 Aprile 2019 ed e' rappresentata in **Figura 14** e **Figura 14a**. Si puo' notare che gli stati di traffico "Libero (A)" si trovano principalmente su strade che collegano i centri abitati. Mentre gli stati di traffico "Saturato (D)" si trovano principalemnte nei centri abitati e sulla maggior parte delle strade secondarie e terziarie.
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=7, fig.cap ="**Figura 14**. Stati del traffico e Livelli di Sevizio (LOS) nella provincia di Catania su un campione di circa 1500 veicoli per il giorno 15 Aprile 2019. Lo spessore della linea aumenta con il grado dei Livelli di Servizio."}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/traffic_states.png")
+
+```
+
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=10,fig.height=7, fig.cap ="**Figura 14a**. Stati del traffico e Livelli di Sevizio (LOS) nella provincia di Catania su un campione di circa 1500 veicoli per il giorno 15 Aprile 2019. Lo spessore della linea aumenta con il grado dei Livelli di Servizio."}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/traffic_states_a.png")
+
+```
+
+
+*<br/><br/>*
+
+
+## Appendice. Diagramma di flusso per l'algoritmo di Map-Matching
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/map_matching_1.png")
+
+```
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/map_matching_2.png")
+
+```
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/map_matching_3.png")
+
+```
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5}
+
+knitr::include_graphics("C:/ENEA_CAS_WORK/Catania_RAFAEL/reporting/map_matching_4.png")
+
+```
+
+*<br/><br/>*
 
 
