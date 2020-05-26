@@ -31,7 +31,7 @@ import geopy.distance
 today = date.today()
 today = today.strftime("%b-%d-%Y")
 
-# ## load grafo
+## load grafo
 # file_graphml = 'Catania__Italy.graphml'
 # grafo = ox.load_graphml(file_graphml)
 # ## ox.plot_graph(grafo)
@@ -47,6 +47,7 @@ cur_HAIG = conn_HAIG.cursor()
 
 # erase existing table
 # cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching_temp CASCADE")
+# cur_HAIG.execute("DROP TABLE IF EXISTS mapmatch_MULTIPROC_temp CASCADE")
 # cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching CASCADE")
 # conn_HAIG.commit()
 
@@ -62,7 +63,7 @@ all_EDGES = pd.DataFrame([])
 # get all ID terminal of Viasat data
 all_VIASAT_IDterminals = pd.read_sql_query(
     ''' SELECT "track_ID" 
-        FROM public.routecheck''', conn_HAIG)
+        FROM public.routecheck_temp_concat''', conn_HAIG)
 
 # make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
 all_ID_TRACKS = list(all_VIASAT_IDterminals.track_ID.unique())
@@ -82,6 +83,7 @@ all_ID_TRACKS = list(all_VIASAT_IDterminals.track_ID.unique())
 # track_ID = '2509151'
 # TRIP_ID = '2509151_3'
 
+# track_ID = '2509222'
 ################################################################################
 # create basemap
 ave_LAT = 37.53988692816245
@@ -92,7 +94,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 ## read each TRIP from each idterm (TRACK_ID or idtrajectory)
 
 ## to be used when the query stop. Start from the last saved index
-last_track_idx = 89
+last_track_idx = 166
 for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_ID_TRACKS)]):
 # for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
     track_ID = str(track_ID)
@@ -105,9 +107,15 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_I
         TRIP_ID = trip
         viasat = viasat_data[viasat_data.TRIP_ID == trip]
         viasat.reset_index(drop=True, inplace=True)
+
         ## FILTERING ##################################
-        ## remove records with the following anomaly:
-        viasat = viasat[viasat.anomaly != "IQ2C4V6"]
+        ## remove/filter records with the following anomaly:
+        viasat = viasat[viasat.anomaly != "IQ2C4V6"]  ## first conditions (good)
+        viasat = viasat[viasat.anomaly != "IQc345d"]
+        viasat = viasat[viasat.anomaly != "EQc3456"]
+        viasat = viasat[viasat.anomaly != "EQc3T5d"]
+        # viasat = viasat[viasat['progressive'] != 0]
+
 
         if len(viasat) > 5:
             ## introduce a dynamic buffer
@@ -116,9 +124,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_I
             if dx < 0.007:
                 buffer_diam = 0.00020
             else:
-                buffer_diam = 0.00005
+                buffer_diam = 0.00008
 
-            buffer_diam = 0.00008   ## best choiche...so far
+            buffer_diam = 0.00008   ## best choice...so far
 
             ## get extent of viasat data
             ext = 0.025
@@ -149,8 +157,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_I
             viasat_extent = gpd.GeoDataFrame(viasat_extent, geometry = 'geometry')
             # viasat_extent.plot()
 
-            ## get graph only within the extension of the rectangular polygon
-            ## filter some features from the OSM graph
+            # get graph only within the extension of the rectangular polygon
+            # filter some features from the OSM graph
             filter = (
                 '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
                 'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
@@ -758,12 +766,17 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_I
                 from collections import OrderedDict
                 max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
 
-                print(i)
-                ### attach the last destination node (v) to the matched list of nodes
-                if len(track_list) > 1:
-                    if track_list[i] == max(track_list):
-                        last_node = v
-                        max_prob_node.append(last_node)
+                # print(i)
+                # ### attach the last destination node (v) to the matched list of nodes
+                # if len(track_list) > 1:
+                #     if track_list[i] == max(track_list):
+                #         last_node = v
+                #         max_prob_node.append(last_node)
+
+                ##### get last element of the "adjacency_list" (dictionary)
+                last_key_nodes = list(adjacency_list.keys())[-1]
+                last_nodes = list(adjacency_list[last_key_nodes])  ## get both of them!
+                max_prob_node.extend(last_nodes)
 
 
                 ### check that the nodes are on the same direction!!!!! ####
@@ -961,29 +974,30 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_I
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].bfill()
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
                     edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].ffill()
+                    edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].bfill()
                     ## remove rows with negative "mean_speed"...for now....
                     edges_matched_route_GV = edges_matched_route_GV[edges_matched_route_GV['mean_speed'] > 0]
                     edges_matched_route_GV = gpd.GeoDataFrame(edges_matched_route_GV)
+                    if len(edges_matched_route_GV) > 0:
+                        # populate a DB
+                        try:
+                            final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory', 'geometry',
+                                                                                  'u', 'v', 'osmid',
+                                                                                  'idtrace', 'sequenza', 'mean_speed',
+                                                                                  'timedate', 'totalseconds', 'TRIP_ID',
+                                                                                  'length', 'highway', 'name', 'ref']]
 
-                    # populate a DB
-                    try:
-                        final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory', 'geometry',
-                                                                              'u', 'v', 'osmid',
-                                                                              'idtrace', 'sequenza', 'mean_speed',
-                                                                              'timedate', 'totalseconds', 'TRIP_ID',
-                                                                              'length', 'highway', 'name', 'ref']]
+                            final_map_matching_table_GV = gpd.GeoDataFrame(final_map_matching_table_GV)
 
-                        final_map_matching_table_GV = gpd.GeoDataFrame(final_map_matching_table_GV)
-
-                        ### Connect to a DB and populate the DB  ###
-                        connection = engine.connect()
-                        final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
-                        final_map_matching_table_GV.drop('geometry', 1, inplace=True)
-                        final_map_matching_table_GV.to_sql("mapmatching_temp", con=connection, schema="public",
-                                           if_exists='append')
-                        connection.close()
-                    except KeyError:
-                        print("['ref'] not in OSM edge")
+                            ### Connect to a DB and populate the DB  ###
+                            connection = engine.connect()
+                            final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
+                            final_map_matching_table_GV.drop('geometry', 1, inplace=True)
+                            final_map_matching_table_GV.to_sql("mapmatching_temp", con=connection, schema="public",
+                                               if_exists='append')
+                            connection.close()
+                        except KeyError:
+                            print("['ref'] not in OSM edge")
 
                     # make a dataframe from the dictionaries "time_track" and "distance_between_points"
                     time_dist_speed_edges = pd.DataFrame.from_dict(time_track, orient='index').reset_index()
@@ -1060,6 +1074,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_I
 #######################################################################################
 #######################################################################################
 
+conn_HAIG.close()
+cur_HAIG.close()
 
 '''
 ## copy temporary table to a permanent table with the right GEOMETRY datatype
