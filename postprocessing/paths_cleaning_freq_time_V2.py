@@ -30,19 +30,15 @@ import db_connect
 from shapely import wkb
 
 '''
-### load all map-matching files
-### match pattern of .GeoJson files
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing\\new_geojsons')
-extension = 'geojson'
-all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
-#combine all files in the list
-gdf_all_EDGES = pd.concat([gpd.read_file(f) for f in all_filenames])
+gdf_all_EDGES = gpd.read_file('C:/ENEA_CAS_WORK/Catania_RAFAEL/postprocessing/new_geojsons/all_EDGES_2019-04-15_Apr-16-2020_130_194.geojson')
+AAA = pd.DataFrame(gdf_all_EDGES)
 '''
+
 
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
 
-# get all ID terminal of Viasat data
+# get all map-matched data from the DB
 gdf_all_EDGES = pd.read_sql_query(
     ''' SELECT *
         FROM public.mapmatching''', conn_HAIG)
@@ -51,27 +47,10 @@ gdf_all_EDGES = pd.read_sql_query(
 def wkb_tranformation(line):
    return wkb.loads(line.geom, hex=True)
 
-gdf_all_EDGES.geometry = gdf_all_EDGES.apply(wkb_tranformation, axis=1)
+gdf_all_EDGES['geometry'] = gdf_all_EDGES.apply(wkb_tranformation, axis=1)
+gdf_all_EDGES.drop(['geom'], axis=1, inplace= True)
 gdf_all_EDGES = gpd.GeoDataFrame(gdf_all_EDGES)
 gdf_all_EDGES.plot()
-
-
-
-
-## make a .csv file that assigns to each (u,v) pair, the type of road ("highway")
-edges = []
-import json
-for file in all_filenames:
-    # with open("all_EDGES_2019-04-15_Apr-15-2020_0_130.geojson") as f:
-    with open(file) as f:
-        data = json.load(f)
-    for feature in data['features']:
-        print(feature['properties'])
-        edge = [feature['properties']['u'], feature['properties']['v'], feature['properties']['highway']]
-        edges.append((edge))
-edges_highways = pd.DataFrame(edges,  columns=['u', 'v', 'highway'])
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
-edges_highways.to_csv('edges_highways.csv')
 
 
 os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL\\postprocessing')
@@ -80,19 +59,12 @@ gdf_all_EDGES_sel = gdf_all_EDGES[['u', 'v']]
 # time --> secs
 # distance --> km
 # speed --> km/h
-# gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time', 'distance', 'speed', 'hour', 'timedate']]
-gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'time', 'distance', 'speed']]
+gdf_all_EDGES_time = gdf_all_EDGES[['u', 'v', 'mean_speed']]
 
 ## fill nans by mean of before and after non-nan values (for 'time' and 'speed')
-gdf_all_EDGES_time['time'] = (gdf_all_EDGES_time['time'].ffill()+gdf_all_EDGES_time['time'].bfill())/2
-gdf_all_EDGES_time['speed'] = (gdf_all_EDGES_time['speed'].ffill()+gdf_all_EDGES_time['speed'].bfill())/2
+# gdf_all_EDGES_time['time'] = (gdf_all_EDGES_time['time'].ffill()+gdf_all_EDGES_time['time'].bfill())/2
+# gdf_all_EDGES_time['speed'] = (gdf_all_EDGES_time['speed'].ffill()+gdf_all_EDGES_time['speed'].bfill())/2
 
-# AAA = pd.DataFrame(gdf_all_EDGES_time)
-# AAA.dropna(subset = ['hour'], inplace= True)
-
-###################
-#### GROUP BY #####
-###################
 
 #######################################################################
 ## count how many times an edge ('u', 'v') occur in the geodataframe ##
@@ -104,9 +76,6 @@ df_all_EDGES_sel = gdf_all_EDGES.groupby(gdf_all_EDGES_sel.columns.tolist()).siz
 df_all_EDGES_records = df_all_EDGES_sel
 threshold = np.average(df_all_EDGES_records.records)
 
-### select only columns with records > N
-# df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= 15]
-# df_all_EDGES_sel = df_all_EDGES_sel[df_all_EDGES_sel.records >= round(threshold,0) + 1]
 
 ### add colors based on 'records'
 vmin = min(df_all_EDGES_records.records)
@@ -116,18 +85,20 @@ vmax = max(df_all_EDGES_records.records)
 norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
 mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Reds)  # scales of reds
 df_all_EDGES_records['color'] = df_all_EDGES_records['records'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
-# records = df_all_EDGES_sel[['records']]
 
 df_all_EDGES_sel = df_all_EDGES_sel[['u','v']]
 
 # filter recover_all_EDGES (geo-dataframe) with df_recover_all_EDGES_sel (dataframe)
-keys = list(df_all_EDGES_sel.columns.values)
-index_recover_all_EDGES = gdf_all_EDGES.set_index(keys).index
-index_df_all_EDGES_sel = df_all_EDGES_sel.set_index(keys).index
-clean_edges_matched_route = gdf_all_EDGES[index_recover_all_EDGES.isin(index_df_all_EDGES_sel)]
+clean_edges_matched_route = pd.merge(df_all_EDGES_sel, gdf_all_EDGES, on=['u', 'v'],how='left')
+clean_edges_matched_route = gpd.GeoDataFrame(clean_edges_matched_route)
+clean_edges_matched_route.drop_duplicates(['u', 'v'], inplace=True)
+
+# keys = list(df_all_EDGES_sel.columns.values)
+# index_recover_all_EDGES = gdf_all_EDGES.set_index(keys).index
+# index_df_all_EDGES_sel = df_all_EDGES_sel.set_index(keys).index
+# clean_edges_matched_route = gdf_all_EDGES[index_recover_all_EDGES.isin(index_df_all_EDGES_sel)]
 
 # get same color name according to the same 'u' 'v' pair
-clean_edges_matched_route[['u', 'v']].head()
 # merge records and colors into the geodataframe
 MERGED_clean_EDGES = pd.merge(clean_edges_matched_route, df_all_EDGES_records, on=['u', 'v'], how='inner')
 # remove duplicates nodes
@@ -170,9 +141,9 @@ folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 ##########################################
 
-MERGED_clean_EDGES.to_file(filename='FREQUENCIES_and_RECORDS_by_EDGES.geojson', driver='GeoJSON')
+MERGED_clean_EDGES.to_file(filename='DB_FREQUENCIES_and_RECORDS_by_EDGES.geojson', driver='GeoJSON')
 # my_map.save("clean_matched_route_frequecy_all_EDGES_10032020.html")
-my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_Apr-27-2020.html")
+my_map.save("clean_matched_route_frequecy_all_EDGES_2019-04-15_May-26-2020.html")
 
 
 ### compute the average number of trips between the SAME ORIGIN and DESTINATION
