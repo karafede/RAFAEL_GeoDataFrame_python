@@ -346,6 +346,16 @@ merged_data.drop('geometry', 1, inplace=True)
 merged_data.to_sql("paths_postprocess_temp", con=connection, schema="public")
 connection.close()
 
+## drop one column
+cur_HAIG.execute("""
+ALTER TABLE "paths_postprocess_temp" DROP "level_0"
+     """)
+conn_HAIG.commit()
+
+conn_HAIG.close()
+cur_HAIG.close()
+
+
 '''
 # copy temporary table to a permanent table with the right GEOMETRY datatype
 # Create an SQL connection engine to the output DB
