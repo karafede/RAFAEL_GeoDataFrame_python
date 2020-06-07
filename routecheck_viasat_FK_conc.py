@@ -42,6 +42,7 @@ cur = conn.cursor()
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
 
+
 # Function to generate WKB hex
 def wkb_hexer(line):
     return line.wkb_hex
