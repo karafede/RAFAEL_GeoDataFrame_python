@@ -35,8 +35,6 @@ today = today.strftime("%b-%d-%Y")
 #############################################################
 #############################################################
 
-# make a copy of routecheck into routecheck_temp
-
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
 
@@ -44,7 +42,7 @@ cur_HAIG = conn_HAIG.cursor()
 # get all ID terminal of Viasat data
 all_VIASAT_TRIP_IDs = pd.read_sql_query(
     ''' SELECT "TRIP_ID" 
-        FROM "mapmatch_MULTIPROC_temp"''', conn_HAIG)
+        FROM public.mapmatching_2019 ''', conn_HAIG)
 
 # make a list of all unique trips
 all_TRIP_IDs = list(all_VIASAT_TRIP_IDs.TRIP_ID.unique())
@@ -55,6 +53,18 @@ print("trip number:", len(all_TRIP_IDs))
 ## get all terminals (unique number of vehicles)
 idterm = list((all_VIASAT_TRIP_IDs.TRIP_ID.str.split('_', expand=True)[0]).unique())
 print("vehicle number:", len(idterm))
+
+
+## reload 'all_ID_TRACKS' as list
+with open("D:/ENEA_CAS_WORK/RAFAEL/all_ID_TRACKS_2019.txt", "r") as file:
+    all_ID_TRACKS = eval(file.readline())
+len(all_ID_TRACKS)
+## make difference between all idterm and matched idterms
+all_ID_TRACKS_DIFF = list(set(all_ID_TRACKS) - set(idterm))
+len(all_ID_TRACKS_DIFF)
+# ## save 'all_ID_TRACKS' as list
+with open("D:/ENEA_CAS_WORK/SENTINEL/all_ID_TRACKS_2019_new.txt", "w") as file:
+    file.write(str(all_ID_TRACKS_DIFF))
 
 ###########################################################################
 ###########################################################################
