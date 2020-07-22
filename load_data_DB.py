@@ -50,7 +50,7 @@ static_data.to_sql("obu", con=connection, schema="public", index=False)
 ##################################################
 
 # match pattern of .csv files
-viasat_filenames = ['VST_ANAS_CT_20190201.csv',    # 30064082 lines
+viasat_filenames = [# 'VST_ANAS_CT_20190201.csv',    # 30064082 lines
                     'VST_ANAS_CT_20190501.csv',    # 35181813 lines
                     'VST_ANAS_CT_20190801.csv',    # 26527801 lines
                     'VST_ANAS_CT_20191101.csv']    # 30986196 lines
@@ -72,7 +72,7 @@ for csv_file in viasat_filenames:
 
     slice = 100000  # slice of data to be insert into the DB during the loop
     ## calculate the neccessary number of iteration to carry out in order to upload all data into the DB
-    iter = int(round(lines/slice, ndigits=0)) +1
+    iter = int(round(lines/slice, ndigits=0))   #+1
     for i in range(0, iter):
         print(i)
         print(i, csv_file)
@@ -88,6 +88,16 @@ for csv_file in viasat_filenames:
         df.to_sql("dataraw", con=connection, schema="public",
                                        if_exists='append', index = False)
 
+
+###########################################################
+##### Check size DB and tables ############################
+
+pd.read_sql_query('''
+SELECT pg_size_pretty( pg_relation_size('public.dataraw') )''', conn_HAIG)
+
+### check the size of the WHOLE DB "HAIG_Viasat_SA"
+pd.read_sql_query('''
+SELECT pg_size_pretty( pg_database_size('HAIG_Viasat_CT') )''', conn_HAIG)
 
 
 
@@ -107,6 +117,15 @@ cur_HAIG.execute("""
 CREATE index dataraw_idterm_idx on public.dataraw(idterm);
 """)
 conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index dataraw_timedate_idx on public.dataraw(timedate);
+""")
+conn_HAIG.commit()
+
+
+
 
 
 
@@ -155,3 +174,26 @@ idterm_vehtype_portata.to_sql("idterm_portata", con=connection, schema="public",
 #################################################################################
 ##################################################################################
 
+### get unique list of dates in the DB (dataraw)
+
+# make a list of unique dates (only dates not times!)
+# select an unique table of dates postgresql
+unique_DATES = pd.read_sql_query(
+    '''SELECT DISTINCT all_dates.dates
+        FROM ( SELECT dates.d AS dates
+               FROM generate_series(
+               (SELECT MIN(timedate) FROM public.dataraw),
+               (SELECT MAX(timedate) FROM public.dataraw),
+              '1 day'::interval) AS dates(d)
+        ) AS all_dates
+        INNER JOIN public.dataraw
+	    ON all_dates.dates BETWEEN public.dataraw.timedate AND public.dataraw.timedate
+        ORDER BY all_dates.dates ''', conn_HAIG)
+
+# ADD a new field with only date (no time)
+unique_DATES['just_date'] = unique_DATES['dates'].dt.date
+
+# subset database with only one specific date and one specific TRACK_ID)
+for idx, row in unique_DATES.iterrows():
+    DATE = row[1].strftime("%Y-%m-%d")
+    print(DATE)
