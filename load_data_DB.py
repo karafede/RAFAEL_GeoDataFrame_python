@@ -95,10 +95,12 @@ for csv_file in viasat_filenames:
 pd.read_sql_query('''
 SELECT pg_size_pretty( pg_relation_size('public.dataraw') )''', conn_HAIG)
 
+pd.read_sql_query('''
+SELECT pg_size_pretty( pg_relation_size('public.routecheck_2019') )''', conn_HAIG)
+
 ### check the size of the WHOLE DB "HAIG_Viasat_SA"
 pd.read_sql_query('''
 SELECT pg_size_pretty( pg_database_size('HAIG_Viasat_CT') )''', conn_HAIG)
-
 
 
 ###########################################################
@@ -125,11 +127,20 @@ CREATE index dataraw_timedate_idx on public.dataraw(timedate);
 conn_HAIG.commit()
 
 
+cur_HAIG.execute("""
+CREATE index dataraw_vehtype_idx on public.dataraw(vehtype);
+""")
+conn_HAIG.commit()
 
 
+cur_HAIG.execute("""
+CREATE index dataraw_id_idx on public.dataraw("id");
+""")
+conn_HAIG.commit()
 
 
-
+###################################################################
+###################################################################
 ###################################################################
 #### create table with 'idterm', 'vehtype' and 'portata' ##########
 
@@ -146,28 +157,16 @@ idterm_vehtype_portata = pd.read_sql_query('''
 
 ## drop duplicates ###
 idterm_vehtype_portata.drop_duplicates(['idterm'], inplace=True)
-idterm_vehtype_portata.to_csv('D:/ENEA_CAS_WORK/SENTINEL/viasat_data/idterm_vehtype_portata.csv')
+idterm_vehtype_portata.to_csv('D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterm_vehtype_portata.csv')
 ## relaod .csv file
-idterm_vehtype_portata = pd.read_csv('D:/ENEA_CAS_WORK/SENTINEL/viasat_data/idterm_vehtype_portata.csv')
+idterm_vehtype_portata = pd.read_csv('D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterm_vehtype_portata.csv')
 idterm_vehtype_portata = idterm_vehtype_portata[['idterm', 'vehtype', 'portata']]
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_SA')
+engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
 connection = engine.connect()
 ## populate DB
 idterm_vehtype_portata.to_sql("idterm_portata", con=connection, schema="public",
           if_exists='append', index=False)
-
-
-# IDs_hourly = pd.read_sql_query('''  WITH ids AS
-#                                     (SELECT
-#                                     split_part("TRIP_ID"::TEXT,'_', 1) idterm, timedate
-#                                     FROM mapmatching_2017
-#                                     LIMIT 100)
-#                                     SELECT date_trunc('day', ids.timedate),
-#                                     ids.timedate,
-#                                     ids.idterm
-#                                     FROM ids
-#                                     ''', conn_HAIG)
 
 
 #################################################################################
@@ -188,6 +187,77 @@ unique_DATES = pd.read_sql_query(
         ) AS all_dates
         INNER JOIN public.dataraw
 	    ON all_dates.dates BETWEEN public.dataraw.timedate AND public.dataraw.timedate
+        ORDER BY all_dates.dates ''', conn_HAIG)
+
+# ADD a new field with only date (no time)
+unique_DATES['just_date'] = unique_DATES['dates'].dt.date
+
+# subset database with only one specific date and one specific TRACK_ID)
+for idx, row in unique_DATES.iterrows():
+    DATE = row[1].strftime("%Y-%m-%d")
+    print(DATE)
+
+
+################################################################
+################################################################
+
+### further operations on routecheck and mapmatching_2019 #####
+
+### create index for "timedate'
+cur_HAIG.execute("""
+CREATE index routecheck_2019_timedate_idx on public.routecheck_2019(timedate);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'idterm'
+cur_HAIG.execute("""
+CREATE index routecheck_2019_idterm_idx on public.routecheck_2019(idterm);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'longitude'
+cur_HAIG.execute("""
+CREATE index routecheck_2019_lon_idx on public.routecheck_2019(longitude);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'latitutde'
+cur_HAIG.execute("""
+CREATE index routecheck_2019_lat_idx on public.routecheck_2019(latitude);
+""")
+conn_HAIG.commit()
+
+
+##############################################################
+### get unique list of dates in the DB (routecheck_2019) #####
+
+
+BBB = pd.read_sql_query(
+    '''SELECT timedate
+        FROM public.routecheck_2019
+        WHERE date(timedate) = '2019-02-08' ''', conn_HAIG)
+
+CCC = pd.read_sql_query(
+    '''SELECT *
+        FROM public.routecheck_2019
+        WHERE idterm = '2400048' ''', conn_HAIG)
+
+
+# make a list of unique dates (only dates not times!)
+# select an unique table of dates postgresql
+unique_DATES = pd.read_sql_query(
+    '''SELECT DISTINCT all_dates.dates
+        FROM ( SELECT dates.d AS dates
+               FROM generate_series(
+               (SELECT MIN(timedate) FROM public.routecheck_2019),
+               (SELECT MAX(timedate) FROM public.routecheck_2019),
+              '1 day'::interval) AS dates(d)
+        ) AS all_dates
+        INNER JOIN public.routecheck_2019
+	    ON all_dates.dates BETWEEN public.routecheck_2019.timedate AND public.routecheck_2019.timedate
         ORDER BY all_dates.dates ''', conn_HAIG)
 
 # ADD a new field with only date (no time)
