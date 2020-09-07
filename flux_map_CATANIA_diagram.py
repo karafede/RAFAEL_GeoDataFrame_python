@@ -85,6 +85,7 @@ unique_DATES = pd.read_sql_query(
 
 # ADD a new field with only date (no time)
 unique_DATES['just_date'] = unique_DATES['dates'].dt.date
+MONTHS = unique_DATES['dates'].dt.month
 
 from datetime import datetime
 now1 = datetime.now()
@@ -122,6 +123,40 @@ viasat_data = pd.read_sql_query('''
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
                                       WHERE dataraw.vehtype::bigint = 1
                                       ''', conn_HAIG)
+
+
+
+viasat_data_Aug = pd.read_sql_query('''
+                       SELECT  
+                          mapmatching_2019.u, mapmatching_2019.v,
+                               mapmatching_2019.timedate, mapmatching_2019.mean_speed, 
+                               mapmatching_2019.idtrace, mapmatching_2019.sequenza,
+                               mapmatching_2019.idtrajectory,
+                               dataraw.idterm, dataraw.vehtype
+                          FROM mapmatching_2019
+                          LEFT JOIN dataraw 
+                                      ON mapmatching_2019.idtrace = dataraw.id  
+                                      /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
+                                      WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '08'
+                                      AND dataraw.vehtype::bigint = 1
+                                      ''', conn_HAIG)
+
+viasat_data_May = pd.read_sql_query('''
+                       SELECT  
+                          mapmatching_2019.u, mapmatching_2019.v,
+                               mapmatching_2019.timedate, mapmatching_2019.mean_speed, 
+                               mapmatching_2019.idtrace, mapmatching_2019.sequenza,
+                               mapmatching_2019.idtrajectory,
+                               dataraw.idterm, dataraw.vehtype
+                          FROM mapmatching_2019
+                          LEFT JOIN dataraw 
+                                      ON mapmatching_2019.idtrace = dataraw.id  
+                                      /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
+                                      WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '05'
+                                      AND dataraw.vehtype::bigint = 1
+                                      ''', conn_HAIG)
+
+
 
 ### get counts for all edges ########
 all_data = viasat_data[['u','v']]
@@ -168,8 +203,72 @@ highlight_function=lambda x: {'weight':3,
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/plot_EGDES_all_dates/'
 # my_map.save(path + "traffic_" + DATE + "_all_EDGES_counts_Catania.html")
 # my_map.save(path + "MON_25_Feb_2019_HEAVY_traffic_counts_all_EDGES_all_Catania.html")
-my_map.save(path + "CARS_traffic_counts_all_EDGES_all_Catania.html")
+my_map.save(path + "November_CARS_traffic_counts_all_EDGES_all_Catania.html")
 
 
 now2 = datetime.now()
 print(now2 - now1)
+
+
+#################################################################################
+#################################################################################
+#### find differences between seasons ###########################################
+
+### get counts for all edges ########
+all_data_May = viasat_data_May[['u','v']]
+all_counts_uv_May = viasat_data_May.groupby(viasat_data_May.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+all_data_Aug = viasat_data_Aug[['u','v']]
+all_counts_uv_Aug = all_data_Aug.groupby(all_data_Aug.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+
+
+merged = pd.merge(all_counts_uv_May, all_counts_uv_Aug,  on=['u', 'v'], how='outer')
+## replace all nan with zero
+merged = merged.fillna(0)
+merged.counts_x = merged.counts_x.astype('int')
+merged.counts_y = merged.counts_y.astype('int')
+## counts of AUGUST (-) counts of NOVEMBER
+merged['counts'] = merged.counts_x - merged.counts_y
+diff_May_Aug = merged[merged.counts > 0]
+
+# merged = all_counts_uv_August.merge(all_counts_uv_November, indicator=True, how='outer')
+# August = merged[merged['_merge'] == 'left_only']
+# November = merged[merged['_merge'] == 'right_only']
+# Both = merged[merged['_merge'] == 'both']
+
+all_counts_uv = diff_May_Aug
+
+all_counts_uv = pd.merge(all_counts_uv, gdf_edges, on=['u', 'v'], how='left')
+all_counts_uv = gpd.GeoDataFrame(all_counts_uv)
+all_counts_uv.drop_duplicates(['u', 'v'], inplace=True)
+# all_counts_uv.plot()
+
+## rescale all data by an arbitrary number
+all_counts_uv["scales"] = (all_counts_uv.counts/max(all_counts_uv.counts)) * 7
+
+################################################################################
+# create basemap CATANIA
+ave_LAT = 37.510284
+ave_LON = 15.092042
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+#################################################################################
+
+
+folium.GeoJson(
+all_counts_uv[['u','v', 'counts', 'scales', 'geometry']].to_json(),
+    style_function=lambda x: {
+        'fillColor': 'red',
+        'color': 'red',
+        'weight':  x['properties']['scales'],
+        'fillOpacity': 1,
+        },
+highlight_function=lambda x: {'weight':3,
+        'color':'blue',
+        'fillOpacity':1
+    },
+    # fields to show
+    tooltip=folium.features.GeoJsonTooltip(
+        fields=['u', 'v', 'counts']),
+    ).add_to(my_map)
+
+path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/plot_EGDES_all_dates/'
+my_map.save(path + "DIFF_May_Aug_CARS_counts_all_EDGES_all_Catania.html")
