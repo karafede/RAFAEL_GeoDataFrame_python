@@ -72,7 +72,7 @@ track_ID = '2507511'
 trip = '2507511_0'
 
 # all_ID_TRACKS = ['2507511']
-track_ID = '2508141'
+# track_ID = '2508141'
 # all_ID_TRACKS = ['2508141']    # trip 3....(to use as example)
 
 # track_ID = '2509123'
@@ -122,7 +122,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             else:
                 buffer_diam = 0.00008
 
-            buffer_diam = 0.00008   ## best choice...so far   0.00008
+            buffer_diam = 0.00005   ## best choice...so far   0.00008
             buffer_diam_pic = 0.00020
 
             ## get extent of viasat data
@@ -197,7 +197,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                                     fill_opacity=1).add_to(my_map)
             # my_map.save("matched_route_21032020.html")
             # my_map.save("matched_route_VIASAT_" + DATE + '_' + today + ".html")
-            my_map.save("matched_route_VIASAT_" + '_' + today + ".html")
+            my_map.save("matched_route_VIASAT_" + trip + ".html")
 
             ######################################################
 
@@ -241,7 +241,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 
             from datetime import datetime
 
-            # find all edges intersect by the buffers defined above
+            ## find all edges intersect by the buffers defined above
+            ## and get distance between Viasat measurement and edge
             buff = []
             index_edges = []
             index_nodes = []
@@ -280,7 +281,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             ## near neighbour edges (near the viasat measurements)
             nn_gdf_edges = gdf_edges[gdf_edges.index.isin(index_edges)]
             ## plot selects edges
-            nn_gdf_edges.plot()
+            # nn_gdf_edges.plot()
             # nn_gdf_edges.to_file(filename='nn_gdf_edges.geojson', driver='GeoJSON')
             # folium.GeoJson('nn_gdf_edges.geojson').add_to((my_map))
             my_map.save("matched_route_with_buffer.html")
@@ -779,13 +780,20 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                 from collections import OrderedDict
                 max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
 
-                print(i)
-                ### attach the last destination node (v) to the matched list of nodes
-                if len(track_list) > 1:
-                    if track_list[i] == max(track_list):
-                        last_node = v
-                        max_prob_node.append(last_node)
+                # print(i)
+                # ### attach the last destination node (v) to the matched list of nodes
+                # if len(track_list) > 1:
+                #     if track_list[i] == max(track_list):
+                #         last_node = v
+                #         max_prob_node.append(last_node)
+                #
                 # max_prob_node.append(529152100)
+                #### get last element of the "adjacency_list" (dictionary)
+                last_key_nodes = list(adjacency_list.keys())[-1]
+                last_nodes = list(adjacency_list[last_key_nodes])   ## get both of them!
+                max_prob_node.extend(last_nodes)
+
+
 
 
                 ### check that the nodes are on the same direction!!!!! ####
@@ -928,8 +936,11 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     KKK_new = KKK[['u', 'v', 'buffer_ID', 'id', 'progressive', 'totalseconds', 'path_time', 'speed',
                                    'timedate', 'TRIP_ID', 'idtrajectory', 'track_ID', 'anomaly']]
                     edges_matched_route_GV = pd.merge(HHH, KKK_new, on=['u', 'v', 'buffer_ID'], how='left')
+                    edges_matched_route_GV['id'] = edges_matched_route_GV['id'].bfill()
                     edges_matched_route_GV['id'] = edges_matched_route_GV['id'].ffill()
                     edges_matched_route_GV['id'] = edges_matched_route_GV['id'].bfill()
+                    # if (edges_matched_route_GV['id']).isnull().sum() == 0:
+                    # edges_matched_route_GV['id'].fillna(-1)
                     edges_matched_route_GV['id'] = edges_matched_route_GV.id.astype('int')
 
                     edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV['idtrajectory'].ffill()
@@ -976,13 +987,14 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         df_speed["mean_speed"].iloc[len(df_speed)-1] = first.speed.iloc[len(first)-1]
                     # merge df_speed with main dataframe "edges_matched_route_GV" using "idtrace" as common field
                     edges_matched_route_GV = pd.merge(edges_matched_route_GV, df_speed, on=['idtrace'], how='left')
-                    edges_matched_route_GV.drop(['totalseconds_y'], axis=1)
+                    edges_matched_route_GV.drop(['totalseconds_y'], axis=1, inplace = True)
                     edges_matched_route_GV = edges_matched_route_GV.rename(columns={'totalseconds_x': 'totalseconds'})
 
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].ffill()
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].bfill()
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
                     edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].ffill()
+                    edges_matched_route_GV['track_ID'] = edges_matched_route_GV['track_ID'].ffill()
                     ## remove rows with negative "mean_speed"...for now....
                     edges_matched_route_GV = edges_matched_route_GV[edges_matched_route_GV['mean_speed'] > 0]
                     edges_matched_route_GV = gpd.GeoDataFrame(edges_matched_route_GV)
@@ -990,9 +1002,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     # populate a DB
                     try:
                         final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory', 'geometry',
-                                                                              'u', 'v', 'osmid',
-                                                                              'idtrace', 'sequenza', 'mean_speed',
-                                                                              'timedate', 'totalseconds', 'TRIP_ID',
+                                                                              'u', 'v',                                                                        'idtrace', 'sequenza', 'mean_speed',
+                                                                              'timedate', 'totalseconds', 'TRIP_ID', 'track_ID',
                                                                               'length', 'highway', 'name', 'ref']]
 
                         final_map_matching_table_GV = gpd.GeoDataFrame(final_map_matching_table_GV)
