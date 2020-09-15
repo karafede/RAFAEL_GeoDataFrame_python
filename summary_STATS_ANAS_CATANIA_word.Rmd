@@ -1,0 +1,1521 @@
+---
+title: "Confronto dati ANAS-VIASAT nella provincia di Catania (2019)" 
+author:
+- Federico Karagulian
+date: "ultima versione `r format(Sys.time(), '%d %B %Y, %H:%M')`"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: 
+    reference_docx: word_style_FK.docx
+  number_sections: true
+  bookdown::word_document: default
+---
+
+
+## 1. Postazione ANAS e dati Viasat nella provincia di Catania
+
+Il confronto tra dati **ANAS** e **Viasat** nella provincia di Catania è stato fatto su una base di dati registrati nel corso di quattro mesi nell'anno 2019: Febbraio, Maggio, Agosto, Novembre. I mesi sono stati scelti per rappresentare la variazione stagionale del flusso di traffico nell'area Catanese.
+Le sezioni stradali **RA15 km6** della **tangenziale di Catania** e la sezione **SS121 km7** della **superstrada Paternò-Catania** hanno mostrato il maggior numero di passaggi rilevati con il dispositivo Viasat. L'elaborazione dei rilevamenti Viasat con l'algoritmo di mapmatching ha permesso di fare un confronto con i passaggi di autoveicoli registrati dalle postazioni ANAS. Oltre alle due sezioni stradali sopra indicate, il confronto dei passaggi ANAS-Viasat è stato operato su altre postazioni ANAS: *A19_km188,  SS192_km67 e SS114 (km57, km83, km107)* che hanno presentato un numero minore di passaggi Viasat in confronto alle postazioni RA15 km6 e SS121 km7.
+
+I dati ANAS sono stati raggruppati per tipo di veicolo (classe), data & ora e, direzione (ascendente, discendente). La stessa cosa è stata fatta per i passaggi di veicoli Viasat ottenuti dal mapmatching. La tipologia di veicoli è stata suddivisa in due classi: **automobili** e **veicoli pesanti**. Per coerenza con i dati Viasat, abbiamo escluso gli autobus e le moto dai dati ANAS. 
+
+Poichè i dati Viasat vengono forniti con un formato data & ora in unità *UTC*, per avere la corrispondenza con i dati ANAS (con formato ora in *CEST*), alle osservazioni del mese di Maggio ed Agosto dei dati Viasat sono state aggiunte 2 ore, mentre alle osservazioni del mese di Febbraio e Novembre è stata aggiunta un'ora.  
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1.** Serie temporale oraria del numero di passaggi per tutti i tipi di autoveicoli sull'autostrada A2 (km5+004) direzione Salerno (2017)"}
+
+
+rm(list = ls())
+
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(readr)
+library(broom)
+library(threadr)
+library(dplyr)
+library(dygraphs)
+library(ggpmisc)
+library(plotly)
+library(GGally)
+library(htmlwidgets)
+library(htmltools)
+library(webshot)
+library(ggrepel)
+library(openair)
+library(widgetframe)
+library(grid)
+library(gridExtra)
+library(pander)
+library(varhandle)
+library(gsubfn)
+options(scipen=5)
+
+# saving the original graphical parameters
+op <- par(no.readonly = TRUE)
+
+# load data
+# setwd
+WD <- "D:/ENEA_CAS_WORK/Catania_RAFAEL/files_ANAS/"
+
+patt <- ".csv"
+setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/files_ANAS/ANAS_TSeries/DatiElementari_10 tratte nella provincia di Catania_dal_01-02-2019_al_01-03-2019")
+filenames <- list.files(pattern = patt)
+# filenames
+
+# read all data
+DB_2019_FEBRUARY <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/files_ANAS/ANAS_TSeries/DatiElementari_10 tratte nella provincia di Catania_dal_01-02-2019_al_01-03-2019/",filenames[14]),
+                      header = T, skip = 48, sep=";")[, 1:10]
+DB_2019_MAY <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/files_ANAS//ANAS_TSeries/DatiElementari_10 tratte nella provincia di Catania_dal_01-05-2019_al_01-06-2019/",filenames[14]),
+                      header = T, skip = 48, sep=";")[, 1:10]
+DB_2019_AUGUST <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/files_ANAS//ANAS_TSeries/DatiElementari_10 tratte nella provincia di Catania_dal_01-08-2019_al_01-09-2019/",filenames[14]),
+                      header = T, skip = 48, sep=";")[, 1:10]
+DB_2019_NOVEMBER <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/files_ANAS//ANAS_TSeries/DatiElementari_10 tratte nella provincia di Catania_dal_01-11-2019_al_01-12-2019/",filenames[14]),
+                      header = T, skip = 48, sep=";")[, 1:10]
+DB_2019_FEBRUARY <- as.data.frame(DB_2019_FEBRUARY)
+DB_2019_MAY <- as.data.frame(DB_2019_MAY)
+DB_2019_AUGUST <- as.data.frame(DB_2019_AUGUST)
+DB_2019_NOVEMBER <- as.data.frame(DB_2019_NOVEMBER)
+
+
+# Bind and perform data cleaning
+DB <- rbind(DB_2019_FEBRUARY, DB_2019_MAY, DB_2019_AUGUST, DB_2019_NOVEMBER)
+# DB1 <- rbind(DB_2019_FEBRUARY, DB_2019_MAY, DB_2019_AUGUST, DB_2019_NOVEMBER)
+# DB2 <- rbind(DB_2019_FEBRUARY, DB_2019_MAY, DB_2019_AUGUST, DB_2019_NOVEMBER)
+# DB3 <- rbind(DB_2019_FEBRUARY, DB_2019_MAY, DB_2019_AUGUST, DB_2019_NOVEMBER)
+# DB <- rbind(DB1, DB2, DB3)
+
+
+headers <- names(DB)
+headers <- str_replace_all(headers, "\\.|\\(|\\)", "_")
+headers <- make.names(headers, unique = TRUE)
+headers <- str_replace_all(headers, "\\.", "_")
+headers <- str_to_lower(headers)
+
+# Give table headers
+names(DB) <- headers
+
+
+# format DateTime
+DB$riferimento_temporale <- lubridate::dmy_hms(DB$riferimento_temporale, tz = "UTC")
+names(DB)[names(DB) == 'riferimento_temporale'] <- 'timedate'
+
+#########################################################################
+
+### assign vehicle type to each "classe"
+# 1 = Moto
+# 2 = Auto
+# 3 = Auto rimorchio
+# 4 = Furgoni
+# 5 = Camion <7,5m
+# 6 = Camion >7,5m
+# 7 = Autotreni
+# 8 = Articolati
+# 9 = Autobus
+
+
+DB$classe <- gsub(c("2|3"),"automobili", (DB$classe))
+DB$classe <- gsub(c("4|5|6|7|8"),"veicoli pesanti", (DB$classe))
+### remove Moto and Autobus
+DB <- DB[!DB$classe == "1", ]
+DB <- DB[!DB$classe == "9", ]
+DB <- DB[!DB$classe == "10", ]
+
+
+
+## get the DAY and HOUR (of the week) of observations
+DB <- DB %>%
+  mutate(day = wday(timedate, label=TRUE)) %>%
+  mutate(hour = hour(timedate)) 
+DB$month <- factor(format(DB$timedate, format = "%B"))
+DB$month <- as.factor((DB$month))
+DB$day <- as.factor((DB$day))
+DB$hour <- as.factor((DB$hour))
+
+### ALL counts by DIREZIONE, CORSIA CLASSE and HOUR
+## resample to 1 hour (dati grezzi)
+total_counts_direzione_all <- DB %>%
+    group_by(date=floor_date(timedate, "1 hour"), direzione, corsia, classe, hour) %>%
+    summarize(count = length(hour))
+
+### ALL counts by DIREZIONE
+total_counts_direzione <- total_counts_direzione_all %>%
+    group_by(direzione) %>%
+    summarize(count_VIASAT = sum(count))
+
+### ALL counts by direzione and CLASSE
+total_counts_direzione_classe <- total_counts_direzione_all %>%
+    group_by(classe) %>%
+    summarize(count_VIASAT = sum(count))
+### ---> classe 2 has the higher number of passages
+
+
+```
+
+*<br/><br/>*
+
+
+
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1**. Distribuzione del coefficiente di penetrazione per i dati VIASAT rispetto ai dati ANAS sulla tratta A19_Km_188 + 848. I dati sono riferiti ai mesi di Febbraio, Maggio, Agosto, Novembre 2019."}
+
+
+#### distribuzione COEFFICIENTE di PENETRAZIONE VIASAT/ANAS ##############
+##########################################################################
+
+####################
+#### ANAS_SS192_km67
+####################
+# dati_grezzi_ANAS_SS192_km67 <- total_counts_direzione_all %>%
+#   group_by(direzione, date, classe) %>%
+#   summarise(count = sum(count))
+# 
+# SOMMA_dati_grezzi_ANAS_SS192_km67 <- dati_grezzi_ANAS_SS192_km67 %>%
+#   group_by(direzione) %>%
+#   summarise(count = sum(count)) 
+# ## A > D
+# write.csv(dati_grezzi_ANAS_SS192_km67, "dati_grezzi_ANAS_SS192_km67.csv")
+dati_grezzi_ANAS_SS192_km67 <- read.csv("dati_grezzi_ANAS_SS192_km67.csv", header = T)[-1]
+
+
+
+###################
+#### ANAS_A19_km188
+###################
+
+# dati_grezzi_ANAS_A19_Km_188 <- total_counts_direzione_all %>%
+#   group_by(direzione, date, classe) %>%
+#   summarise(count = sum(count))
+# 
+# SOMMA_dati_grezzi_AANAS_A19_Km_188 <- dati_grezzi_ANAS_A19_Km_188 %>%
+#   group_by(direzione) %>%
+#   summarise(count = sum(count)) 
+# ## A > D
+# write.csv(dati_grezzi_ANAS_A19_Km_188, "dati_grezzi_ANAS_A19_Km_188.csv")
+dati_grezzi_ANAS_A19_Km_188 <- read.csv("dati_grezzi_ANAS_A19_Km_188.csv", header = T)[-1]
+
+
+
+
+####################
+#### ANAS_SS121_km7
+####################
+
+# dati_grezzi_ANAS_SS121_km7 <- total_counts_direzione_all %>%
+#   group_by(direzione, date, classe) %>%
+#   summarise(count = sum(count))
+# 
+# SOMMA_dati_grezzi_ANAS_SS121_km7 <- dati_grezzi_ANAS_SS121_km7 %>%
+#   group_by(direzione) %>%
+#   summarise(count = sum(count))
+# ## D > A
+# write.csv(dati_grezzi_ANAS_SS121_km7, "dati_grezzi_ANAS_SS121_km7.csv")
+dati_grezzi_ANAS_SS121_km7 <- read.csv("dati_grezzi_ANAS_SS121_km7.csv", header = T)[-1]
+
+
+####################
+#### RA15_Km_6
+####################
+
+# dati_grezzi_ANAS_RA15_Km_6 <- total_counts_direzione_all %>%
+#   group_by(direzione, date, classe) %>%
+#   summarise(count = sum(count))
+# 
+# SOMMA_dati_grezzi_ANAS_RA15_Km_6 <- dati_grezzi_ANAS_RA15_Km_6 %>%
+#   group_by(direzione) %>%
+#   summarise(count = sum(count))
+# ## A > D
+# write.csv(dati_grezzi_ANAS_RA15_Km_6, "dati_grezzi_ANAS_RA15_Km_6.csv")
+dati_grezzi_ANAS_RA15_Km_6 <- read.csv("dati_grezzi_ANAS_RA15_Km_6.csv", header = T)[-1]
+
+
+####################
+#### SS114
+####################
+
+# dati_grezzi_ANAS_SS114 <- total_counts_direzione_all %>%
+#   group_by(direzione, date, classe) %>%
+#   summarise(count = sum(count))
+# 
+# SOMMA_dati_grezzi_SS114 <- dati_grezzi_ANAS_SS114 %>%
+#   group_by(direzione) %>%
+#   summarise(count = sum(count))
+# ## D > A
+# write.csv(dati_grezzi_ANAS_SS114, "dati_grezzi_ANAS_SS114.csv")
+dati_grezzi_ANAS_SS114 <- read.csv("dati_grezzi_ANAS_SS114.csv", header = T)[-1]
+
+
+
+######################################################
+###########################################
+#### VIASAT_SS192_km67
+######################
+
+
+VIASAT_SS192_km67 <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/VIASAT_SS192_km67.csv"), header = T, sep=",")[-1]
+
+VIASAT_SS192_km67 <- VIASAT_SS192_km67 %>%
+  mutate(timedate = ymd_hms(timedate, tz = "UTC"))
+
+
+VIASAT_SS192_km67$vehtype <- gsub(1, "automobili", (VIASAT_SS192_km67$vehtype))
+VIASAT_SS192_km67$vehtype <- gsub(2, "veicoli pesanti", (VIASAT_SS192_km67$vehtype))
+colnames(VIASAT_SS192_km67)[colnames(VIASAT_SS192_km67) == 'vehtype'] <- 'classe'
+
+
+## get the DAY and HOUR (of the week) of observations
+VIASAT_SS192_km67 <- VIASAT_SS192_km67 %>%
+  mutate(day = wday(timedate, label=TRUE)) %>%
+  mutate(hour = hour(timedate))
+VIASAT_SS192_km67$day <- as.factor((VIASAT_SS192_km67$day))
+VIASAT_SS192_km67$hour <- as.factor((VIASAT_SS192_km67$hour))
+VIASAT_SS192_km67$month <- factor(format(VIASAT_SS192_km67$timedate, format = "%B"))
+VIASAT_SS192_km67$month <- as.factor((VIASAT_SS192_km67$month))
+
+
+## !!!check the timezone and the legal time during the months
+## Febbrao --> +1 hour
+## Maggio --> +2 hour
+## Agosto --> +2 hour
+## November --> +1 hour
+
+VIASAT_SS192_km67_Feb_Nov <- VIASAT_SS192_km67 %>%
+  filter(month %in% c("febbraio", "novembre")) %>%
+  mutate(timedate = timedate + hours(1))
+
+VIASAT_SS192_km67_May_Aug <- VIASAT_SS192_km67 %>%
+  filter(month %in% c("maggio", "agosto")) %>%
+  mutate(timedate = timedate + hours(2))
+
+VIASAT_SS192_km67 <- rbind(VIASAT_SS192_km67_Feb_Nov, VIASAT_SS192_km67_May_Aug)
+
+## resample to 1 hour (dati grezzi)
+total_counts_VIASAT_SS192_km67 <- VIASAT_SS192_km67 %>%
+    group_by(date=floor_date(timedate, "1 hour"), u,v, classe) %>%
+    summarize(count = length(idterm))
+
+
+# (2193083700,	4795153417),  --> A  ## Ascendente
+# (4795154225,	4795154223)  <--- D  ## Discentente
+
+total_counts_VIASAT_SS192_km67$direzione <- as.factor(total_counts_VIASAT_SS192_km67$u)
+total_counts_VIASAT_SS192_km67$direzione <- gsub("2193083700", "A", (total_counts_VIASAT_SS192_km67$direzione))
+total_counts_VIASAT_SS192_km67$direzione <- gsub("4795154225", "D", (total_counts_VIASAT_SS192_km67$direzione))
+
+somma_counts_VIASAT_SS192_km67 <- total_counts_VIASAT_SS192_km67 %>%
+  group_by(direzione) %>%
+  summarise(count = sum(count)) 
+
+
+### join VIASAT and ANAS hourly data
+passaggi_VIASAT_SS192_km67 <- as.data.frame(total_counts_VIASAT_SS192_km67)
+passaggi_VIASAT_SS192_km67$date <- as.character(passaggi_VIASAT_SS192_km67$date)
+
+joined_ANAS_VIASAT_SS192_km67 <- passaggi_VIASAT_SS192_km67 %>%
+  left_join(dati_grezzi_ANAS_SS192_km67, by = c("date", "direzione", "classe"))
+
+## rename "counts" columns
+names(joined_ANAS_VIASAT_SS192_km67)[names(joined_ANAS_VIASAT_SS192_km67) == 'count.x'] <- 'passaggi_VIASAT'
+
+names(joined_ANAS_VIASAT_SS192_km67)[names(joined_ANAS_VIASAT_SS192_km67) == 'count.y'] <- 'passaggi_ANAS'
+
+
+#### calculate coefficient of penetration VIASAT/ANAS with all hourly data
+joined_ANAS_VIASAT_SS192_km67$ratio <- round(((joined_ANAS_VIASAT_SS192_km67$passaggi_VIASAT)/(joined_ANAS_VIASAT_SS192_km67$passaggi_ANAS))*100, digits = 1)
+joined_ANAS_VIASAT_SS192_km67 <- joined_ANAS_VIASAT_SS192_km67[complete.cases(joined_ANAS_VIASAT_SS192_km67[, "ratio"]), ] 
+joined_ANAS_VIASAT_SS192_km67 <- joined_ANAS_VIASAT_SS192_km67[joined_ANAS_VIASAT_SS192_km67$ratio < 8, ]
+
+######################
+#### VIASAT_A19_km188
+######################
+
+
+VIASAT_A19_km188 <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/VIASAT_A19_km188.csv"), header = T, sep=",")[-1]
+
+VIASAT_A19_km188 <- VIASAT_A19_km188 %>%
+  mutate(timedate = ymd_hms(timedate, tz = "UTC"))
+
+
+## get the DAY and HOUR (of the week) of observations
+VIASAT_A19_km188 <- VIASAT_A19_km188 %>%
+  mutate(day = wday(timedate, label=TRUE)) %>%
+  mutate(hour = hour(timedate))
+VIASAT_A19_km188$day <- as.factor((VIASAT_A19_km188$day))
+VIASAT_A19_km188$hour <- as.factor((VIASAT_A19_km188$hour))
+
+
+VIASAT_A19_km188$vehtype <- gsub(1, "automobili", (VIASAT_A19_km188$vehtype))
+VIASAT_A19_km188$vehtype <- gsub(2, "veicoli pesanti", (VIASAT_A19_km188$vehtype))
+colnames(VIASAT_A19_km188)[colnames(VIASAT_A19_km188) == 'vehtype'] <- 'classe'
+VIASAT_A19_km188$month <- factor(format(VIASAT_A19_km188$timedate, format = "%B"))
+VIASAT_A19_km188$month <- as.factor((VIASAT_A19_km188$month))
+
+
+## !!!check the timezone and the legal time during the months
+## Febbrao --> +1 hour
+## Maggio --> +2 hour
+## Agosto --> +2 hour
+## November --> +1 hour
+
+VIASAT_A19_km188_Feb_Nov <- VIASAT_A19_km188 %>%
+  filter(month %in% c("febbraio", "novembre")) %>%
+  mutate(timedate = timedate + hours(1))
+
+VIASAT_A19_km188_May_Aug <- VIASAT_A19_km188 %>%
+  filter(month %in% c("maggio", "agosto")) %>%
+  mutate(timedate = timedate + hours(2))
+
+VIASAT_A19_km188 <- rbind(VIASAT_A19_km188_Feb_Nov, VIASAT_A19_km188_May_Aug)
+
+
+## resample to 1 hour (dati grezzi)
+total_counts_VIASAT_A19_km188 <- VIASAT_A19_km188 %>%
+    group_by(date=floor_date(timedate, "1 hour"), u,v, classe) %>%
+    summarize(count = length(idterm))
+
+# (281305756, 5159815955),  --> A  ## Ascendente
+# (305783627, 4039429604)  <--- D  ## Discentente
+
+## (281305756, 5159815955)  ---> Palermo
+## (305783627, 4039429604)  ---> Catania
+
+total_counts_VIASAT_A19_km188$direzione <- as.factor(total_counts_VIASAT_A19_km188$u)
+total_counts_VIASAT_A19_km188$direzione <- gsub("281305756", "A", (total_counts_VIASAT_A19_km188$direzione))
+total_counts_VIASAT_A19_km188$direzione <- gsub("305783627", "D", (total_counts_VIASAT_A19_km188$direzione))
+
+
+somma_counts_VIASAT_A19_km188 <- total_counts_VIASAT_A19_km188 %>%
+  group_by(direzione) %>%
+  summarise(count = sum(count)) 
+
+
+### join VIASAT and ANAS hourly data
+passaggi_VIASAT_A19_km188 <- as.data.frame(total_counts_VIASAT_A19_km188)
+passaggi_VIASAT_A19_km188$date <- as.character(passaggi_VIASAT_A19_km188$date)
+
+joined_ANAS_VIASAT_A19_km188 <- passaggi_VIASAT_A19_km188 %>%
+  left_join(dati_grezzi_ANAS_A19_Km_188, by = c("date", "direzione", "classe"))
+
+## rename "counts" columns
+names(joined_ANAS_VIASAT_A19_km188)[names(joined_ANAS_VIASAT_A19_km188) == 'count.x'] <- 'passaggi_VIASAT'
+
+names(joined_ANAS_VIASAT_A19_km188)[names(joined_ANAS_VIASAT_A19_km188) == 'count.y'] <- 'passaggi_ANAS'
+
+
+#### calculate coefficient of penetration VIASAT/ANAS with all hourly data
+joined_ANAS_VIASAT_A19_km188$ratio <- round(((joined_ANAS_VIASAT_A19_km188$passaggi_VIASAT)/(joined_ANAS_VIASAT_A19_km188$passaggi_ANAS))*100, digits = 1)
+joined_ANAS_VIASAT_A19_km188 <- joined_ANAS_VIASAT_A19_km188[complete.cases(joined_ANAS_VIASAT_A19_km188[, "ratio"]), ] 
+joined_ANAS_VIASAT_A19_km188 <- joined_ANAS_VIASAT_A19_km188[joined_ANAS_VIASAT_A19_km188$ratio < 8, ]
+
+
+######################################################
+###########################################
+#### VIASAT_SS121_km7
+######################
+
+
+VIASAT_SS121_km7 <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/VIASAT_SS121_km7.csv"), header = T, sep=",")[-1]
+
+VIASAT_SS121_km7 <- VIASAT_SS121_km7 %>%
+  mutate(timedate = ymd_hms(timedate, tz = "UTC"))
+
+
+VIASAT_SS121_km7$vehtype <- gsub(1, "automobili", (VIASAT_SS121_km7$vehtype))
+VIASAT_SS121_km7$vehtype <- gsub(2, "veicoli pesanti", (VIASAT_SS121_km7$vehtype))
+colnames(VIASAT_SS121_km7)[colnames(VIASAT_SS121_km7) == 'vehtype'] <- 'classe'
+
+
+## get the DAY and HOUR (of the week) of observations
+VIASAT_SS121_km7 <- VIASAT_SS121_km7 %>%
+  mutate(day = wday(timedate, label=TRUE)) %>%
+  mutate(hour = hour(timedate))
+VIASAT_SS121_km7$day <- as.factor((VIASAT_SS121_km7$day))
+VIASAT_SS121_km7$hour <- as.factor((VIASAT_SS121_km7$hour))
+VIASAT_SS121_km7$month <- factor(format(VIASAT_SS121_km7$timedate, format = "%B"))
+VIASAT_SS121_km7$month <- as.factor((VIASAT_SS121_km7$month))
+
+
+## !!!check the timezone and the legal time during the months
+## Febbrao --> +1 hour
+## Maggio --> +2 hour
+## Agosto --> +2 hour
+## November --> +1 hour
+
+VIASAT_SS121_km7_Feb_Nov <- VIASAT_SS121_km7 %>%
+  filter(month %in% c("febbraio", "novembre")) %>%
+  mutate(timedate = timedate + hours(1))
+
+VIASAT_SS121_km7_May_Aug <- VIASAT_SS121_km7 %>%
+  filter(month %in% c("maggio", "agosto")) %>%
+  mutate(timedate = timedate + hours(2))
+
+VIASAT_SS121_km7 <- rbind(VIASAT_SS121_km7_Feb_Nov, VIASAT_SS121_km7_May_Aug)
+
+## resample to 1 hour (dati grezzi)
+total_counts_VIASAT_SS121_km7 <- VIASAT_SS121_km7 %>%
+    group_by(date=floor_date(timedate, "1 hour"), u,v, classe) %>%
+    summarize(count = length(idterm))
+
+
+# (839605642,	839605642),  --> A  ## Ascendente
+# (611623885,	293556974)  <--- D  ## Discentente
+
+total_counts_VIASAT_SS121_km7$direzione <- as.factor(total_counts_VIASAT_SS121_km7$u)
+total_counts_VIASAT_SS121_km7$direzione <- gsub("839605642", "D", (total_counts_VIASAT_SS121_km7$direzione))
+total_counts_VIASAT_SS121_km7$direzione <- gsub("611623885", "A", (total_counts_VIASAT_SS121_km7$direzione))
+
+somma_counts_VIASAT_SS121_km7 <- total_counts_VIASAT_SS121_km7 %>%
+  group_by(direzione) %>%
+  summarise(count = sum(count)) 
+
+
+### join VIASAT and ANAS hourly data
+passaggi_VIASAT_SS121_km7 <- as.data.frame(total_counts_VIASAT_SS121_km7)
+passaggi_VIASAT_SS121_km7$date <- as.character(passaggi_VIASAT_SS121_km7$date)
+
+joined_ANAS_VIASAT_SS121_km7 <- passaggi_VIASAT_SS121_km7 %>%
+  left_join(dati_grezzi_ANAS_SS121_km7, by = c("date", "direzione", "classe"))
+
+## rename "counts" columns
+names(joined_ANAS_VIASAT_SS121_km7)[names(joined_ANAS_VIASAT_SS121_km7) == 'count.x'] <- 'passaggi_VIASAT'
+
+names(joined_ANAS_VIASAT_SS121_km7)[names(joined_ANAS_VIASAT_SS121_km7) == 'count.y'] <- 'passaggi_ANAS'
+
+
+#### calculate coefficient of penetration VIASAT/ANAS with all hourly data
+joined_ANAS_VIASAT_SS121_km7$ratio <- round(((joined_ANAS_VIASAT_SS121_km7$passaggi_VIASAT)/(joined_ANAS_VIASAT_SS121_km7$passaggi_ANAS))*100, digits = 1)
+joined_ANAS_VIASAT_SS121_km7 <- joined_ANAS_VIASAT_SS121_km7[complete.cases(joined_ANAS_VIASAT_SS121_km7[, "ratio"]), ] 
+joined_ANAS_VIASAT_SS121_km7 <- joined_ANAS_VIASAT_SS121_km7[joined_ANAS_VIASAT_SS121_km7$ratio < 8, ]
+
+
+######################################################
+###########################################
+#### VIASAT_RA15_Km_6
+######################
+
+
+VIASAT_RA15_Km_6 <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/VIASAT_RA15_km6.csv"), header = T, sep=",")[-1]
+
+VIASAT_RA15_Km_6 <- VIASAT_RA15_Km_6 %>%
+  mutate(timedate = ymd_hms(timedate, tz = "UTC"))
+
+
+VIASAT_RA15_Km_6$vehtype <- gsub(1, "automobili", (VIASAT_RA15_Km_6$vehtype))
+VIASAT_RA15_Km_6$vehtype <- gsub(2, "veicoli pesanti", (VIASAT_RA15_Km_6$vehtype))
+colnames(VIASAT_RA15_Km_6)[colnames(VIASAT_RA15_Km_6) == 'vehtype'] <- 'classe'
+
+
+## get the DAY and HOUR (of the week) of observations
+VIASAT_RA15_Km_6 <- VIASAT_RA15_Km_6 %>%
+  mutate(day = wday(timedate, label=TRUE)) %>%
+  mutate(hour = hour(timedate))
+VIASAT_RA15_Km_6$day <- as.factor((VIASAT_RA15_Km_6$day))
+VIASAT_RA15_Km_6$hour <- as.factor((VIASAT_RA15_Km_6$hour))
+VIASAT_RA15_Km_6$month <- factor(format(VIASAT_RA15_Km_6$timedate, format = "%B"))
+VIASAT_RA15_Km_6$month <- as.factor((VIASAT_RA15_Km_6$month))
+
+
+## !!!check the timezone and the legal time during the months
+## Febbrao --> +1 hour
+## Maggio --> +2 hour
+## Agosto --> +2 hour
+## November --> +1 hour
+
+VIASAT_RA15_Km_6_Feb_Nov <- VIASAT_RA15_Km_6 %>%
+  filter(month %in% c("febbraio", "novembre")) %>%
+  mutate(timedate = timedate + hours(1))
+
+VIASAT_RA15_Km_6_May_Aug <- VIASAT_RA15_Km_6 %>%
+  filter(month %in% c("maggio", "agosto")) %>%
+  mutate(timedate = timedate + hours(2))
+
+VIASAT_RA15_Km_6 <- rbind(VIASAT_RA15_Km_6_Feb_Nov, VIASAT_RA15_Km_6_May_Aug)
+
+## resample to 1 hour (dati grezzi)
+total_counts_VIASAT_RA15_Km_6 <- VIASAT_RA15_Km_6 %>%
+    group_by(date=floor_date(timedate, "1 hour"), u,v, classe) %>%
+    summarize(count = length(idterm))
+
+
+# (476455543,	4064451884),  --> A  ## Ascendente
+# (294034837,	6754556102)  <--- D  ## Discentente
+
+total_counts_VIASAT_RA15_Km_6$direzione <- as.factor(total_counts_VIASAT_RA15_Km_6$u)
+total_counts_VIASAT_RA15_Km_6$direzione <- gsub("294034837", "D", (total_counts_VIASAT_RA15_Km_6$direzione))
+total_counts_VIASAT_RA15_Km_6$direzione <- gsub("476455543", "A", (total_counts_VIASAT_RA15_Km_6$direzione))
+
+somma_counts_VIASAT_RA15_Km_6 <- total_counts_VIASAT_RA15_Km_6 %>%
+  group_by(direzione) %>%
+  summarise(count = sum(count)) 
+
+
+### join VIASAT and ANAS hourly data
+passaggi_VIASAT_RA15_Km_6 <- as.data.frame(total_counts_VIASAT_RA15_Km_6)
+passaggi_VIASAT_RA15_Km_6$date <- as.character(passaggi_VIASAT_RA15_Km_6$date)
+
+joined_ANAS_VIASAT_RA15_Km_6 <- passaggi_VIASAT_RA15_Km_6 %>%
+  left_join(dati_grezzi_ANAS_RA15_Km_6, by = c("date", "direzione", "classe"))
+
+## rename "counts" columns
+names(joined_ANAS_VIASAT_RA15_Km_6)[names(joined_ANAS_VIASAT_RA15_Km_6) == 'count.x'] <- 'passaggi_VIASAT'
+
+names(joined_ANAS_VIASAT_RA15_Km_6)[names(joined_ANAS_VIASAT_RA15_Km_6) == 'count.y'] <- 'passaggi_ANAS'
+
+
+#### calculate coefficient of penetration VIASAT/ANAS with all hourly data
+joined_ANAS_VIASAT_RA15_Km_6$ratio <- round(((joined_ANAS_VIASAT_RA15_Km_6$passaggi_VIASAT)/(joined_ANAS_VIASAT_RA15_Km_6$passaggi_ANAS))*100, digits = 1)
+joined_ANAS_VIASAT_RA15_Km_6 <- joined_ANAS_VIASAT_RA15_Km_6[complete.cases(joined_ANAS_VIASAT_RA15_Km_6[, "ratio"]), ] 
+joined_ANAS_VIASAT_RA15_Km_6 <- joined_ANAS_VIASAT_RA15_Km_6[joined_ANAS_VIASAT_RA15_Km_6$ratio < 8, ]
+
+
+
+######################################################
+###########################################
+#### VIASAT_SS114
+######################
+
+
+VIASAT_SS114 <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/VIASAT_SS114.csv"), header = T, sep=",")[-1]
+
+VIASAT_SS114 <- VIASAT_SS114 %>%
+  mutate(timedate = ymd_hms(timedate, tz = "UTC"))
+
+
+VIASAT_SS114$vehtype <- gsub(1, "automobili", (VIASAT_SS114$vehtype))
+VIASAT_SS114$vehtype <- gsub(2, "veicoli pesanti", (VIASAT_SS114$vehtype))
+colnames(VIASAT_SS114)[colnames(VIASAT_SS114) == 'vehtype'] <- 'classe'
+
+
+## get the DAY and HOUR (of the week) of observations
+VIASAT_SS114 <- VIASAT_SS114 %>%
+  mutate(day = wday(timedate, label=TRUE)) %>%
+  mutate(hour = hour(timedate))
+VIASAT_SS114$day <- as.factor((VIASAT_SS114$day))
+VIASAT_SS114$hour <- as.factor((VIASAT_SS114$hour))
+VIASAT_SS114$month <- factor(format(VIASAT_SS114$timedate, format = "%B"))
+VIASAT_SS114$month <- as.factor((VIASAT_SS114$month))
+
+
+## !!!check the timezone and the legal time during the months
+## Febbrao --> +1 hour
+## Maggio --> +2 hour
+## Agosto --> +2 hour
+## November --> +1 hour
+
+VIASAT_SS114_Feb_Nov <- VIASAT_SS114 %>%
+  filter(month %in% c("febbraio", "novembre")) %>%
+  mutate(timedate = timedate + hours(1))
+
+VIASAT_SS114_May_Aug <- VIASAT_SS114 %>%
+  filter(month %in% c("maggio", "agosto")) %>%
+  mutate(timedate = timedate + hours(2))
+
+VIASAT_SS114 <- rbind(VIASAT_SS114_Feb_Nov, VIASAT_SS114_May_Aug)
+
+## resample to 1 hour (dati grezzi)
+total_counts_VIASAT_SS114 <- VIASAT_SS114 %>%
+    group_by(date=floor_date(timedate, "1 hour"), u,v, classe) %>%
+    summarize(count = length(idterm))
+
+
+somma_counts_VIASAT_SS114 <- total_counts_VIASAT_SS114 %>%
+  group_by(u,v) %>%
+  summarise(count = sum(count)) 
+
+total_counts_VIASAT_SS114$direzione <- as.factor(total_counts_VIASAT_SS114$u)
+total_counts_VIASAT_SS114$direzione <- gsub("3752100124", "D", (total_counts_VIASAT_SS114$direzione))
+total_counts_VIASAT_SS114$direzione <- gsub("766553690", "A", (total_counts_VIASAT_SS114$direzione))
+total_counts_VIASAT_SS114$direzione <- gsub("302628417", "A", (total_counts_VIASAT_SS114$direzione))
+
+
+
+### join VIASAT and ANAS hourly data
+passaggi_VIASAT_SS114 <- as.data.frame(total_counts_VIASAT_SS114)
+passaggi_VIASAT_SS114$date <- as.character(passaggi_VIASAT_SS114$date)
+
+joined_ANAS_VIASAT_SS114 <- passaggi_VIASAT_SS114 %>%
+  left_join(dati_grezzi_ANAS_SS114, by = c("date", "direzione", "classe"))
+
+## rename "counts" columns
+names(joined_ANAS_VIASAT_SS114)[names(joined_ANAS_VIASAT_SS114) == 'count.x'] <- 'passaggi_VIASAT'
+
+names(joined_ANAS_VIASAT_SS114)[names(joined_ANAS_VIASAT_SS114) == 'count.y'] <- 'passaggi_ANAS'
+
+
+#### calculate coefficient of penetration VIASAT/ANAS with all hourly data
+joined_ANAS_VIASAT_SS114$ratio <- round(((joined_ANAS_VIASAT_SS114$passaggi_VIASAT)/(joined_ANAS_VIASAT_SS114$passaggi_ANAS))*100, digits = 1)
+joined_ANAS_VIASAT_SS114 <- joined_ANAS_VIASAT_SS114[complete.cases(joined_ANAS_VIASAT_SS114[, "ratio"]), ] 
+joined_ANAS_VIASAT_SS114 <- joined_ANAS_VIASAT_SS114[joined_ANAS_VIASAT_SS114$ratio < 8, ]
+
+
+
+
+#####################
+#####################
+#####################
+#### density plot ###
+#####################
+
+
+
+p <- ggplot(joined_ANAS_VIASAT_A19_km188, aes(x=ratio, fill=direzione)) +
+     geom_histogram() +
+     theme_bw() +
+    # geom_density(stat = 'bin') +
+    theme(legend.title=element_blank()) + 
+    aes(y=stat(count)/sum(stat(count))) + 
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap( ~ direzione, ncol = 4) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    guides(fill=FALSE) +
+    theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=12)) +
+    theme(axis.text.x=element_text(size=12, colour = "black")) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13)) +
+    xlab("coefficiente penetrazione (%) (VIASAT / ANAS)") +
+    ylab("conteggi / totale conteggi (%)") +
+    geom_vline(xintercept = 1, col="blue", lty=2, size=1) +
+    geom_text(aes(x = 1 , y = 0.05 , label = "1.0%"), size = 4) +
+    # geom_vline(xintercept = 0.7, col="red", lty=2, size=1) +
+    # geom_text(aes(x = 4.5 , y = 0.01 , label = "3.5%"), size = 4) +
+   # geom_vline(xintercept = 1.5, col="black", lty=2, size=1) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+    ggtitle("Coefficiente di penetrazione tra dati VIASAT e dati ANAS - Tutti i veicoli   (A19_km188+848, 2019)") +
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+```
+
+
+*<br/><br/>*
+
+## 2. Confronto ANAS-Viasat
+
+Il confronto dei passaggi ANAS con i passaggi Viasat (ottenuti dall'algoritmo di mapmatching) è stato eseguito per ogni sezione sopra indicata. Più precisamente, il confronto del passaggio di autoveicoli è stato effettuato su base oraria e per ogni direzione di marcia (ascendente, discendente) senza distinzione tra automobili e veicoli pesanti. La distribuzione dei rapporti tra **passaggi orari** Viasat e passaggi orari ANAS è stato visualizzato in forma di istogramma per tutte le sezioni stradali analizzate **Figura 1 - Figura 5**. Il rapporto percentuale tra il numero passaggi VIASAT ed ANAS è stato definito come **coefficiente di penetrazione**. La distribuzione del coefficiente di penetrazione dipende dal numero di ore su cui è stato effettuato il confronto VIASAT-ANAS.    
+
+
+*<br/><br/>*
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 2**. Distribuzione del coefficiente di penetrazione per i dati VIASAT rispetto ai dati ANAS sulla tratta RA15_Km_6+983. Febbraio, Maggio, Agosto, Novembre 2019."}
+
+
+#####################
+#### density plot ###
+#####################
+
+
+
+p <- ggplot(joined_ANAS_VIASAT_RA15_Km_6, aes(x=ratio, fill=direzione)) +
+     geom_histogram() +
+     theme_bw() +
+    # geom_density(stat = 'bin') +
+    theme(legend.title=element_blank()) + 
+    aes(y=stat(count)/sum(stat(count))) + 
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap( ~ direzione, ncol = 4) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    guides(fill=FALSE) +
+    theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=12)) +
+    theme(axis.text.x=element_text(size=12, colour = "black")) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13)) +
+    xlab("coefficiente penetrazione (%) (VIASAT / ANAS)") +
+    ylab("conteggi / totale conteggi (%)") +
+    # geom_vline(xintercept = 1, col="blue", lty=2, size=1) +
+    geom_text(aes(x = 1.1 , y = 0.05 , label = "1.4%"), size = 4) +
+    # geom_vline(xintercept = 0.7, col="red", lty=2, size=1) +
+    # geom_text(aes(x = 4.5 , y = 0.01 , label = "3.5%"), size = 4) +
+   geom_vline(xintercept = 1.4, col="black", lty=2, size=1) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+    ggtitle("Coefficiente di penetrazione tra dati VIASAT e dati ANAS - Tutti i veicoli (RA15_Km_6+983, 2019)") +
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+
+```
+
+
+*<br/><br/>*
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 3**. Distribuzione del coefficiente di penetrazione per i dati VIASAT rispetto ai dati ANAS sulla tratta SS121_km7+973 Febbraio, Maggio, Agosto, Novembre 2019."}
+
+
+#####################
+#### density plot ###
+#####################
+
+
+
+p <- ggplot(joined_ANAS_VIASAT_SS121_km7, aes(x=ratio, fill=direzione)) +
+     geom_histogram() +
+     theme_bw() +
+    # geom_density(stat = 'bin') +
+    theme(legend.title=element_blank()) + 
+    aes(y=stat(count)/sum(stat(count))) + 
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap( ~ direzione, ncol = 4) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    guides(fill=FALSE) +
+    theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=12)) +
+    theme(axis.text.x=element_text(size=12, colour = "black")) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13)) +
+    xlab("coefficiente penetrazione (%) (VIASAT / ANAS)") +
+    ylab("conteggi / totale conteggi (%)") +
+    # geom_vline(xintercept = 1, col="blue", lty=2, size=1) +
+    geom_text(aes(x = 2.9 , y = 0.05 , label = "2.3%"), size = 4) +
+    # geom_vline(xintercept = 0.7, col="red", lty=2, size=1) +
+    # geom_text(aes(x = 4.5 , y = 0.01 , label = "3.5%"), size = 4) +
+   geom_vline(xintercept = 2.2, col="black", lty=2, size=1) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+    ggtitle("Coefficiente di penetrazione tra dati VIASAT e dati ANAS - Tutti i veicoli (SS121_km7+973, 2019)") +
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+
+```
+
+
+*<br/><br/>*
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 4**. Distribuzione del coefficiente di penetrazione per i dati VIASAT rispetto ai dati ANAS sulla tratta SS192_Km_67+447. Febbraio, Maggio, Agosto, Novembre 2019."}
+
+
+#####################
+#### density plot ###
+#####################
+
+
+
+p <- ggplot(joined_ANAS_VIASAT_SS192_km67, aes(x=ratio, fill=direzione)) +
+     geom_histogram() +
+     theme_bw() +
+    # geom_density(stat = 'bin') +
+    theme(legend.title=element_blank()) + 
+    aes(y=stat(count)/sum(stat(count))) + 
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap( ~ direzione, ncol = 4) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    guides(fill=FALSE) +
+    theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=12)) +
+    theme(axis.text.x=element_text(size=12, colour = "black")) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13)) +
+    xlab("coefficiente penetrazione (%) (VIASAT / ANAS)") +
+    ylab("conteggi / totale conteggi (%)") +
+    # geom_vline(xintercept = 1, col="blue", lty=2, size=1) +
+    # geom_text(aes(x = 2.5 , y = 0.020 , label = "1.5%"), size = 4) +
+    # geom_vline(xintercept = 0.7, col="red", lty=2, size=1) +
+    # geom_text(aes(x = 4.5 , y = 0.01 , label = "3.5%"), size = 4) +
+   # geom_vline(xintercept = 1.5, col="black", lty=2, size=1) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+    ggtitle("Coefficiente di penetrazione tra dati VIASAT e dati ANAS - Tutti i veicoli (SS192_Km_67+447, 2019)") +
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+```
+
+
+*<br/><br/>*
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 5**. Distribuzione del coefficiente di penetrazione per i dati VIASAT rispetto ai dati ANAS sulle tratte della strada SS114. Febbraio, Maggio, Agosto, Novembre 2019."}
+
+
+#####################
+#### density plot ###
+#####################
+
+
+
+p <- ggplot(joined_ANAS_VIASAT_SS114, aes(x=ratio, fill=direzione)) +
+     geom_histogram() +
+     theme_bw() +
+    # geom_density(stat = 'bin') +
+    theme(legend.title=element_blank()) + 
+    aes(y=stat(count)/sum(stat(count))) + 
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap( ~ direzione, ncol = 4) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    guides(fill=FALSE) +
+    theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=12)) +
+    theme(axis.text.x=element_text(size=12, colour = "black")) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13)) +
+    xlab("coefficiente penetrazione (%) (VIASAT / ANAS)") +
+    ylab("conteggi / totale conteggi (%)") +
+    # geom_vline(xintercept = 1, col="blue", lty=2, size=1) +
+    geom_text(aes(x = 1.3 , y = 0.15 , label = "0.7%"), size = 4) +
+    geom_vline(xintercept = 0.7, col="black", lty=2, size=1) +
+    # geom_text(aes(x = 4.5 , y = 0.01 , label = "3.5%"), size = 4) +
+   # geom_vline(xintercept = 1.4, col="black", lty=2, size=1) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+    ggtitle("Coefficiente di penetrazione tra dati VIASAT e dati ANAS - Tutti i veicoli (SS114, 2019)") +
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+
+```
+
+
+*<br/><br/>*
+
+La variazine del coefficiente di penetrazione VIASAT-ANAS è stata visualizzata in **Figura 6**. Indipendentemente dal numero di ore confrontate, si può notare che il coefficiente di penetrazione ha un'elevata variabilità e mostra valori diversi per diverse sezioni stradali. Si è cercato di modellizzare le distribuzioni dei coefficienti di penetrazione con una curva **gaussiana**. Come si può vedere in **Figura 7**, solo la distribuzione relativa alla sezione stradale **SS121 km7** ha mostrato un discreto accordo con il modello gaussiano.
+I risultati della modellizzazione sono ripotati in **Tabella 1**. Il **valore medio** e la **deviazione standard** più alta relativa alla distribuzione del coefficiente di penetrazione è stata osservata per la sezione SS121 km7 (valore medio = **2.49**, deviazione standard = **1.45**). Mentre il valore più basso della distribuzione del coefficiente di penetrazione è stato osservato per la sezione SS114 con un valore medio di *0.94* ed una deviazione standard di *0.89*. Come si può notare, i valori di deviazione standard rappresentano più del 50% dei valori medi.
+ 
+
+*<br/><br/>*
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 6**. BOX plot. Febbraio, Maggio, Agosto, Novembre 2019. I valori ripotati indicano il numero di ore confrontate tra passaggi VIASAT ed ANAS)."}
+
+
+### join all ratios together....
+
+df_A19 <- data.frame(joined_ANAS_VIASAT_A19_km188$ratio)
+names(df_A19) <- "ratio"
+df_A19$source <- "A19_km188"
+
+
+df_SS192 <- data.frame(joined_ANAS_VIASAT_SS192_km67$ratio)
+names(df_SS192) <- "ratio"
+df_SS192$source <- "SS192_km67"
+
+
+df_SS121 <- data.frame(joined_ANAS_VIASAT_SS121_km7$ratio)
+names(df_SS121) <- "ratio"
+df_SS121$source <- "SS121_km7"
+
+df_RA15 <- data.frame(joined_ANAS_VIASAT_RA15_Km_6$ratio)
+names(df_RA15) <- "ratio"
+df_RA15$source <- "RA15_Km6"
+
+df_SS114 <- data.frame(joined_ANAS_VIASAT_SS114$ratio)
+names(df_SS114) <- "ratio"
+df_SS114$source <- "SS114"
+
+
+df <- rbind(df_A19, 
+            df_SS192,
+            df_SS121,
+            df_RA15,
+            df_SS114)
+somma_df <- df %>%
+  group_by(source) %>%
+  summarise(total = length(ratio))
+
+df <- df %>%
+  filter(ratio <5)
+
+
+p <- ggplot(df) + 
+    aes(x =source, y = ratio) +
+    geom_boxplot(fill = "orange") + 
+    theme_bw() +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13),     
+          axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=14)) +
+    ylab("conteggi / totale conteggi (%)") +
+    xlab("coefficiente penetrazione (%) (VIASAT / ANAS)") +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+    geom_text(data = somma_df, aes(x = source, y = 2, label = total), size = 8, hjust = 0.5,  vjust = -0.5)+
+    ggtitle("Confronto dei dati ANAS & VIASAT (Feb-May-Aug-Nov 2019)") +
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+```
+
+
+*<br/><br/>*
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 7.** Modellizzazione della distribuzione del coefficente di penetrazione VIASAT-ANAS per ogni sezione stradale. Il modello gaussiano è stato applicato ad ongni distribuzione."}
+
+
+plots <- lapply(split(df, df$source),FUN=function(speed_dist){ 
+    ggplot(speed_dist, aes(ratio)) +
+    geom_density(alpha = 0.5) +
+    # ylim(0, 0.035) +
+    stat_function(fun = dnorm, 
+                  args = list(mean = mean(speed_dist$ratio),
+                           sd = sd(speed_dist$ratio)), colour = "red") +  ## fit with Gaussian
+    theme_bw() +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=10),     
+          axis.text.x=element_text(angle=0,hjust=0,vjust=1, size=10)) +
+      ylab("conteggi/tot. conteggi (%)") +
+    xlab("coeff. penetrazione (%) (VIASAT / ANAS)") +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=10),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=10, colour="black")) +
+    geom_vline(xintercept=mean(speed_dist$speed), color="red", linetype="dashed", size=0.5) 
+})
+
+
+# Finally, present the plots on 2 columns.
+grid.arrange(plots$A19_km188, plots$SS192_km67, plots$SS121_km7,
+             plots$RA15_Km6, plots$SS114  ,nrow=2, ncol = 3,
+             top = textGrob("       A19_km188+848                          SS192_km67+447                       SS121_km7+973",gp=gpar(fontsize=15,font=3)),
+             bottom = textGrob("RA15_Km_6+983                      SS114                                             ",gp=gpar(fontsize=15,font=3)))
+
+````
+
+*<br/><br/>*
+
+## 3. Conclusioni
+
+Considerando la grande variabilità del coefficiente di penetrazione e la differenza non trascurabile tra i coefficienti ottenuti per le diverse sezioni stradali, si è pensato di modelizzare l'insieme di tutti i coefficiente di penetrazione. **Tabella 2** mostra che il valore medio ottenuto per il coefficiente di penetrazione è **1.42** con una deviazione standard di **1.1**. Anche in questo caso, il valore di deviazione standard rappresenta più del 50% del valore medio. Per concludere, la scelta del valore di **1.42 ± 1.1** come coefficiente di penetrazione VIASAT/ANAS nell'area di Catania, rispecchia la variabilità in eccesso o in difetto del numero di passaggi di autoveicoli registrati sulle sezioni stradali esaminate. 
+  
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.** "}
+
+
+# estimate paramters
+library(MASS)
+library(fitdistrplus)
+
+## fit with a "gaussian/normal" distribution
+fit_A19_km188 <- fitdistrplus::fitdist(joined_ANAS_VIASAT_A19_km188$ratio, "norm")
+class(fit_A19_km188) <- c("fitdist", "fitdistr") 
+fit_A19_km188 <- as.data.frame(broom::tidy(fit_A19_km188))
+names(fit_A19_km188) <- c("term", "A19_km188", "A19_km188_error" )
+
+fit_SS192_km67  <- fitdistrplus::fitdist(joined_ANAS_VIASAT_SS192_km67$ratio, "norm")
+class(fit_SS192_km67) <- c("fitdist", "fitdistr") 
+fit_SS192_km67 <- as.data.frame(broom::tidy(fit_SS192_km67))
+names(fit_SS192_km67) <- c("term", "SS192_km67", "SS192_km67_error" )
+
+## fit with a "gaussian/normal" distribution
+fit_RA15_Km_6 <- fitdistrplus::fitdist(joined_ANAS_VIASAT_RA15_Km_6$ratio, "norm")
+class(fit_RA15_Km_6) <- c("fitdist", "fitdistr") 
+fit_RA15_Km_6 <- as.data.frame(broom::tidy(fit_RA15_Km_6))
+names(fit_RA15_Km_6) <- c("term", "RA15_Km_6", "RA15_Km_6_error" )
+
+fit_SS121_km7  <- fitdistrplus::fitdist(joined_ANAS_VIASAT_SS121_km7$ratio, "norm")
+class(fit_SS121_km7) <- c("fitdist", "fitdistr") 
+fit_SS121_km7 <- as.data.frame(broom::tidy(fit_SS121_km7))
+names(fit_SS121_km7) <- c("term", "SS121_km7", "SS121_km7_error" )
+
+
+## fit with a "gaussian/normal" distribution
+fit_SS114 <- fitdistrplus::fitdist(joined_ANAS_VIASAT_SS114$ratio, "norm")
+class(fit_SS114) <- c("fitdist", "fitdistr") 
+fit_SS114 <- as.data.frame(broom::tidy(fit_SS114))
+names(fit_SS114) <- c("term", "SS114", "SS114_error" )
+
+
+A19_km188 <- gather(fit_A19_km188,  "sezione_stradale", "ratio", 2:length(fit_A19_km188)) 
+SS192_km67 <- gather(fit_SS192_km67, "sezione_stradale", "ratio", 2:length(fit_SS192_km67)) 
+RA15_Km_6 <- gather(fit_RA15_Km_6, "sezione_stradale", "ratio", 2:length(fit_RA15_Km_6)) 
+SS121_km7 <- gather(fit_SS121_km7, "sezione_stradale", "ratio", 2:length(fit_SS121_km7)) 
+SS114 <- gather(fit_SS114, "sezione_stradale", "ratio", 2:length(fit_SS114)) 
+
+
+fits <- rbind(A19_km188, 
+              SS192_km67,
+              RA15_Km_6,
+              SS121_km7,
+              SS114)
+fits <- fits %>%
+  filter(sezione_stradale %in% c("A19_km188", "SS192_km67", "RA15_Km_6", "SS121_km7", "SS114"))
+fits$ratio <- round(fits$ratio, digits = 2)
+names(fits) <- c("", "sezione stradale", "ratio(VIASAT/ANAS) %")
+
+Caption <- paste0("**Tabella 1.** Parametri statistici ottenuti dalla modellizzazione dei coefficienti di penetrazione (VIASAT/ANAS) usando un modello gaussiano per ogni sezione stradale.")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(fits, emphasize.strong.cols = 1, missing = "")
+
+````
+
+
+*<br/><br/>*
+
+
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura A2**. BOX plot. Febbraio, Maggio, Agosto, Novembre 2019."}
+
+
+### join all ratios together....
+
+df_all <- df
+df_all$source <- "tutte le sezioni"
+
+
+p <- ggplot(df_all) + 
+    aes(x =source, y = ratio) +
+    geom_boxplot(fill = "orange") + 
+    theme_bw() +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13),     
+          axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=14)) +
+    ylab("conteggi / totale conteggi (%)") +
+    xlab("coefficiente penetrazione (%) (VIASAT / ANAS)") +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+    ggtitle("Confronto dei dati ANAS & VIASAT (Feb-May-Aug-Nov 2019)") +
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+# p
+
+
+```
+
+*<br/><br/>*
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 2.  ** "}
+
+
+# estimate paramters
+library(MASS)
+library(fitdistrplus)
+
+## fit with a "gaussian/normal" distribution
+fit_df_all <- fitdistrplus::fitdist(df_all$ratio, "norm")
+class(fit_df_all) <- c("fitdist", "fitdistr") 
+fit_df_all <- as.data.frame(broom::tidy(fit_df_all))
+names(fit_df_all) <- c("term", "tutte le sezioni", "all_error" )
+
+fits <- gather(fit_df_all,  "sezione_stradale", "ratio", 2:length(fit_df_all)) 
+
+fits <- fits %>%
+  filter(sezione_stradale %in% c("tutte le sezioni"))
+fits$ratio <- round(fits$ratio, digits = 2)
+names(fits) <- c("", "sezione stradale", "ratio(VIASAT/ANAS) %")
+
+Caption <- paste0("**Tabella 2.** Parametri statistici ottenuti dalla modellizzazione dell'insieme di tutti i coefficienti di penetrazione (VIASAT/ANAS) usando un modello gaussiano.")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(fits, emphasize.strong.cols = 1, missing = "")
+
+````
+
+
+
+
+*<br/><br/>*
+*<br/><br/>*
+
+## A. Esempio di dati aggregati su una sezione stradale (dati ANAS)
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 3.** Numero di passaggi totali per giorno della settimana e per classe di autoveicoli sulla sezione SS114_Km_106+167. I numeri all'interno del grafico indicano la distribuzione percentuale per classi di veicolo del numero di passaggi."}
+
+###############################
+### summary stats by day ######
+###############################
+
+
+total_counts_direzione_all <- as.data.frame(total_counts_direzione_all)
+
+### add DAY
+total_counts_direzione_all <- total_counts_direzione_all %>%
+  mutate(day = wday(date, label=TRUE))
+total_counts_direzione_all$day <- as.factor((total_counts_direzione_all$day))
+total_counts_direzione_all$hour <- as.factor((total_counts_direzione_all$hour))
+
+
+total_counts_direzione_all$month <- factor(format(total_counts_direzione_all$date, format = "%B"))
+total_counts_direzione_all$month <- as.factor((total_counts_direzione_all$month))
+
+
+# somma di tutti i tipi di conteggi per i passaggi di veicoli
+ANAS_STATS_passaggi_daily <- total_counts_direzione_all %>%
+  group_by(direzione,
+           classe,
+           month, day, hour) %>%
+  summarise(conteggi_per_tipo = mean(count, na.rm = TRUE))
+
+ANAS_STATS_passaggi_daily <- ANAS_STATS_passaggi_daily %>%
+  group_by(direzione,
+           classe, month,
+           day) %>%
+  summarise(conteggi_per_tipo = sum(conteggi_per_tipo, na.rm = TRUE))
+
+
+
+### for the whole vehycles
+## resample to 1 hour
+all_vehtype <- DB %>%
+    group_by(date=floor_date(timedate, "1 hour"), direzione) %>%
+    summarize(count = length(hour))
+
+all_vehtype <- all_vehtype %>%
+mutate(day = wday(date, label=TRUE)) %>%
+  mutate(hour = hour(date))
+
+### add MONTH
+all_vehtype$month <- factor(format(all_vehtype$date, format = "%B"))
+
+all_vehtype$month <- as.factor((all_vehtype$month))
+all_vehtype$day <- as.factor((all_vehtype$day))
+all_vehtype$hour <- as.factor((all_vehtype$hour))
+
+
+#### somma di tutti i tipi di conteggi per i passaggi di veicoli
+### direzione ASCENDENTE
+all_vehtype_A <- all_vehtype %>%
+  filter(direzione == "A") %>%
+  group_by(month, day, hour) %>%
+  summarise(conteggi_totali = mean(count, na.rm = TRUE))
+
+all_vehtype_A <- all_vehtype_A %>%
+  group_by(month, day) %>%
+  summarise(conteggi_totali = sum(conteggi_totali, na.rm = TRUE))
+
+### direzione DISCENDENTE
+all_vehtype_D <- all_vehtype %>%
+  filter(direzione == "D") %>%
+  group_by(month, day, hour) %>%
+  summarise(conteggi_totali = mean(count, na.rm = TRUE))
+
+all_vehtype_D <- all_vehtype_D %>%
+  group_by(month, day) %>%
+  summarise(conteggi_totali = sum(conteggi_totali, na.rm = TRUE))
+
+
+ANAS_STATS_passaggi_daily_A <- ANAS_STATS_passaggi_daily %>%
+  filter(direzione == "A") 
+ANAS_STATS_passaggi_daily_D <- ANAS_STATS_passaggi_daily %>%
+  filter(direzione == "D") 
+
+
+ANAS_STATS_passaggi_daily_A <- ANAS_STATS_passaggi_daily_A %>%
+  left_join(all_vehtype_A, by = c("day", "month"))
+ANAS_STATS_passaggi_daily_D <- ANAS_STATS_passaggi_daily_D %>%
+  left_join(all_vehtype_D, by = c("day", "month"))
+
+
+ANAS_STATS_passaggi_daily_A <- as.data.frame(ANAS_STATS_passaggi_daily_A)
+ANAS_STATS_passaggi_daily_D <- as.data.frame(ANAS_STATS_passaggi_daily_D)
+## get number all all vehicles by pecentage
+# normalize all "passaggi" to the conteggi_totali
+
+ANAS_STATS_passaggi_daily_A$norm_conteggi <- (ANAS_STATS_passaggi_daily_A$conteggi_per_tipo/ANAS_STATS_passaggi_daily_A$conteggi_totali)*100
+ANAS_STATS_passaggi_daily_A$norm_conteggi <- round(ANAS_STATS_passaggi_daily_A$norm_conteggi, digits = 0)
+
+ANAS_STATS_passaggi_daily_D$norm_conteggi <- (ANAS_STATS_passaggi_daily_D$conteggi_per_tipo/ANAS_STATS_passaggi_daily_D$conteggi_totali)*100
+ANAS_STATS_passaggi_daily_D$norm_conteggi <- round(ANAS_STATS_passaggi_daily_D$norm_conteggi, digits = 0)
+
+
+# ANAS_STATS_passaggi_daily_A <- ANAS_STATS_passaggi_daily_A[order(-ANAS_STATS_passaggi_daily_A$conteggi_totali),]
+# ANAS_STATS_passaggi_daily_A <- ANAS_STATS_passaggi_daily_A[order(-ANAS_STATS_passaggi_daily_A$norm_conteggi),]
+# ANAS_STATS_passaggi_daily_A <- as.data.frame(ANAS_STATS_passaggi_daily_A)
+
+
+### plot passaggi by % pecentage and by DAY #####
+###################################################
+
+## correct percentages
+ANAS_STATS_passaggi_daily_A$norm_conteggi[ANAS_STATS_passaggi_daily_A$classe == "veicoli pesanti"] <-  (100 - ANAS_STATS_passaggi_daily_A$norm_conteggi[ANAS_STATS_passaggi_daily_A$classe == "automobili"])
+
+
+ANAS_STATS_passaggi_daily_D$norm_conteggi[ANAS_STATS_passaggi_daily_D$classe == "veicoli pesanti"] <-  (100 - ANAS_STATS_passaggi_daily_D$norm_conteggi[ANAS_STATS_passaggi_daily_D$classe == "automobili"])
+
+
+
+# ##################---------------------------###########################
+# ########################--------------------------######################
+# ANAS_STATS_passaggi_daily <- ANAS_STATS_passaggi_daily %>%
+#   group_by(month, day, classe) %>%
+#   summarise(conteggi_per_tipo = sum(conteggi_per_tipo))
+# ########################--------------------------######################
+# ##################---------------------------###########################
+# 
+# 
+# ##################---------------------------###########################
+# ########################--------------------------######################
+# ANAS_STATS_passaggi_daily <- ANAS_STATS_passaggi_daily %>%
+#   filter(direzione == "A")
+# ########################--------------------------######################
+# ##################---------------------------###########################
+
+
+p <- ggplot(data = ANAS_STATS_passaggi_daily_A,
+              aes(day, conteggi_per_tipo, fill = day)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    # facet_wrap( ~ month, ncol = 4) +
+    # facet_grid(direzione ~ classe, scales = "free", space = "free") +
+    facet_grid(classe ~ month, scales = "free", space = "free") +
+    guides(fill=FALSE) +
+    ylim(0, 2500) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("numero di passaggi") +            # Set y-axis label
+    theme(axis.title.y = element_text(face="bold", colour="black", size=12),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=11)) +
+    xlab("") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+          axis.text.x  = element_text(angle=45, vjust=1, size=12)) +
+    # geom_text(aes(label = paste(norm_conteggi, "%")), size = 4, hjust = 0.5,  vjust = -0.5) +
+    geom_text(aes(label = round(norm_conteggi, digits = 0)), size = 3, hjust = 0.5,  vjust = -0.5) +
+    ggtitle("Numero totale medio di passaggi per giorno della settimana - dir. ascendente (ANAS, SS114_Km_106+167, 2019)") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold", size = 11))
+  p
+
+
+```
+
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 4.** Numero di passaggi orari nei giorni feriali per classe di autoveicoli sulla sezione SS114_Km_106+167."}
+
+################################
+### summary stats by hour ######
+################################
+
+
+VIASAT_STATS_passaggi_hourly <- total_counts_direzione_all %>%
+   filter(!day %in% c("sab", "dom"))
+
+
+# somma di tutti i tipi di conteggi per i passaggi di veicoli
+VIASAT_STATS_passaggi_hourly <- VIASAT_STATS_passaggi_hourly %>%
+  group_by(direzione,
+           month,
+           hour) %>%
+  summarise(conteggi_totali = mean(count, na.rm = TRUE))
+
+
+VIASAT_STATS_passaggi_hourly <- as.data.frame(VIASAT_STATS_passaggi_hourly)
+ 
+VIASAT_STATS_passaggi_hourly <- VIASAT_STATS_passaggi_hourly[order(-VIASAT_STATS_passaggi_hourly$conteggi_totali),]
+
+VIASAT_STATS_passaggi_hourly$hour <- unfactor(VIASAT_STATS_passaggi_hourly$hour)
+VIASAT_STATS_passaggi_hourly$hour <- as.numeric(VIASAT_STATS_passaggi_hourly$hour)
+
+#### plot
+
+# VIASAT_STATS_passaggi_hourly_SALERNO <- VIASAT_STATS_passaggi_hourly %>%
+#    filter(direzione == "--> Salerno") 
+
+p <- ggplot(data = VIASAT_STATS_passaggi_hourly,
+              aes(hour, conteggi_totali, fill = hour)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    # facet_wrap( ~ vehtype, ncol = 4) +  
+    # facet_grid(direzione ~ vehtype, scales = "free", space = "free") +
+   facet_grid(direzione ~ month, scales = "free", space = "free") +
+    guides(fill=FALSE) +
+    ylim(0, 140) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("numero di passaggi") +            # Set y-axis label
+    xlab(expression(paste(""))) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=10),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=9)) +
+    xlab("") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+          axis.text.x  = element_text(angle=0, vjust=0.5, size=12, hjust = 0.5)) + 
+    theme(axis.title.y = element_text(face="bold", colour="black", size=12),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=12)) +
+    scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
+    ggtitle("Numero totale di passaggi orari nei giorni feriali (ANAS, SS114_Km_106+167, 2019)") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+  p
+
+
+```
+
+
+
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 4a.** Numero di passaggi orari nei giorni festivi per classe di autoveicoli sulla sezione SS114_Km_106+167."}
+
+################################
+### summary stats by hour ######
+################################
+
+VIASAT_STATS_passaggi_hourly <- total_counts_direzione_all %>%
+   filter(day %in% c("sab", "dom"))
+
+
+# somma di tutti i tipi di conteggi per i passaggi di veicoli
+VIASAT_STATS_passaggi_hourly <- VIASAT_STATS_passaggi_hourly %>%
+  group_by(direzione,
+           month,
+           hour) %>%
+  summarise(conteggi_totali = mean(count, na.rm = TRUE))
+
+
+VIASAT_STATS_passaggi_hourly <- as.data.frame(VIASAT_STATS_passaggi_hourly)
+ 
+VIASAT_STATS_passaggi_hourly <- VIASAT_STATS_passaggi_hourly[order(-VIASAT_STATS_passaggi_hourly$conteggi_totali),]
+
+VIASAT_STATS_passaggi_hourly$hour <- unfactor(VIASAT_STATS_passaggi_hourly$hour)
+VIASAT_STATS_passaggi_hourly$hour <- as.numeric(VIASAT_STATS_passaggi_hourly$hour)
+
+#### plot
+
+# VIASAT_STATS_passaggi_hourly_SALERNO <- VIASAT_STATS_passaggi_hourly %>%
+#    filter(direzione == "--> Salerno") 
+
+p <- ggplot(data = VIASAT_STATS_passaggi_hourly,
+              aes(hour, conteggi_totali, fill = hour)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    # facet_wrap( ~ vehtype, ncol = 4) +  
+    # facet_grid(direzione ~ vehtype, scales = "free", space = "free") +
+   facet_grid(direzione ~ month, scales = "free", space = "free") +
+    guides(fill=FALSE) +
+    ylim(0, 140) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("numero di passaggi") +            # Set y-axis label
+    xlab(expression(paste(""))) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=10),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=9)) +
+    xlab("") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+          axis.text.x  = element_text(angle=0, vjust=0.5, size=12, hjust = 0.5)) + 
+    theme(axis.title.y = element_text(face="bold", colour="black", size=12),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=12)) +
+    scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
+    ggtitle("Numero totale di passaggi orari nei giorni festivi (ANAS, SS114_Km_106+167, 2019)") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+  p
+
+
+```
+
+
+
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 5.**  Flusso per ora della giornata sulla sezione SS114_Km_106+167."}
+
+################################
+### summary stats by hour ######
+################################
+
+## get all passaggi (conteggi) by hour
+## resample data  y 15 minutes
+total_counts_direzione_all <- DB %>%
+    group_by(date=floor_date(timedate, "15 minutes"), direzione, corsia, classe, hour) %>%
+    summarize(count = length(hour))
+
+total_counts_direzione_all <- total_counts_direzione_all %>%
+  mutate(day = wday(date, label=TRUE))
+total_counts_direzione_all$day <- as.factor((total_counts_direzione_all$day))
+total_counts_direzione_all$hour <- as.factor((total_counts_direzione_all$hour))
+
+
+total_counts_direzione_all$month <- factor(format(total_counts_direzione_all$date, format = "%B"))
+total_counts_direzione_all$month <- as.factor((total_counts_direzione_all$month))
+
+
+#### calcola capacita' massima e PHF
+ANAS_STATS_passaggi_15min <- total_counts_direzione_all %>%
+  group_by(direzione, corsia, classe, hour ) %>%
+  mutate(time_15 = format(ymd_hms(date), "%H:%M:%S"))
+
+## sum by corsia
+ANAS_STATS_passaggi_15min <- ANAS_STATS_passaggi_15min %>%
+   group_by(direzione, hour, day, month) %>%
+  summarize(count = sum(count))
+
+# VIASAT_STATS_passaggi_15min <- VIASAT_STATS_passaggi_15min %>%
+#   group_by(direzione, u,v, time_15) %>%
+#   summarise(flux = mean((count)/1.0, na.rm = TRUE))
+# CAPACITÀ: massimo volume orario di traffico in una generica sezione e in determinate condizioni operative,relativo ad un intervallo di tempo che generalmente è fissato in 15 min.
+
+# PORTATA <- ((4*max(VIASAT_STATS_passaggi_15min$flux))*100)/COEFF_PENETR
+
+
+total_counts_direzione_all <- as.data.frame(total_counts_direzione_all)
+## sum "corsie"
+total_counts_direzione_all <- total_counts_direzione_all %>%
+  group_by(direzione, hour, day, month) %>%
+  summarize(count = sum(count))
+
+
+# ANAS_STATS_passaggi_hourly <- total_counts_direzione_all %>%
+#   group_by(direzione, month,
+#            hour) %>%
+#   summarise(flux = mean((count)/0.25, na.rm = TRUE))
+
+
+total_counts_direzione_all <- total_counts_direzione_all %>%
+   filter(!day %in% c("sab", "dom"))
+
+
+ANAS_STATS_flux_hourly <- total_counts_direzione_all %>%
+  group_by(direzione, month,
+           hour) %>%
+  summarise(flux = mean((count)/4, na.rm = TRUE))
+
+ANAS_STATS_flux_hourly$hour <- unfactor(ANAS_STATS_flux_hourly$hour)
+ANAS_STATS_flux_hourly$hour <- as.numeric(ANAS_STATS_flux_hourly$hour)
+
+p <- ggplot(data = ANAS_STATS_flux_hourly,
+              aes(hour, flux, fill = hour)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    # facet_wrap( ~ vehtype, ncol = 4) +  
+    # facet_grid(direzione ~ vehtype, scales = "free", space = "free") +
+   facet_grid(direzione ~ month, scales = "free", space = "free") +
+    guides(fill=FALSE) +
+    ylim(0, 500) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("FLusso (veicoli/ora)") +            # Set y-axis label
+    xlab(expression(paste(""))) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=10),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=9)) +
+    xlab("") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+          axis.text.x  = element_text(angle=0, vjust=0.5, size=12, hjust = 0.5)) + 
+    theme(axis.title.y = element_text(face="bold", colour="black", size=12),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=12)) +
+    scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
+    ggtitle("FLusso orario conforme ad ANAS nei giorni feriali (ANAS, SS114_Km_106+167, 2019)") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+  p
+
+
+````
+
+
+*<br/><br/>*
+
+

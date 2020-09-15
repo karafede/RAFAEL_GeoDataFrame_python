@@ -110,6 +110,7 @@ for idx, row in unique_DATES.iterrows():
     #                                    /*AND dataraw.vehtype::bigint = 1*/
     #                                    ''', conn_HAIG, params=[DATE])
 
+
 viasat_data = pd.read_sql_query('''
                        SELECT  
                           mapmatching_2019.u, mapmatching_2019.v,
@@ -121,9 +122,8 @@ viasat_data = pd.read_sql_query('''
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                      WHERE dataraw.vehtype::bigint = 1
+                                      WHERE dataraw.vehtype::bigint = 2
                                       ''', conn_HAIG)
-
 
 
 viasat_data_Aug = pd.read_sql_query('''
@@ -157,12 +157,9 @@ viasat_data_May = pd.read_sql_query('''
                                       ''', conn_HAIG)
 
 
-
 ### get counts for all edges ########
 all_data = viasat_data[['u','v']]
 all_counts_uv = all_data.groupby(all_data.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
-
-# AAA = viasat_data[viasat_data['u'] == 1416519821]
 
 ########################################################
 ##### build the map ####################################
@@ -209,7 +206,7 @@ my_map.save(path + "November_CARS_traffic_counts_all_EDGES_all_Catania.html")
 now2 = datetime.now()
 print(now2 - now1)
 
-
+#################################################################################
 #################################################################################
 #################################################################################
 #### find differences between seasons ###########################################
