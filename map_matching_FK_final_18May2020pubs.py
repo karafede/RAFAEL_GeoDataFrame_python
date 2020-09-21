@@ -1,6 +1,6 @@
 
 import os
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 os.getcwd()
 
 import numpy as np
@@ -56,6 +56,7 @@ def wkb_hexer(line):
 
 # Create an SQL connection engine to the output DB
 engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
+engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_CT')
 
 all_EDGES = pd.DataFrame([])
 
@@ -87,7 +88,7 @@ trip = '2507511_0'
 ave_LAT = 37.53988692816245
 ave_LON = 15.044971594798902
 my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
-##########################################################################################
+################################################################################
 
 ## read each TRIP from each idterm (TRACK_ID or idtrajectory)
 
@@ -122,8 +123,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             else:
                 buffer_diam = 0.00008
 
-            buffer_diam = 0.00005   ## best choice...so far   0.00008
-            buffer_diam_pic = 0.00020
+            buffer_diam = 0.00010   ## best choice...so far   0.00005 or 0.00008
+            buffer_diam_pic = 0.00020   ## this is the diamteter to show on the pics
 
             ## get extent of viasat data
             ext = 0.025
@@ -212,7 +213,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             buffer = viasat_gdf.buffer(buffer_diam)
             buffer_pic = viasat_gdf.buffer(buffer_diam_pic)
             # buffer.plot()
-            # make a dataframe
+            # make a dataframe and assign 'geometry'
             buffer_viasat = pd.DataFrame(buffer)
             buffer_viasat.columns = ['geometry']
             buffer_viasat_pic = pd.DataFrame(buffer_pic)
@@ -282,8 +283,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             nn_gdf_edges = gdf_edges[gdf_edges.index.isin(index_edges)]
             ## plot selects edges
             # nn_gdf_edges.plot()
-            # nn_gdf_edges.to_file(filename='nn_gdf_edges.geojson', driver='GeoJSON')
-            # folium.GeoJson('nn_gdf_edges.geojson').add_to((my_map))
+            nn_gdf_edges = nn_gdf_edges[['geometry']]
+            nn_gdf_edges.to_file(filename='nn_gdf_edges.geojson', driver='GeoJSON')
+            folium.GeoJson('nn_gdf_edges.geojson').add_to((my_map))
             my_map.save("matched_route_with_buffer.html")
 
             '''
@@ -313,8 +315,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             road_type = ['motorway', 'motorway_link', 'secondary', 'primary', 'tertiary', 'residential', 
                          'unclassified', 'trunk', 'trunk_link', 'tertiary_link', 'secondary_link', 'service']
             ## this is a partial grapho
-            file_graphml = 'Catania__Italy_cost.graphml'  ##!!!! need the cost graph
-            # grafo = ox.load_graphml(file_graphml)
+            ## file_graphml = 'Catania__Italy_cost.graphml'  ##!!!! need the cost graph
+            grafo = ox.load_graphml(file_graphml)
             # ## ox.plot_graph(grafo)
             my_map = roads_type_folium(file_graphml, road_type, place_country)
             
@@ -1012,8 +1014,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         connection = engine.connect()
                         final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
                         final_map_matching_table_GV.drop('geometry', 1, inplace=True)
-                        final_map_matching_table_GV.to_sql("mapmatching_temp", con=connection, schema="public",
-                                           if_exists='append')
+                        # final_map_matching_table_GV.to_sql("mapmatching_temp", con=connection, schema="public",
+                        #                   if_exists='append')
                         connection.close()
                     except KeyError:
                         print("['ref'] not in OSM edge")
@@ -1062,22 +1064,27 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         # all_EDGES.to_csv('all_EDGES.csv')
                         # with open('all_EDGES_' + DATE + '_' + today + '.geojson', 'w') as f:
                         #     f.write(all_EDGES.to_json())
-                        with open('all_EDGES_' + '_' + today + '.geojson', 'w') as f:
-                            f.write(all_EDGES.to_json())
+
+                        # with open('all_EDGES_' + '_' + today + '.geojson', 'w') as f:
+                        #    f.write(all_EDGES.to_json())
 
                         ## add plot in Folium map
                         # save first as geojson file
                         # edges_matched_route.geometry.to_file(filename='matched_route_' + DATE + '_' + today + '.geojson',
                         #                                      driver='GeoJSON')
-                        edges_matched_route.geometry.to_file(filename='matched_route_' + '_' + today + '.geojson',
+                        # edges_matched_route.geometry.to_file(filename='matched_route_' + '_' + today + '.geojson',
+                        #                                      driver='GeoJSON')
+                        edges_matched_route.geometry.to_file(filename='matched_route_with_buffer.geojson',
                                                              driver='GeoJSON')
                         # folium.GeoJson('matched_route_' + DATE + '_' + today + '.geojson').add_to((my_map))
                         # my_map.save("matched_route_VIASAT_" + DATE + '_' + today + ".html")
-                        folium.GeoJson('matched_route_' + '_' + today + '.geojson').add_to((my_map))
-                        my_map.save("matched_route_VIASAT_" + '_' + today + ".html")
+                        folium.GeoJson('matched_route_with_buffer.geojson').add_to((my_map))
+                        my_map.save("matched_route_with_buffer.html")
                         # save last track ID and index (to be used in case the query stops)
-                        with open("last_track_ID.txt", "w") as text_file:
-                            text_file.write("last track ID and last track index: %s %s" % (track_ID, last_track_idx))
+
+                        # with open("last_track_ID.txt", "w") as text_file:
+                        #    text_file.write("last track ID and last track index: %s %s" % (track_ID, last_track_idx))
+
                         # path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/outputs_catania_28022020/'
                         # my_map.save(path + track_ID + "_" + DATE + "_matched_route.html")
                         # path_cloud = 'C:/Users/Federico/ownCloud/Catania_RAFAEL/outputs_catania_28022020/'

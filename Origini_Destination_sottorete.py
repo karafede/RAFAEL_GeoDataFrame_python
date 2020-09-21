@@ -131,6 +131,7 @@ now2 = datetime.now()
 print(now2 - now1)
 
 
+
 ## 1. get all idterm from veicoli pesanti and unique (u,v)
 ## 2. get all ORIGIN and DESTINATION for veicoli pesanti
 ## 3. get all data for all vehicles (auto and veicoli pesanti)
@@ -146,6 +147,33 @@ all_idterms_pesanti = list(viasat_data_pesanti.idterm.unique())
 uv_pesanti = viasat_data_pesanti.drop_duplicates(['u', 'v'])
 ## reset index
 uv_pesanti = uv_pesanti.reset_index(level=0)[['u','v']]
+
+## 5. get "counts" from the "sottorete"
+all_data = viasat_data_pesanti[['u','v']]
+all_counts_uv = all_data.groupby(all_data.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+
+### make average for "mean_speed" for the "sottorete"
+sottorete_speed = viasat_data_pesanti[['u', 'v', 'mean_speed']]
+### get AVERAGE of travelled travelled "speed" for each edge
+sottorete_speed = (sottorete_speed.groupby(['u', 'v']).mean()).reset_index()
+sottorete_speed['mean_speed'] = sottorete_speed.mean_speed.astype('int')
+## change names
+sottorete_speed.columns = ["u", "v", "travel_speed"]
+
+## merge with "all_counts_uv"
+sottorete_speed = pd.merge(sottorete_speed, all_counts_uv, on=['u', 'v'], how='left')
+
+## define the travelled_time on each edge
+## merge with OSM edges (geometry)
+sottorete_speed = pd.merge(sottorete_speed, gdf_edges, on=['u', 'v'], how='left')
+sottorete_speed.drop_duplicates(['u', 'v'], inplace=True)
+sottorete_speed['length(km)'] = sottorete_speed['length']/1000
+sottorete_speed['travel_time'] = ((sottorete_speed['length(km)']) / (sottorete_speed['travel_speed'])) *3600 # seconds
+sottorete_speed = gpd.GeoDataFrame(sottorete_speed)
+
+## save data
+sottorete_speed.to_file(filename='sottorete_speed_counts_veicoli_pesanti.geojson', driver='GeoJSON')
+sottorete_speed.plot()
 
 
 ######################################################################################
@@ -187,6 +215,8 @@ ODs = all_catania_OD.drop_duplicates(['ORIGIN', 'DESTINATION'])
 
 ######################################################################################
 ######################################################################################
+######################################################################################
+######################################################################################
 
 ## 3. get all data for all vehicles (auto and veicoli pesanti)
 viasat_data_all = pd.read_sql_query('''
@@ -203,19 +233,106 @@ viasat_data_all = pd.read_sql_query('''
                                       /*WHERE dataraw.vehtype::bigint = 2*/
                                       ''', conn_HAIG)
 
+'''
+
+## 1. get all idterm for all vehicles
+all_idterms = list(viasat_data_all.idterm.unique())
+uv_all = viasat_data_all.drop_duplicates(['u', 'v'])
+## reset index
+uv_all = uv_all.reset_index(level=0)[['u','v']]
+
+
+## 5. get "counts" from the "sottorete"
+all_data = viasat_data_all[['u','v']]
+all_counts_uv = all_data.groupby(all_data.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+
+### make average for "mean_speed" for the "sottorete"
+sottorete_speed = viasat_data_all[['u', 'v', 'mean_speed']]
+### get AVERAGE of travelled travelled "speed" for each edge
+sottorete_speed = (sottorete_speed.groupby(['u', 'v']).mean()).reset_index()
+sottorete_speed['mean_speed'] = sottorete_speed.mean_speed.astype('int')
+## change names
+sottorete_speed.columns = ["u", "v", "travel_speed"]
+
+## merge with "all_counts_uv"
+sottorete_speed = pd.merge(sottorete_speed, all_counts_uv, on=['u', 'v'], how='left')
+
+## define the travelled_time on each edge
+## merge with OSM edges (geometry)
+sottorete_speed = pd.merge(sottorete_speed, gdf_edges, on=['u', 'v'], how='left')
+sottorete_speed.drop_duplicates(['u', 'v'], inplace=True)
+sottorete_speed['length(km)'] = sottorete_speed['length']/1000
+sottorete_speed['travel_time'] = ((sottorete_speed['length(km)']) / (sottorete_speed['travel_speed'])) *3600 # seconds
+sottorete_speed = gpd.GeoDataFrame(sottorete_speed)
+
+## save data
+sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles.geojson', driver='GeoJSON')
+sottorete_speed.plot()
+
+del all_data
+del viasat_data_all
+
+
+######################################################################################
+### get ORIGIN and DESTINATION for each idterm of all vehicles #######################
+######################################################################################
+
+## 2. get all ORIGIN and DESTINATION for all vehicles
+
+### initialize an empty dataframe
+all_catania_OD = pd.DataFrame([])
+
+for idx, idterm in enumerate(all_idterms):
+    print(idterm)
+    all_data = viasat_data_all[(viasat_data_all.idterm == idterm)]
+    ## remove duplicates 'idtrajectories' (trips)
+    all_trips = all_data.drop_duplicates(['idtrajectory'])
+    ## make a list of all_trips
+    all_trips = list(all_trips.idtrajectory.unique())
+    for idx_a, idtrajectory in enumerate(all_trips):
+        print(idtrajectory)
+        ## filter data by idterm and by idtrajectory (trip)
+        data = viasat_data_all[(viasat_data_all.idterm == idterm) & (viasat_data_all.idtrajectory == idtrajectory)]
+        ## sort data by "sequenza'
+        data = data.sort_values('sequenza')
+        ORIGIN = data[data.sequenza == min(data.sequenza)][['u']].iloc[0][0]
+        DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
+        data['ORIGIN'] = ORIGIN
+        data['DESTINATION'] = DESTINATION
+        all_catania_OD = all_catania_OD.append(data)
+
+        all_catania_OD = all_catania_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
+        ## reset index
+        all_catania_OD = all_catania_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
+
+## save data
+all_catania_OD.to_csv('all_catania_OD_all_vehicles.csv')
+
+
+'''
+
+
+
+
+
+
+
+
 
 ## 4. filter all data with the (u,v) edges of veicoli pesanti
 ## filter with the edges for veicoli pesanti "viasat_data_pesanti_uv" and create a "sottorete"
-sottorete = pd.merge(uv_pesanti, viasat_data_all[['u','v','mean_speed']], on=['u', 'v'], how='left')
+# sottorete = pd.merge(uv_pesanti, viasat_data_all[['u','v', 'timedate', 'mean_speed']], on=['u', 'v'], how='left')
+sottorete = pd.merge(uv_pesanti, viasat_data_all[['u','v', 'mean_speed']], on=['u', 'v'], how='left')
 ## drop all rows with NA values
 sottorete = sottorete.dropna()
-
 
 ## 5. get "counts" from the "sottorete"
 all_data = sottorete[['u','v']]
 all_counts_uv = all_data.groupby(all_data.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+# all_counts_uv = sottorete.groupby(['timedate', 'u', 'v']).size().reset_index().rename(columns={0:'counts'})
 
-del viasat_data_all
+
+# del viasat_data_all
 
 ### make average for "mean_speed" for the "sottorete"
 sottorete_speed = sottorete[['u', 'v', 'mean_speed']]
@@ -223,13 +340,26 @@ sottorete_speed = sottorete[['u', 'v', 'mean_speed']]
 sottorete_speed = (sottorete_speed.groupby(['u', 'v']).mean()).reset_index()
 # sottorete_speed['mean_speed'] = round(sottorete_speed['mean_speed'], 0)
 sottorete_speed['mean_speed'] = sottorete_speed.mean_speed.astype('int')
+## change names
 sottorete_speed.columns = ["u", "v", "travel_speed"]
 
 ## merge with "all_counts_uv"
 sottorete_speed = pd.merge(sottorete_speed, all_counts_uv, on=['u', 'v'], how='left')
 
+
+## save as. csv file
+# sottorete_speed.to_csv('sottorete_counts_timdedate.csv')
+
+##########################################################
+### get the FLUX #########################################
+## load data processed from R  ###########################
+# sottorete_FLUX = pd.read_csv("FLUX_sottorete_CATANIA.csv")
+# sottorete_FLUX = sottorete_FLUX[['u', 'v', 'hour', 'flux', 'travel_speed']]
+# sottorete_FLUX.drop_duplicates(['u', 'v'], inplace=True)
+
+
 ## define the travelled_time on each edge
-## merge with OSM edges
+## merge with OSM edges (geometry)
 sottorete_speed = pd.merge(sottorete_speed, gdf_edges, on=['u', 'v'], how='left')
 sottorete_speed.drop_duplicates(['u', 'v'], inplace=True)
 sottorete_speed['length(km)'] = sottorete_speed['length']/1000
@@ -239,3 +369,14 @@ sottorete_speed = gpd.GeoDataFrame(sottorete_speed)
 ## save data
 sottorete_speed.to_file(filename='sottorete_speed.geojson', driver='GeoJSON')
 sottorete_speed.plot()
+
+
+### generate a map for checking...
+################################################################################
+# create basemap
+ave_LAT = 37.53988692816245
+ave_LON = 15.044971594798902
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+################################################################################
+# folium.GeoJson('sottorete_FLUX.geojson').add_to((my_map))
+# my_map.save("sottorete_FLUX.html")

@@ -116,5 +116,5 @@ SELECT pg_size_pretty( pg_relation_size('public.idterm_portata') )''', conn_HAIG
 
 ### check the size of the WHOLE DB "HAIG_Viasat_SA"
 pd.read_sql_query('''
-SELECT pg_size_pretty( pg_database_size('HAIG_Viasat_SA') )''', conn_HAIG)
+SELECT pg_size_pretty( pg_database_size('HAIG_Viasat_CT') )''', conn_HAIG)
 

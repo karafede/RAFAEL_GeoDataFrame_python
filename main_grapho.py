@@ -13,7 +13,7 @@ import osmnx as ox
 
 # input name of City and Country
 place_country = "Catania, Italy"
-place_country = "Fisciano, Italy"
+# place_country = "Fisciano, Italy"
 # filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|' \
 #          'raceway|cycleway|steps|construction|primary|tertiary"]')
 
@@ -23,11 +23,10 @@ place_country = "Fisciano, Italy"
 road_type = ['motorway', 'motorway_link', 'secondary', 'primary', 'tertiary', 'residential',
              'unclassified', 'trunk', 'trunk_link', 'tertiary_link', 'secondary_link', 'service']
 
-
 # roads = road_type.replace(', ', '|')
 # filter = '["highway"~' + '"' + roads + '"' + "]"
-# distance = 60000 # distance from the center of the map (in meters)
-distance = 70000 # distance from the center of the map (in meters)
+distance = 60000 # distance from the center of the map (in meters)
+# distance = 70000 # distance from the center of the map (in meters)
 
 # make grapho, save .graphml, save shapefile (node and edges) and get statistics (basic and extended)
 ###########################################
@@ -35,13 +34,18 @@ distance = 70000 # distance from the center of the map (in meters)
 ###########################################
 network_city = graph(place_country, distance) # filter
 
-file_graphml = 'Fisciano__Italy.graphml'
+file_graphml = 'Catania__Italy_60km.graphml'
+# file_graphml = 'Catania__Italy_60km_sottorete.graphml'
+# file_graphml = 'Fisciano__Italy.graphml'
 grafo = ox.load_graphml(file_graphml)
-ox.plot_graph(grafo)
+# ox.plot_graph(grafo)
+gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
+gdf_edges.plot()
 
 # assign weight and cost (==time) to the grapho
 # file_graphml = 'Catania__Italy.graphml'
-file_graphml = 'Fisciano__Italy.graphml'
+file_graphml = 'Catania__Italy_60km.graphml'
+# file_graphml = 'Fisciano__Italy.graphml'
 # file_graphml = 'partial_OSM.graphml'
 cost_assignment(file_graphml, place_country)
 
@@ -54,10 +58,10 @@ Catania = ox.plot_graph_folium(Catania, graph_map=None, popup_attribute=None, ti
 Catania.save("partial_OSM.html")
 '''
 
-# select road type and make a map (it returns a my_map, to be used as base map for the viasat data)
-# !!! use the _cost.graphml
+### select road type and make a map (to be used as base map for the viasat data)
 # file_graphml = 'Catania__Italy_cost.graphml'
-file_graphml = 'Fisciano__Italy.graphml'
+file_graphml = 'Catania__Italy_60km.graphml'
+# file_graphml = 'Fisciano__Italy.graphml'
 my_map = roads_type_folium(file_graphml, road_type, place_country)
 
 # edge centrality (make a map) (bc = betweenness centrality; cc = closeness centrality)

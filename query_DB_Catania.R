@@ -37,6 +37,9 @@ dbListFields(conn_HAIG, "OSM_edges")
 dbListFields(conn_HAIG, "routecheck_2019")
 dbListFields(conn_HAIG, "mapmatching_2019")
 dbListFields(conn_HAIG, "idterm_portata")
+dbListFields(conn_HAIG, "vulnerability_2019")
+dbListFields(conn_HAIG, "vulnerability_pesanti_2019")
+
 
 # load "idterm_vehtype_portata"
 idterm_vehtype_portata <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterm_vehtype_portata.csv"),
@@ -375,4 +378,30 @@ n_data <- SS114 %>%
 SS114 <- SS114 %>%
   left_join(idterm_vehtype_portata, by = "idterm")
 write.csv(SS114, "VIASAT_SS114.csv")
+
+##################################################################
+##################################################################
+##################################################################
+#### get VULNERABILITY table #####################################
+
+vulnerability_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT *
+                                    FROM vulnerability_2019
+                                    ")
+
+list_CELLs <- unique(vulnerability_2019$CELL)
+length(list_CELLs)
+
+
+#######################################################
+#######################################################
+
+vulnerability_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT *
+                                    FROM vulnerability_pesanti_2019
+                                    ")
+
+list_CELLs <- unique(vulnerability_2019$CELL)
+length(list_CELLs)
+
 

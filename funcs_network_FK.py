@@ -1,6 +1,6 @@
 
 import os
-os.chdir('C:\\ENEA_CAS_WORK\\Catania_RAFAEL')
+os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 import osmnx as ox
 import networkx as nx
 import numpy as np
@@ -37,9 +37,22 @@ def graph(place_country, distance):  # filter
     # filter = (
     #     '["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
     #     'raceway|cycleway|steps|construction|primary|secondary|tertiary"]')
+    # filter = (
+    #     '["highway"!~"living_street|abandoned|footway|pedestrian|raceway|cycleway|steps|construction|'
+    #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
+    # filter = (
+    #     '["highway"!~"living_street|abandoned|steps|construction|'
+    #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
+
     filter = (
-        '["highway"!~"living_street|abandoned|footway|pedestrian|raceway|cycleway|steps|construction|'
-        'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
+        '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
+        'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
+
+    ## for "sottorete"
+    # filter = (
+    #     '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
+    #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway|'
+    #     'tertiary|residential|tertiary_link|service|secondary_link|unclassified"]')
     # filter = filter
 
     # import grapho (graphml)
@@ -152,20 +165,36 @@ def roads_type_folium(file_graphml, road_type, place_country):
     #     , 'trunk', 'trunk_link', 'tertiary_link', 'secondary_link']
     # road = gdf_edges[(gdf_edges.highway.isin( list(road_type.split (",")) ))]
 
+    # ox.get_edge_colors_by_attr....
     # make a dictionary for ech color
+    # road_color_dict = {
+    #     "secondary": "red",
+    #     "primary": "green",
+    #     "tertiary": "blue",
+    #     "motorway_link": "yellow",
+    #     "motorway": "black",
+    #     "trunk": "orange",
+    #     "trunk_link": "orange",
+    #     "residential": "orange",
+    #     "unclassified": "brown",
+    #     "tertiary_link": "orange",
+    #     "secondary_link": "orange",
+    #     "service": "orange"
+    # }
+
     road_color_dict = {
-        "secondary": "red",
-        "primary": "green",
-        "tertiary": "blue",
-        "motorway_link": "yellow",
+        "secondary": "lightgrey",
+        "primary": "lightgrey",
+        "tertiary": "lightgrey",
+        "motorway_link": "black",
         "motorway": "black",
-        "trunk": "orange",
-        "trunk_link": "orange",
-        "residential": "orange",
-        "unclassified": "brown",
-        "tertiary_link": "orange",
-        "secondary_link": "orange",
-        "service": "orange"
+        "trunk": "black",
+        "trunk_link": "black",
+        "residential": "lightgrey",
+        "unclassified": "lightgrey",
+        "tertiary_link": "lightgrey",
+        "secondary_link": "lightgrey",
+        "service": "lightgrey"
     }
     points = []
     # prepare a base_map ###########################################################
@@ -218,7 +247,8 @@ def roads_type_folium(file_graphml, road_type, place_country):
             # roadtype = ' '.join([str(elem) for elem in road_type])
             # roads = re.sub('[/," ",:]', '_', roadtype)
     # my_map.save(name_place_country + "_" + "partial" + ".html")
-    my_map.save("Catania_partial.html")
+    # my_map.save("Catania_partial.html")
+    my_map.save("Fisciano_partial.html")
     return my_map
 
 
