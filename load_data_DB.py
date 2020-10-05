@@ -203,18 +203,34 @@ for idx, row in unique_DATES.iterrows():
 
 ### further operations on routecheck and mapmatching_2019 #####
 
-### create index for "timedate'
-cur_HAIG.execute("""
-CREATE index routecheck_2019_timedate_idx on public.routecheck_2019(timedate);
-""")
-conn_HAIG.commit()
-
 
 ### create index for 'idterm'
 cur_HAIG.execute("""
 CREATE index routecheck_2019_idterm_idx on public.routecheck_2019(idterm);
 """)
 conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_2019_id_idx on public.routecheck_2019("id");
+""")
+conn_HAIG.commit()
+
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_2019_TRIP_ID_idx on public.routecheck_2019("TRIP_ID");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_2019_timedate_idx on public.routecheck_2019("timedate");
+""")
+conn_HAIG.commit()
+
+
+
 
 
 ### create index for 'longitude'

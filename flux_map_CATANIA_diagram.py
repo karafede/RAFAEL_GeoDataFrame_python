@@ -111,6 +111,8 @@ for idx, row in unique_DATES.iterrows():
     #                                    ''', conn_HAIG, params=[DATE])
 
 
+
+
 viasat_data = pd.read_sql_query('''
                        SELECT  
                           mapmatching_2019.u, mapmatching_2019.v,
