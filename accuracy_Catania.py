@@ -142,11 +142,14 @@ def func(arg):
     ### sort values by "sequenza"
     selected_trip = selected_trip.sort_values('sequenza')
 
+    AAA = pd.merge(selected_trip, gdf_edges, on=['u', 'v'], how='left')
+    AAA.drop_duplicates(['u', 'v'], inplace=True)
+    AAA = gpd.GeoDataFrame(AAA)
+
     selected_trip = pd.merge(selected_trip, gdf_edges[['u', 'v', 'length']], on=['u', 'v'], how='left')
     selected_trip.drop_duplicates(['u', 'v'], inplace=True)
     ### find the travelled distance of the matched route
     sum_distance_mapmatching = sum(selected_trip.length)
-
 
     ## get progressive associate to each TRIP_ID
     routecheck_trip = pd.read_sql_query('''

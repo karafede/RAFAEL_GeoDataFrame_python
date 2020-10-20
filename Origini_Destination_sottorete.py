@@ -89,8 +89,7 @@ unique_DATES = pd.read_sql_query(
 unique_DATES['just_date'] = unique_DATES['dates'].dt.date
 MONTHS = unique_DATES['dates'].dt.month
 
-from datetime import datetime
-now1 = datetime.now()
+
 
 # subset database with only one specific date and one specific TRACK_ID)
 for idx, row in unique_DATES.iterrows():
@@ -99,7 +98,7 @@ for idx, row in unique_DATES.iterrows():
 
 ##### import selected edges of the CATANIA "sottorete to get all idterms crossing that edges
 
-#
+
 # df = pd.read_csv("sottorete_catania.csv", delimiter=',')
 # ## filter by one specific DATE
 # df['timedate'] = df['timedate'].astype('datetime64[ns]')
@@ -111,6 +110,8 @@ for idx, row in unique_DATES.iterrows():
 ### get all the "idterm" crossing the EDGED of the sottorete
 # all_idterms = list(df.idterm.unique())
 
+from datetime import datetime
+now1 = datetime.now()
 
 #### get all VIASAT data from map-matching (automobili e mezzi pesanti) on selected date
 viasat_data_pesanti = pd.read_sql_query('''
@@ -124,7 +125,8 @@ viasat_data_pesanti = pd.read_sql_query('''
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                      WHERE dataraw.vehtype::bigint = 2
+                                      WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '08' 
+                                      AND dataraw.vehtype::bigint = 2
                                       ''', conn_HAIG)
 
 now2 = datetime.now()
@@ -172,7 +174,9 @@ sottorete_speed['travel_time'] = ((sottorete_speed['length(km)']) / (sottorete_s
 sottorete_speed = gpd.GeoDataFrame(sottorete_speed)
 
 ## save data
-sottorete_speed.to_file(filename='sottorete_speed_counts_veicoli_pesanti.geojson', driver='GeoJSON')
+# sottorete_speed.to_file(filename='sottorete_speed_counts_veicoli_pesanti.geojson', driver='GeoJSON')
+# sottorete_speed.to_file(filename='sottorete_speed_counts_veicoli_pesanti_FEBRUARY.geojson', driver='GeoJSON')
+sottorete_speed.to_file(filename='sottorete_speed_counts_veicoli_pesanti_AUGUST.geojson', driver='GeoJSON')
 sottorete_speed.plot()
 
 
@@ -209,7 +213,9 @@ for idx, idterm in enumerate(all_idterms_pesanti):
         all_catania_OD = all_catania_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 ## save data
-all_catania_OD.to_csv('all_catania_OD.csv')
+# all_catania_OD.to_csv('all_catania_OD.csv')
+# all_catania_OD.to_csv('all_catania_OD_FEBRUARY.csv')
+all_catania_OD.to_csv('all_catania_OD_AUGUST.csv')
 UVs = all_catania_OD.drop_duplicates(['u', 'v'])
 ODs = all_catania_OD.drop_duplicates(['ORIGIN', 'DESTINATION'])
 
@@ -230,13 +236,20 @@ viasat_data_all = pd.read_sql_query('''
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
+                                       WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '02' 
                                       /*WHERE dataraw.vehtype::bigint = 2*/
                                       ''', conn_HAIG)
+
+## 1. get all idterm for all vehicles
+all_idterms = list(viasat_data_all.idterm.unique())
+all_idterms = all_idterms[0:300]
 
 '''
 
 ## 1. get all idterm for all vehicles
 all_idterms = list(viasat_data_all.idterm.unique())
+all_idterms = all_idterms[0:300]
+
 uv_all = viasat_data_all.drop_duplicates(['u', 'v'])
 ## reset index
 uv_all = uv_all.reset_index(level=0)[['u','v']]
@@ -283,6 +296,7 @@ del viasat_data_all
 all_catania_OD = pd.DataFrame([])
 
 for idx, idterm in enumerate(all_idterms):
+    print(idx)
     print(idterm)
     all_data = viasat_data_all[(viasat_data_all.idterm == idterm)]
     ## remove duplicates 'idtrajectories' (trips)
@@ -290,6 +304,7 @@ for idx, idterm in enumerate(all_idterms):
     ## make a list of all_trips
     all_trips = list(all_trips.idtrajectory.unique())
     for idx_a, idtrajectory in enumerate(all_trips):
+        print(idx_a)
         print(idtrajectory)
         ## filter data by idterm and by idtrajectory (trip)
         data = viasat_data_all[(viasat_data_all.idterm == idterm) & (viasat_data_all.idtrajectory == idtrajectory)]
@@ -306,16 +321,12 @@ for idx, idterm in enumerate(all_idterms):
         all_catania_OD = all_catania_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 ## save data
-all_catania_OD.to_csv('all_catania_OD_all_vehicles.csv')
+# all_catania_OD.to_csv('all_catania_OD_all_vehicles.csv')
+# all_catania_OD.to_csv('all_catania_OD_AUGUST_300_vehicles.csv')
+all_catania_OD.to_csv('all_catania_OD_FEBRUARY_300_vehicles.csv')
 
 
 '''
-
-
-
-
-
-
 
 
 
@@ -350,13 +361,6 @@ sottorete_speed = pd.merge(sottorete_speed, all_counts_uv, on=['u', 'v'], how='l
 ## save as. csv file
 # sottorete_speed.to_csv('sottorete_counts_timdedate.csv')
 
-##########################################################
-### get the FLUX #########################################
-## load data processed from R  ###########################
-# sottorete_FLUX = pd.read_csv("FLUX_sottorete_CATANIA.csv")
-# sottorete_FLUX = sottorete_FLUX[['u', 'v', 'hour', 'flux', 'travel_speed']]
-# sottorete_FLUX.drop_duplicates(['u', 'v'], inplace=True)
-
 
 ## define the travelled_time on each edge
 ## merge with OSM edges (geometry)
@@ -366,8 +370,10 @@ sottorete_speed['length(km)'] = sottorete_speed['length']/1000
 sottorete_speed['travel_time'] = ((sottorete_speed['length(km)']) / (sottorete_speed['travel_speed'])) *3600 # seconds
 sottorete_speed = gpd.GeoDataFrame(sottorete_speed)
 
-## save data
-sottorete_speed.to_file(filename='sottorete_speed.geojson', driver='GeoJSON')
+## save data (for all vehicles)
+# sottorete_speed.to_file(filename='sottorete_speed.geojson', driver='GeoJSON')
+# sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles_FEBRUARY.geojson', driver='GeoJSON')
+sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles_AUGUST.geojson', driver='GeoJSON')
 sottorete_speed.plot()
 
 

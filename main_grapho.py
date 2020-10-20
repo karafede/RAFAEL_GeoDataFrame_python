@@ -34,8 +34,8 @@ distance = 60000 # distance from the center of the map (in meters)
 ###########################################
 network_city = graph(place_country, distance) # filter
 
-file_graphml = 'Catania__Italy_60km.graphml'
-# file_graphml = 'Catania__Italy_60km_sottorete.graphml'
+# file_graphml = 'Catania__Italy_60km.graphml'
+file_graphml = 'Catania__Italy_for_CENTRALITY.graphml'
 # file_graphml = 'Fisciano__Italy.graphml'
 grafo = ox.load_graphml(file_graphml)
 # ox.plot_graph(grafo)
@@ -65,7 +65,7 @@ file_graphml = 'Catania__Italy_60km.graphml'
 my_map = roads_type_folium(file_graphml, road_type, place_country)
 
 # edge centrality (make a map) (bc = betweenness centrality; cc = closeness centrality)
-centrality(file_graphml, place_country, bc=False, cc=True)  # road_type
+centrality(file_graphml, place_country, bc=True, cc=False)  # road_type
 
 # OSM map & viasat data (make a map)
 # !!! use the _cost.graphml

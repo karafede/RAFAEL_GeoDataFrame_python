@@ -1,0 +1,295 @@
+---
+title: "Accuracy map'matching over Salerno and Catania areas"
+author:
+- Federico Karagulian
+date: "ultima versione `r format(Sys.time(), '%d %B %Y, %H:%M')`"
+output:
+  word_document: 
+    reference_docx: word_style_FK.docx
+  pdf_document: default
+  html_document: default
+  number_sections: true
+  bookdown::word_document: default
+---
+
+
+## Accuracy Catania
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1.** Accuracy Catania"}
+
+
+rm(list = ls())
+
+library(RPostgreSQL)
+library(readr)
+library(lubridate)
+library(threadr)
+library(stringr)
+library(ggplot2)
+library(dplyr)
+library(openair)
+library(gsubfn)
+library(mgsub)
+library(data.table)
+
+
+setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
+
+# loads the PostgreSQL driver
+drv <- dbDriver("PostgreSQL")
+
+
+conn_HAIG <- dbConnect(drv, dbname = "HAIG_Viasat_CT",
+                       host = "10.0.0.1", port = 5432,       
+                       user = "postgres", password = "superuser")
+
+
+setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
+
+
+###############################################################################
+###############################################################################
+
+## load accuracy data from DB
+###  ACCURACY: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
+
+accuracy_2019_all = dbGetQuery(conn_HAIG, "
+                                    SELECT *
+                                    FROM accuracy_2019
+                                    ")
+
+
+accuracy_2019_all <- accuracy_2019_all %>%
+  filter(accuracy > 0 & accuracy <= 100)
+
+
+accuracy_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT accuracy
+                                    FROM accuracy_2019
+                                    ")
+
+accuracy_2019$accuracy <- as.numeric(accuracy_2019$accuracy)
+
+
+### summary STATS (80%-120% accuracy) #######################
+#############################################################
+grouped_accuracy <- accuracy_2019 %>%
+  group_by(accuracy) %>%
+  summarise(count = length(accuracy))
+TOTAL = sum(grouped_accuracy$count)
+good_interval <- grouped_accuracy %>%
+  filter(accuracy >= 80 & accuracy <= 120)
+GOODNESS_matching <- round((sum(good_interval$count) / TOTAL)*100 , digits = 2)
+#############################################################
+#############################################################
+
+
+accuracy_2019 <- accuracy_2019 %>%
+  filter(accuracy > 0 & accuracy <= 100)
+
+df_accuracy_2019_CT <- accuracy_2019
+
+
+
+### plot a distribution
+p <- ggplot(accuracy_2019, aes(x = accuracy)) +
+  geom_histogram(binwidth = 10) +  # 25
+  # geom_histogram() +
+  theme_bw() 
+# p
+
+
+
+### plot a distribution
+p <- ggplot(accuracy_2019, aes(x = accuracy)) +
+  geom_histogram(binwidth = 8, fill="lightblue") +  # 8
+  # geom_histogram() +
+  theme_bw() +
+  # geom_density(stat = 'bin') +
+  theme(legend.title=element_blank()) + 
+  aes(y=stat(count)/sum(stat(count))) + 
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 13)) +
+  guides(fill=FALSE) +
+  theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=16)) +
+  theme(axis.text.x=element_text(size=16, colour = "black")) +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=16)) +
+  xlab("accuracy (%) = length matched path / length travelled distance") +
+  ylab("frequenza (%)") +
+  xlim(0,100)+
+  geom_vline(xintercept = 87, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 80, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 96, col="blue", lty=2, size=1) +
+  geom_text(aes(x = 85 , y = 0.23 , label = "90%"), size = 5) +
+  geom_text(aes(x = 77, y = 0.23 , label = "80%"), size = 5) +
+  geom_text(aes(x = 100 , y = 0.23 , label = "100%"), size = 5) +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=16),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=16, colour="black")) +
+  ggtitle("Accuracy map-matching 2019 Viasat - Catania") +
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 16))
+p
+
+
+```
+
+
+*<br/><br/>*
+*<br/><br/>*
+
+
+## Accuracy Salerno
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 2.** Accuracy Salerno"}
+
+
+#### check Salerno ######################################################
+
+conn_HAIG <- dbConnect(drv, dbname = "HAIG_Viasat_SA",
+                       host = "10.0.0.1", port = 5432,       
+                       user = "postgres", password = "superuser")
+
+
+setwd("D:/ENEA_CAS_WORK/SENTINEL/viasat_data")
+
+###############################################################################
+###############################################################################
+
+## load accuracy data from DB
+###  ACCURACY: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
+
+accuracy_2019_all = dbGetQuery(conn_HAIG, "
+                                    SELECT *
+                                    FROM accuracy_2019
+                                    ")
+
+accuracy_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT accuracy
+                                    FROM accuracy_2019
+                                    ")
+
+accuracy_2019$accuracy <- as.numeric(accuracy_2019$accuracy)
+
+
+### summary STATS (80%-120% accuracy) #######################
+#############################################################
+grouped_accuracy <- accuracy_2019 %>%
+  group_by(accuracy) %>%
+  summarise(count = length(accuracy))
+TOTAL = sum(grouped_accuracy$count)
+good_interval <- grouped_accuracy %>%
+  filter(accuracy >= 80 & accuracy <= 120)
+GOODNESS_matching <- round((sum(good_interval$count) / TOTAL)*100 , digits = 2)
+#############################################################
+#############################################################
+
+accuracy_2019 <- accuracy_2019 %>%
+  filter(accuracy > 0 & accuracy <= 100)
+
+
+df_accuracy_2019_SA <- accuracy_2019
+
+
+
+### plot a distribution
+p <- ggplot(accuracy_2019, aes(x = accuracy)) +
+  geom_histogram(binwidth = 10) +  # 25
+  # geom_histogram() +
+  theme_bw() 
+# p
+
+
+
+### plot a distribution
+p <- ggplot(accuracy_2019, aes(x = accuracy)) +
+  geom_histogram(binwidth = 8,  fill="orange") +  # 25   # 20
+  # geom_histogram() +
+  theme_bw() +
+  # geom_density(stat = 'bin') +
+  theme(legend.title=element_blank()) + 
+  aes(y=stat(count)/sum(stat(count))) + 
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 13)) +
+  guides(fill=FALSE) +
+  theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=12)) +
+  theme(axis.text.x=element_text(size=12, colour = "black")) +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=13)) +
+  xlab("accuracy (%) = length matched path / length travelled distance") +
+  ylab("frequenza (%)") +
+  ylim(0,0.3) +
+  geom_vline(xintercept = 87, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 80, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 96, col="blue", lty=2, size=1) +
+  geom_text(aes(x = 85 , y = 0.23 , label = "90%"), size = 5) +
+  geom_text(aes(x = 77, y = 0.23 , label = "80%"), size = 5) +
+  geom_text(aes(x = 100 , y = 0.23 , label = "100%"), size = 5) +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+  ggtitle("Accuracy map-matching 2019 Viasat - Salerno") +
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+p
+
+
+
+```
+
+
+
+*<br/><br/>*
+*<br/><br/>*
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 3.** Accuracy Catania and Salerno"}
+
+
+##############################################################################
+##############################################################################
+
+### join all ratios together....
+
+names(df_accuracy_2019_CT) <- "accuracy"
+df_accuracy_2019_CT$source <- "Catania"
+
+
+names(df_accuracy_2019_SA) <- "accuracy"
+df_accuracy_2019_SA$source <- "Salerno"
+
+
+df <- rbind(df_accuracy_2019_CT, 
+            df_accuracy_2019_SA)
+somma_df <- df %>%
+  group_by(source) %>%
+  summarise(total = length(accuracy))
+
+  
+  
+  p <- ggplot(df) + 
+  aes(x =source, y = accuracy) +
+  geom_boxplot(fill = "orange") + 
+  theme_bw() +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=13),     
+        axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=14)) +
+  ylab("frequenza (%)") +
+  xlab("accuratezza") +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=13),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=13, colour="black")) +
+  geom_text(data = somma_df, aes(x = source, y = 2, label = total), size = 4, hjust = 1.5,  vjust = -0.5)+
+  ggtitle("accuratezza map-matching su Catania e Salerno") +
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 13))
+  p
+
+###############################################################################
+###############################################################################
+
+
+
+
+
+```
+
+
+*<br/><br/>*
+*<br/><br/>*
+
