@@ -33,8 +33,8 @@ import geopandas as gpd
 def graph(place_country, distance):  # filter
     # filter out some attributes
     #### use this to calculate CENTRALITY
-    filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
-              'raceway|cycleway|steps|construction"]')
+    # filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
+    #           'raceway|cycleway|steps|construction"]')
     # filter = (
     #     '["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
     #     'raceway|cycleway|steps|construction|primary|secondary|tertiary"]')
@@ -46,9 +46,9 @@ def graph(place_country, distance):  # filter
     #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
 
     #### use this for MAP-MATCHING
-    # filter = (
-    #     '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
-    #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
+    filter = (
+        '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
+        'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
 
     ## for "sottorete"
     # filter = (

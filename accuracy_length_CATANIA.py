@@ -34,6 +34,9 @@ from shapely import wkb
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
 
+# conn_HAIG = db_connect.connect_fede_viasat()
+# cur_HAIG = conn_HAIG.cursor()
+
 # Function to generate WKB hex
 def wkb_hexer(line):
     return line.wkb_hex
@@ -62,8 +65,8 @@ cur_HAIG = conn_HAIG.cursor()
 accuracy_2019_all = pd.read_sql_query('''
                SELECT *
                FROM public.accuracy_2019 
-               WHERE accuracy <= 70 
-               AND accuracy > 10''' , conn_HAIG)
+               WHERE accuracy <= 110 
+               AND accuracy >=100''' , conn_HAIG)
 
 accuracy_2019_all = accuracy_2019_all.sort_values('accuracy')
 
@@ -74,6 +77,7 @@ trip_idx = list(accuracy_2019_all["TRIP_ID"])
 
 ###############################################################
 ###############################################################
+# trip_idx = trip_idx[0:10]
 
 ## check LENGTHS of mapmaching path
 
@@ -111,7 +115,7 @@ for idx, TRIP_ID in enumerate(trip_idx):
 
     ## calculate the accuracy of the matched route compared to the sum of the differences of the progressives (from Viasat data)
     ###  ACCURACY: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
-    if (sum_distance_mapmatching > 0 & sum_distance_mapmatching > 0):
+    if (sum_distance_mapmatching > 0) & (sum_progressive > 0):
 
         accuracy = int(int((sum_distance_mapmatching / sum_progressive) * 100))
         print("%%%%%======== ACCURACY (%):",  accuracy)

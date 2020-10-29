@@ -282,8 +282,8 @@ sottorete_speed = gpd.GeoDataFrame(sottorete_speed)
 sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles.geojson', driver='GeoJSON')
 sottorete_speed.plot()
 
-del all_data
-del viasat_data_all
+# del all_data
+# del viasat_data_all
 
 
 ######################################################################################

@@ -55,30 +55,73 @@ def wkb_hexer(line):
     return line.wkb_hex
 
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
+# engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
 engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_CT')
 
 all_EDGES = pd.DataFrame([])
+all_ACCURACY = []     # ratio: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
 
 # get all ID terminal of Viasat data
-all_VIASAT_IDterminals = pd.read_sql_query(
-    ''' SELECT "track_ID" 
-        FROM public.routecheck''', conn_HAIG)
+# all_VIASAT_IDterminals = pd.read_sql_query(
+#    ''' SELECT "idterm"
+#        FROM public.routecheck_2019''', conn_HAIG)
+
+
 
 # make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
-all_ID_TRACKS = list(all_VIASAT_IDterminals.track_ID.unique())
+# all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
+
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
+     all_ID_TRACKS = eval(file.readline())
+
+ ## reload 'idterms_fleet' as list
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterms_fleet.txt", "r") as file:
+ idterms_fleet = eval(file.readline())
 
 # DATE = '2019-04-15'
-track_ID = '2507511'
-trip = '2507511_0'
+track_ID = '2507511' # only valid for the table "routecheck"
+trip = '2507511_0'  ## andata
+# trip = '2507511_3'  ## ritorno
+
+
+track_ID = '5037900'
+trip = '5037900_conc_118'  ## OK
+
+track_ID = '4492323'
+trip = '4492323_conc_218'  # NO
+
+
+track_ID = '3106524'
+trip = '3106524_conc_20'  # NICE!
+
+track_ID = '5906953'
+trip = '5906953_conc_69'  # NI
+
+
+track_ID = '3241082'
+trip = '3241082_conc_93' # OK
+
+
+track_ID = '5904978'
+trip = '5904978_conc_13'  # NI missing first tracks
+
+
+track_ID = '4268346'
+trip = '4268346_conc_162' # bello !
+
+
+track_ID = '4356740'
+trip = '4356740_conc_1' #
 
 # all_ID_TRACKS = ['2507511']
-# track_ID = '2508141'
-# all_ID_TRACKS = ['2508141']    # trip 3....(to use as example)
+# all_ID_TRACKS = ['3188580']
+# track_ID = '4236358'
+# all_ID_TRACKS = ['4236358']
+# trip = '4236358_245'
 
 # track_ID = '2509123'
+# trip = '2509123_4'
 # track_ID = '2507530'
-# track_ID = "2678884"
 
 # DATE = '2019-04-11'
 # track_ID = '3188580'
@@ -87,32 +130,33 @@ trip = '2507511_0'
 # create basemap
 ave_LAT = 37.53988692816245
 ave_LON = 15.044971594798902
-my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')   # cartodbpositron
+# folium.TileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+#                 attr="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community").add_to(my_map)
+
 ################################################################################
 
 ## read each TRIP from each idterm (TRACK_ID or idtrajectory)
-
-## to be used when the query stop. Start from the last saved index
-# last_track_idx = 324+68+10+115
-# for last_track_idx, track_ID in enumerate(all_ID_TRACKS[last_track_idx:len(all_ID_TRACKS)]):
 for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
     track_ID = str(track_ID)
     viasat_data = pd.read_sql_query('''
-                SELECT * FROM public.routecheck 
-                WHERE "track_ID" = '%s' ''' % track_ID, conn_HAIG)
+                  SELECT * FROM public.routecheck 
+                  WHERE "idterm" = '%s' ''' % track_ID, conn_HAIG)
+    ### FILTERING #############################################
+    viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
+    viasat_data = viasat_data[viasat_data.anomaly != "EQc3456"]
+    viasat_data = viasat_data[viasat_data.anomaly != "EQc3T5d"]
+    if int(track_ID) not in idterms_fleet:
+        print("+++++++ vehtype = car ++++++++++++++++")
+        viasat_data = viasat_data[viasat_data.anomaly != "IQ2C4V6"]
     # list all TRIPS for a each idterm
     all_TRIPS = list(viasat_data.TRIP_ID.unique())
     for idx_trip, trip in enumerate(all_TRIPS):
         TRIP_ID = trip
+        # TRIP_ID = trip
         viasat = viasat_data[viasat_data.TRIP_ID == trip]
+        viasat = viasat.sort_values('timedate')
         viasat.reset_index(drop=True, inplace=True)
-
-        ## FILTERING ##################################
-        ## remove/filter records with the following anomaly:
-        viasat = viasat[viasat.anomaly != "IQ2C4V6"]
-        viasat = viasat[viasat.anomaly != "IQc345d"]
-        viasat = viasat[viasat.anomaly != "EQc3456"]
-        viasat = viasat[viasat.anomaly != "IQc3T5d"]
 
         if len(viasat) > 5:
             ## introduce a dynamic buffer
@@ -123,8 +167,9 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             else:
                 buffer_diam = 0.00008
 
-            buffer_diam = 0.00010   ## best choice...so far   0.00005 or 0.00008
+            buffer_diam = 0.00008   ##13 ## best choice...so far 0.00008
             buffer_diam_pic = 0.00020   ## this is the diamteter to show on the pics
+            # buffer_diam_pic = 0.00004  ## this is the diamteter to show on the pics
 
             ## get extent of viasat data
             ext = 0.025
@@ -166,24 +211,20 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             file_graphml = 'partial.graphml'
             from funcs_network_FK import cost_assignment
             place_country = "Catania, Italy"
-            cost_assignment(file_graphml, place_country)
+            # cost_assignment(file_graphml, place_country)
 
             ## make a geo-dataframe from the grapho
             gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
-
-
-            # ## clip all edges from the main grafo according to a boundary polygon
-            # xmin, ymin, xmax, ymax = viasat_extent.total_bounds
-            # gdf_nodes = gdf_nodes_ALL.cx[xmin:xmax, ymin:ymax]
-            # ## clip all edges from the main grafo according to a boundary polygon
-            # gdf_edges = gdf_edges_ALL.cx[xmin:xmax, ymin:ymax]
-
 
             # reset indices
             viasat.reset_index(drop=True, inplace=True)
 
             # create an index column
             viasat["ID"] = viasat.index
+            ## sum of progressive distance (true distance travelled by the vehicle)
+            diff_progressive = viasat.progressive.diff()
+            diff_progressive = diff_progressive.dropna()
+            sum_progressive = sum(diff_progressive)  ## in meters (these are increments)
 
             ######################################################
 
@@ -191,14 +232,13 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             for i in range(len(viasat)):
                 folium.CircleMarker(location=[viasat.latitude.iloc[i], viasat.longitude.iloc[i]],
                                     popup= (TRIP_ID + '_' + str(viasat.ID.iloc[i])),
-                                    radius=1,
+                                    radius= 4,
                                     color="black",
                                     fill=True,
                                     fill_color="black",
                                     fill_opacity=1).add_to(my_map)
-            # my_map.save("matched_route_21032020.html")
             # my_map.save("matched_route_VIASAT_" + DATE + '_' + today + ".html")
-            my_map.save("matched_route_VIASAT_" + trip + ".html")
+            # my_map.save("matched_route_VIASAT_" + trip + ".html")
 
             ######################################################
 
@@ -226,7 +266,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             # add buffered viasat polygons
             # save first as geojson file
             buffer_pic.to_file(filename='buffer_viasat.geojson', driver='GeoJSON')
-            folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
+            # folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
             my_map.save("matched_route_with_buffer.html")
 
             # 1 = 100 km
@@ -260,7 +300,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         index_edges.append(streets.Index)
                         index_buff.append(via_buff.Index)
                         STREET = streets.u, streets.v, via_buff.Index
-                        # get distance between Viasat measurement and edge
+                        # get distance between Viasat measurement and edge (only the part intesecting the buffer)
                         distance = (Point(viasat[['longitude', 'latitude']].iloc[via_buff.Index]).distance(streets.geometry))*100000 # roughly meter conversion
                         print("distance track-edge: ", distance, " meters")
                         edge.append(STREET)
@@ -285,24 +325,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             # nn_gdf_edges.plot()
             nn_gdf_edges = nn_gdf_edges[['geometry']]
             nn_gdf_edges.to_file(filename='nn_gdf_edges.geojson', driver='GeoJSON')
-            folium.GeoJson('nn_gdf_edges.geojson').add_to((my_map))
+            # folium.GeoJson('nn_gdf_edges.geojson').add_to((my_map))
             my_map.save("matched_route_with_buffer.html")
-
-            '''
-            # make an unique lists of all nodes inside the nn_gdf_edges
-            all_nodes = list(pd.concat([gdf_edges['u'], gdf_edges['v']]).unique())
-            nn_list_nodes = list(pd.concat([nn_gdf_edges['u'], nn_gdf_edges['v']]).unique())
-            
-            # all_nodes minus nn_list_nodes
-            set1 = set(all_nodes)
-            set2 = set(nn_list_nodes)
-            set_difference = set1.difference(set2)
-            subtracted_list = list(set_difference)
-            
-            # create a reduced graph with onle the near neighbour nodes
-            grafo.remove_nodes_from(subtracted_list)
-            ox.plot_graph(grafo)
-            '''
 
 
             '''
@@ -331,9 +355,20 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
             # add buffered viasat polygons
             # save first as geojson file
             buffer_pic.to_file(filename='buffer_viasat.geojson', driver='GeoJSON')
-            folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
+            # folium.GeoJson('buffer_viasat.geojson').add_to((my_map))
+
+            # add VIASAT GPS track on the base map (defined above)
+            for i in range(len(viasat)):
+                folium.CircleMarker(location=[viasat.latitude.iloc[i], viasat.longitude.iloc[i]],
+                                    popup=(TRIP_ID + '_' + str(viasat.ID.iloc[i])),
+                                    radius=1,
+                                    color="black",
+                                    fill=True,
+                                    fill_color="black",
+                                    fill_opacity=1).add_to(my_map)
+
             my_map.save("near_neighbours_Catania.html")
-            
+
             '''
 
             ##########################################################
@@ -347,6 +382,11 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                 df_edges = pd.DataFrame(edge)
                 df_edges.columns = ['u', 'v', 'buffer_ID']
                 df_edges.sort_values(by=['buffer_ID'], inplace=True)
+                COUNTS_buffer = df_edges.groupby(df_edges[['buffer_ID']].columns.tolist(), sort=False).size().reset_index().rename(
+                     columns={0: 'counts'})
+                buffer_to_remove = list(((COUNTS_buffer[COUNTS_buffer.counts >= 4]).buffer_ID))
+                df_edges = df_edges[~df_edges.buffer_ID.isin(buffer_to_remove)]
+
                 ## merge "df_edges" with "viasat" to get the "id"
                 EDGES = df_edges
                 EDGES = EDGES.rename(columns={'buffer_ID': 'ID'})
@@ -391,8 +431,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     # u_track = u_dict.get(u)[0][2]
                     u_track = nodes_dict.get(u)[0][2]
                     coords_track = viasat[viasat.ID == u_track].values.tolist()
-                    lon_track = coords_track[0][1]
-                    lat_track = coords_track[0][0]
+                    lon_track = coords_track[0][2]
+                    lat_track = coords_track[0][3]
                     coords_u = gdf_nodes[gdf_nodes.index == u][['x', 'y']].values.tolist()
                     lon_u = coords_u[0][0]
                     lat_u = coords_u[0][1]
@@ -424,7 +464,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                 # "sigma" has been calculated ad the standard deviation of all the distances between viasat measurements and nodes
                 # SIGMA_Z = 1.4826*np.median(DISTANCES) # meters
                 SIGMA_Z = 1.4826*np.median([x[0] for x in DISTANCES]) # meters
-                SIGMA_Z = SIGMA_Z/1000 # Kilometers
+                # SIGMA_Z = SIGMA_Z/1000 # Kilometers
                 print(SIGMA_Z)
 
 
@@ -435,8 +475,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                 # Gaussian distribution of all NODES close to Viasat measurements.
                 def emission_prob(u):
                     c = 1 / (SIGMA_Z * math.sqrt(2 * math.pi))
-                    # return 1 * math.exp(-0.5*(great_circle_track_node(u)/SIGMA_Z)**2)
-                    return great_circle_track_node(u)/SIGMA_Z  # !!! this is only a DISTANCE!!
+                    return 1 * math.exp(-0.5*(great_circle_track_node(u)/SIGMA_Z)**2)
+                    # return great_circle_track_node(u)/SIGMA_Z
 
 
                 prob = []
@@ -557,6 +597,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         # i = 0
                         for u in adjacency_list[track_list[i]]:
                             for v in adjacency_list[track_list[i+1]]:
+                                print(u,v)
                                 # distance travelled from one point to the next one (in km)
                                 distance_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).progressive) - int(
                                     (viasat[viasat['ID'] == track_list[i]]).progressive)
@@ -683,15 +724,14 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                                     print("max_prob_NODE:", MAX_trans_key)
                                     # compare distance: node-GPS track with node-edge
                                     if MAX_emiss_key in DISTANCES_dict.keys():
-                                        if MAX_trans_key != MAX_emiss_key and DISTANCES_dict[MAX_emiss_key] > emiss_prob[MAX_emiss_key]:
-                                            # max_prob_node.append(MAX_trans_key)
-                                            max_prob_node.append(MAX_emiss_key)
-                                        else:
-                                            max_prob_node.append(MAX_trans_key)
+                                        # if MAX_trans_key != MAX_emiss_key and DISTANCES_dict[MAX_emiss_key] > emiss_prob[MAX_emiss_key]:
+                                        #     max_prob_node.append(MAX_emiss_key)
+                                        # else:
+                                        max_prob_node.append(MAX_trans_key)
                                     else:
                                         if MAX_trans_key != MAX_emiss_key:
                                             # max_prob_node.append(MAX_trans_key)
-                                            # distance between Max_key and the GPS track (in Km)
+                                            ## distance between Max_key and the GPS track (in Km)
                                             lat = float(viasat.latitude[viasat.ID == track_list[i]])
                                             lon = float(viasat.longitude[viasat.ID == track_list[i]])
                                             distance_MAX_key_to_track = ox.great_circle_vec(lat1 = grafo.nodes[MAX_emiss_key]['y'],
@@ -728,8 +768,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                                 new_node = min(shortest_path, key=shortest_path.get)
                                 max_prob_node.remove(MAX_trans_key)
                                 max_prob_node.append(new_node)
-                        ##### WORK in progress................................###############################
-                        ####/////////////////////////////////////////########################################
+
                         if len(max_prob_node) != 0:
                             distance_to_track_i = ox.great_circle_vec(lat1 = grafo.nodes[max_prob_node[-1]]['y'],
                                                                       lng1 = grafo.nodes[max_prob_node[-1]]['x'],
@@ -755,7 +794,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                             lon0 = float(viasat.longitude[viasat.ID == track_list[i]])
                             point1 = (lat1, lon1)
                             point0 = (lat0, lon0)
-                        ####/////////////////////////////////////////########################################
+
                             if np.mean(dists) <= (distance_VIASAT/2):
                                 nearest_node = ox.get_nearest_node(grafo, point1, return_dist=True)
                                 geom0, u0, v0 = ox.get_nearest_edge(grafo, point0)
@@ -782,21 +821,10 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                 from collections import OrderedDict
                 max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
 
-                # print(i)
-                # ### attach the last destination node (v) to the matched list of nodes
-                # if len(track_list) > 1:
-                #     if track_list[i] == max(track_list):
-                #         last_node = v
-                #         max_prob_node.append(last_node)
-                #
-                # max_prob_node.append(529152100)
                 #### get last element of the "adjacency_list" (dictionary)
                 last_key_nodes = list(adjacency_list.keys())[-1]
                 last_nodes = list(adjacency_list[last_key_nodes])   ## get both of them!
                 max_prob_node.extend(last_nodes)
-
-
-
 
                 ### check that the nodes are on the same direction!!!!! ####
                 # remove nodes that are not on the same directions..........
@@ -836,6 +864,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                 ## remove duplicates
                 max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
 
+
                 #### build matched route with all max_prob_node  #####
                 matched_route = []
                 all_matched_edges = []
@@ -845,6 +874,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         # use full complete graph to build the final path
                         # route = nx.shortest_path(grafo, origin, destination, weight='length')
                         route = nx.dijkstra_path(grafo, origin, destination, weight='length')
+                        # route = nx.dijkstra_path(grafo, origin, destination)
                         path_edges = list(zip(route, route[1:]))
                         # print(path_edges)
                         all_matched_edges.append(path_edges)
@@ -877,50 +907,29 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     df_nodes = pd.DataFrame(df_nodes)
                     df_nodes.columns = ['u', 'v']
 
-                    # for i in range(len(all_matched_edges)):
-                    #     # print(all_matched_edges[i])
-                    #     route = all_matched_edges[i]
-                    # df_nodes = pd.DataFrame(route)
-                    # df_nodes.columns = ['u', 'v']
-
                     ## merge ordered list of nodes with edges from grafo
                     # GRAFO = pd.DataFrame(gdf_edges)
                     edges_matched_route = pd.merge(df_nodes, gdf_edges, on=['u', 'v'],how='left')
                     edges_matched_route = gpd.GeoDataFrame(edges_matched_route)
                     edges_matched_route.drop_duplicates(['u', 'v'], inplace=True)
 
-                    # if len(edges_matched_route) > len(edges_matched_route_user):
-                    #     edges_matched_route = edges_matched_route_user
 
-
-                    # # filter gdf_edges with df_nodes
-                    # keys = list(df_nodes.columns.values)
-                    # index_gdf_edges = gdf_edges.set_index(keys).index
-                    # index_df_nodes = df_nodes.set_index(keys).index
-                    # edges_matched_route = gdf_edges[index_gdf_edges.isin(index_df_nodes)]
-
-                    # filter 'edges_matched_route' (remove key = 1)
+                    # filter 'edges_matched_route' (remove key = 1, that is the level above the street)
                     filter_edge = edges_matched_route[edges_matched_route.key != 0]
                     if len(filter_edge) !=0:
-                        # selected_edges = edges_matched_route[edges_matched_route.u == int(pd.to_numeric(filter_edge.u))]
                         selected_edges = edges_matched_route[edges_matched_route.u.isin(list(pd.to_numeric(filter_edge.u)))]
                         # get the with row with key == 0 (to be then removed
-                        # idx_edge = int((selected_edges[selected_edges.key == 0].index).values)
                         idx_edge = list(selected_edges[selected_edges.key == 0].index)
                         # filter row in 'edges_matched_route' with index == idx_edge
-                        # edges_matched_route = edges_matched_route[edges_matched_route.index != idx_edge]
                         edges_matched_route = edges_matched_route[~edges_matched_route.index.isin(idx_edge)]
                     # select edges with 'key' == 1
 
 
                     if len(filter_edge) > 1:
-                        # selected_edges = edges_matched_route[edges_matched_route.u == int(pd.to_numeric(filter_edge.u))]
                         selected_edges = edges_matched_route[edges_matched_route.u.isin(list(pd.to_numeric(filter_edge.u)))]
                         if len(selected_edges) == 1:
-                            # idx_edge = int((selected_edges[selected_edges.key == 1].index).values)
                             idx_edge = list(selected_edges[selected_edges.key == 1].index)
                             # filter row in 'edges_matched_route' with index == idx_edge
-                            # edges_matched_route = edges_matched_route[edges_matched_route.index != idx_edge]
                             edges_matched_route = edges_matched_route[~edges_matched_route.index.isin(idx_edge)]
 
                     ##################################################################################
@@ -936,7 +945,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     HHH.drop_duplicates(['u', 'v'], inplace=True)
                     HHH['buffer_ID'] = HHH['buffer_ID'].ffill()
                     KKK_new = KKK[['u', 'v', 'buffer_ID', 'id', 'progressive', 'totalseconds', 'path_time', 'speed',
-                                   'timedate', 'TRIP_ID', 'idtrajectory', 'track_ID', 'anomaly']]
+                                   'timedate', 'TRIP_ID', 'idtrajectory', 'idterm', 'anomaly']]
                     edges_matched_route_GV = pd.merge(HHH, KKK_new, on=['u', 'v', 'buffer_ID'], how='left')
                     edges_matched_route_GV['id'] = edges_matched_route_GV['id'].bfill()
                     edges_matched_route_GV['id'] = edges_matched_route_GV['id'].ffill()
@@ -996,7 +1005,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].bfill()
                     edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
                     edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].ffill()
-                    edges_matched_route_GV['track_ID'] = edges_matched_route_GV['track_ID'].ffill()
+                    edges_matched_route_GV['track_ID'] = edges_matched_route_GV['idterm'].ffill()
                     ## remove rows with negative "mean_speed"...for now....
                     edges_matched_route_GV = edges_matched_route_GV[edges_matched_route_GV['mean_speed'] > 0]
                     edges_matched_route_GV = gpd.GeoDataFrame(edges_matched_route_GV)
@@ -1005,7 +1014,7 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                     try:
                         final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory', 'geometry',
                                                                               'u', 'v',                                                                        'idtrace', 'sequenza', 'mean_speed',
-                                                                              'timedate', 'totalseconds', 'TRIP_ID', 'track_ID',
+                                                                              'timedate', 'totalseconds', 'TRIP_ID', 'idterm',
                                                                               'length', 'highway', 'name', 'ref']]
 
                         final_map_matching_table_GV = gpd.GeoDataFrame(final_map_matching_table_GV)
@@ -1054,41 +1063,34 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
                         ## quick plot
                         # edges_matched_route.plot()
                         ## append all EDGES in an unique dataframe
-                        edges_matched_route['track_ID'] = track_ID
+                        edges_matched_route['idterm'] = track_ID
                         edges_matched_route['trip_ID'] = TRIP_ID
                         edges_matched_route['DESTINATION'] = DESTINATION
                         edges_matched_route['ORIGIN'] = ORIGIN
 
-                        all_EDGES = all_EDGES.append(edges_matched_route)
-                        ## save data
-                        # all_EDGES.to_csv('all_EDGES.csv')
-                        # with open('all_EDGES_' + DATE + '_' + today + '.geojson', 'w') as f:
-                        #     f.write(all_EDGES.to_json())
+                        # all_EDGES = all_EDGES.append(edges_matched_route)
 
-                        # with open('all_EDGES_' + '_' + today + '.geojson', 'w') as f:
-                        #    f.write(all_EDGES.to_json())
-
-                        ## add plot in Folium map
-                        # save first as geojson file
-                        # edges_matched_route.geometry.to_file(filename='matched_route_' + DATE + '_' + today + '.geojson',
-                        #                                      driver='GeoJSON')
-                        # edges_matched_route.geometry.to_file(filename='matched_route_' + '_' + today + '.geojson',
-                        #                                      driver='GeoJSON')
                         edges_matched_route.geometry.to_file(filename='matched_route_with_buffer.geojson',
                                                              driver='GeoJSON')
-                        # folium.GeoJson('matched_route_' + DATE + '_' + today + '.geojson').add_to((my_map))
-                        # my_map.save("matched_route_VIASAT_" + DATE + '_' + today + ".html")
                         folium.GeoJson('matched_route_with_buffer.geojson').add_to((my_map))
                         my_map.save("matched_route_with_buffer.html")
-                        # save last track ID and index (to be used in case the query stops)
 
-                        # with open("last_track_ID.txt", "w") as text_file:
-                        #    text_file.write("last track ID and last track index: %s %s" % (track_ID, last_track_idx))
-
-                        # path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/outputs_catania_28022020/'
-                        # my_map.save(path + track_ID + "_" + DATE + "_matched_route.html")
-                        # path_cloud = 'C:/Users/Federico/ownCloud/Catania_RAFAEL/outputs_catania_28022020/'
-                        # my_map.save(path_cloud + track_ID + "_" + DATE + "_matched_route.html")
+                        #################################################################
+                        #################################################################
+                        ### find the travelled distance of the matched route
+                        sum_distance_mapmatching = sum(final_map_matching_table_GV.length)
+                        ## calculate the accuracy of the matched route compared to the sum of the differences of the progressives (from Viasat data)
+                        accuracy = str(int((sum_distance_mapmatching/sum_progressive)*100))
+                        all_ACCURACY.append(accuracy)
+                        ## save list as .csv file
+                        import csv
+                        # writing the data into the file
+                        # Open File
+                        resultFyle = open("accuracy_mapmatchng_CATANIA.csv", 'w')
+                        # Write data to file
+                        for r in all_ACCURACY:
+                            resultFyle.write(r + "\n")
+                        resultFyle.close()
 
                     except KeyError:
                         print("no distance_edges")
@@ -1099,24 +1101,8 @@ for last_track_idx, track_ID in enumerate(all_ID_TRACKS):
 #######################################################################################
 #######################################################################################
 #######################################################################################
+#######################################################################################
+#######################################################################################
 
 conn_HAIG.close()
 cur_HAIG.close()
-
-'''
-# copy temporary table to a permanent table with the right GEOMETRY datatype
-# Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:vaxcrio1@localhost:5432/HAIG_Viasat_CT')
-with engine.connect() as conn, conn.begin():
-    sql = """create table mapmatching as (select * from mapmatching_temp)"""
-    conn.execute(sql)
-
-# Convert the `'geom'` column back to Geometry datatype, from text
-with engine.connect() as conn, conn.begin():
-    print(conn)
-    sql = """ALTER TABLE public.mapmatching
-                                  ALTER COLUMN geom TYPE Geometry(LINESTRING, 4326)
-                                    USING ST_SetSRID(geom::Geometry, 4326)"""
-    conn.execute(sql)
-
-'''

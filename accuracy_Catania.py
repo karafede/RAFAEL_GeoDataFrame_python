@@ -50,6 +50,9 @@ from multiprocessing import Pool,RLock
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
 
+# conn_HAIG = db_connect.connect_fede_viasat()
+# cur_HAIG = conn_HAIG.cursor()
+
 #####################################################
 ####################################################
 
@@ -59,7 +62,12 @@ cur_HAIG = conn_HAIG.cursor()
 
 
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_CT')
+# engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_CT')
+engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
+connection = engine.connect()
+
+# engine = sal.create_engine('postgresql://postgres:vaxcrio1@192.168.134.43:5432/fede_viasat?gssencmode=disable')
+# connection = engine.connect()
 
 # Function to generate WKB hex
 def wkb_hexer(line):

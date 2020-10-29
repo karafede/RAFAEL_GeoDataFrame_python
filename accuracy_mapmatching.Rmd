@@ -53,10 +53,36 @@ setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
 ## load accuracy data from DB
 ###  ACCURACY: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
 
+# accuracy_2019_all = dbGetQuery(conn_HAIG, "
+#                SELECT *
+#                FROM public.accuracy_2019 
+#                WHERE accuracy <= 150 
+#                AND accuracy >= 140")
+
+
 accuracy_2019_all = dbGetQuery(conn_HAIG, "
                                     SELECT *
                                     FROM accuracy_2019
                                     ")
+
+
+# TRIP_ID <- "4482172_conc_87"
+# 
+# mapmatching = dbGetQuery(conn_HAIG, "
+#                                     SELECT *
+#                                     FROM mapmatching_2019
+#                                     WHERE \"TRIP_ID\" = '4482172_conc_87'
+#                                     ")
+# 
+# matched_candidates <- unique(mapmatching$idtrace)
+# 
+# routecheck = dbGetQuery(conn_HAIG, "
+#                                     SELECT *
+#                                     FROM routecheck_2019
+#                                      WHERE \"TRIP_ID\" = '4482172_conc_87'
+#                                     ")
+# 
+# matched_tracks <- unique(routecheck$id)
 
 
 accuracy_2019_all <- accuracy_2019_all %>%
@@ -190,7 +216,6 @@ accuracy_2019 <- accuracy_2019 %>%
 df_accuracy_2019_SA <- accuracy_2019
 
 
-
 ### plot a distribution
 p <- ggplot(accuracy_2019, aes(x = accuracy)) +
   geom_histogram(binwidth = 10) +  # 25
@@ -293,3 +318,144 @@ somma_df <- df %>%
 *<br/><br/>*
 *<br/><br/>*
 
+
+
+
+## Accuracy Catania by LENGTH
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1a.** Accuracy Catania"}
+
+
+setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
+
+### get all length (in meters) of matched path together with the sum of progressive lenght and the accuracy (%)
+
+accuracy_2019_10_40 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_10_40_percent.csv",  
+                                header = T, sep=",")[-1]
+
+accuracy_2019_40_50 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_40_50_percent.csv",  
+                                header = T, sep=",")[-1]
+
+accuracy_2019_50_60 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_50_60_percent.csv",  
+                                header = T, sep=",")[-1]
+
+accuracy_2019_60_70 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_60_70_percent.csv",  
+                                header = T, sep=",")[-1]
+
+accuracy_2019_70_80 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_70_80_percent.csv",  
+                                header = T, sep=",")[-1]
+
+accuracy_2019_80_90 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_80_90_percent.csv",  
+                                header = T, sep=",")[-1]
+
+accuracy_2019_90_100 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_90_100_percent.csv",  
+                                header = T, sep=",")[-1]
+
+
+###############################################################################
+###############################################################################
+
+# make 0 to 40.....
+names(accuracy_2019_10_40) <- c("matched_distance", "progressive_distance", "accuracy %")
+names(accuracy_2019_40_50) <- c("matched_distance", "progressive_distance", "accuracy %")
+names(accuracy_2019_50_60) <- c("matched_distance", "progressive_distance", "accuracy %")
+names(accuracy_2019_60_70) <- c("matched_distance", "progressive_distance", "accuracy %")
+names(accuracy_2019_70_80) <- c("matched_distance", "progressive_distance", "accuracy %")
+names(accuracy_2019_80_90) <- c("matched_distance", "progressive_distance", "accuracy %")
+names(accuracy_2019_90_100) <- c("matched_distance", "progressive_distance", "accuracy %")
+
+
+accuracy_2019 <- rbind(accuracy_2019_10_40,
+                       accuracy_2019_40_50,
+                       accuracy_2019_50_60,
+                       accuracy_2019_60_70,
+                       accuracy_2019_70_80,
+                       accuracy_2019_80_90,
+                       accuracy_2019_90_100)
+
+
+accuracy_2019 <- accuracy_2019 %>%
+  filter(matched_distance < 25000)
+
+
+
+### plot a distribution
+p <- ggplot(accuracy_2019, aes(x = matched_distance)) +
+  theme_bw() +
+  geom_density(stat = 'bin') +
+  theme(legend.title=element_blank()) + 
+  aes(y=stat(count)/sum(stat(count))) + 
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 13)) +
+  guides(fill=FALSE) +
+  theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=16)) +
+  theme(axis.text.x=element_text(size=16, colour = "black")) +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=16)) +
+  xlab("matched distance (meters)") +
+  ylab("frequency (%)") +
+  # xlim(0,100)+
+  geom_vline(xintercept = 5200, col="blue", lty=2, size=1) +
+  # geom_vline(xintercept = 800, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 1600, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 2700, col="blue", lty=2, size=1) +
+  geom_text(aes(x = 4000 , y = 0.15 , label = "2.8 km"), size = 4) +
+  geom_text(aes(x = 6300 , y = 0.15 , label = "5 km"), size = 4) +
+  geom_text(aes(x = 1000 , y = 0.15 , label = "1.5 km"), size = 4) +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=16),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=16, colour="black")) +
+  ggtitle("Matched distance distribution - Catania") +
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 16))
+p
+
+
+
+
+```
+
+
+*<br/><br/>*
+*<br/><br/>*
+
+
+
+## Accuracy Catania by LENGTH
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1b.** Accuracy Catania"}
+
+
+accuracy_2019 <- accuracy_2019 %>%
+  filter(matched_distance > 1600)
+
+### plot a distribution
+p <- ggplot(accuracy_2019, aes(x = `accuracy %`)) +
+  geom_histogram(binwidth = 8, fill="lightblue") +  # 8
+  # geom_histogram() +
+  theme_bw() +
+  # geom_density(stat = 'bin') +
+  theme(legend.title=element_blank()) + 
+  aes(y=stat(count)/sum(stat(count))) + 
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 13)) +
+  guides(fill=FALSE) +
+  theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=16)) +
+  theme(axis.text.x=element_text(size=16, colour = "black")) +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=16)) +
+  xlab("accuracy (%) = length matched path / length travelled distance") +
+  ylab("frequenza (%)") +
+  xlim(0,100)+
+  geom_vline(xintercept = 87, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 80, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 96, col="blue", lty=2, size=1) +
+  geom_text(aes(x = 85 , y = 0.23 , label = "90%"), size = 5) +
+  geom_text(aes(x = 77, y = 0.23 , label = "80%"), size = 5) +
+  geom_text(aes(x = 100 , y = 0.23 , label = "100%"), size = 5) +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=16),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=16, colour="black")) +
+  ggtitle("Accuracy map-matching 2019 Viasat - Catania") +
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 16))
+p
+
+
+```
