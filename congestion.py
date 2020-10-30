@@ -42,6 +42,7 @@ today = today.strftime("%b-%d-%Y")
 os.chdir('D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data')
 os.getcwd()
 
+
 ########################################################################################
 ########## DATABASE OPERATIONS #########################################################
 ########################################################################################
@@ -113,7 +114,7 @@ viasat_data = pd.read_sql_query('''
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                      /*WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '08'*/
+                                      WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '08'
                                       /*AND dataraw.vehtype::bigint = 2*/
                                       ''', conn_HAIG)
 
@@ -156,6 +157,7 @@ all_counts_uv = all_counts_uv.groupby(['u', 'v', 'hour'], sort=False).mean().res
 all_counts_hourly = all_counts_uv.groupby(['hour'], sort=False).sum().reset_index()
 all_counts_hourly = all_counts_hourly.sort_values('hour', ascending=True)
 all_counts_hourly.plot.bar(x = 'hour', y = 'FLUX')
+
 
 ## get hour with maximum FLUX for each edge (u.v) pair (PEAK HOUR, ORA di PUNTA)
 ### https://stackoverflow.com/questions/15705630/get-the-rows-which-have-the-max-count-in-groups-using-groupby
@@ -238,19 +240,47 @@ speed_PHF_and_SCARICA = speed_PHF_and_SCARICA.sort_values('congestion_index', as
 ## get only congestion index < 1
 speed_PHF_and_SCARICA = speed_PHF_and_SCARICA[speed_PHF_and_SCARICA.congestion_index <= 1]
 
+## merge edges for congestion with the road network to get the geometry
+speed_PHF_and_SCARICA = pd.merge(speed_PHF_and_SCARICA, gdf_edges, on=['u', 'v'], how='left')
+speed_PHF_and_SCARICA.drop_duplicates(['u', 'v'], inplace=True)
+
+## make unique list of "u" and "v"
+all_uv = list(speed_PHF_and_SCARICA.u.unique())  + list(speed_PHF_and_SCARICA.v.unique())
+all_uv = list(dict.fromkeys(all_uv))
+
+## delete edges with 'length' larger than 15 meters
+## check if each node is in the u or v column
+## we only delete isolate edges and not interconnected edges
+for idx, node in enumerate(all_uv):
+    # print(idx, node)
+    U = pd.Series(list(speed_PHF_and_SCARICA.u))
+    V = pd.Series(list(speed_PHF_and_SCARICA.v))
+    if not (node in U.tolist()) and (node in V.tolist()):
+        print("\nThis node exists only in one edge==============================")
+        ### find row to delete (with 'length'> 15 meters
+        if (speed_PHF_and_SCARICA[speed_PHF_and_SCARICA.values == node]['length'].iloc[0] <= 28):
+            print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            row_to_delete = speed_PHF_and_SCARICA[speed_PHF_and_SCARICA.values == node].index
+            speed_PHF_and_SCARICA = speed_PHF_and_SCARICA.drop(row_to_delete)
+
+
+## sort by "length"
+speed_PHF_and_SCARICA.sort_values('length', ascending=True, inplace= True)
+## filter out all road shorter than 11 meters
+# speed_PHF_and_SCARICA = speed_PHF_and_SCARICA[speed_PHF_and_SCARICA.length > 15]
+
 ## normalize "congestion index"
 speed_PHF_and_SCARICA["congestion"] = round(((speed_PHF_and_SCARICA["congestion_index"]/max(speed_PHF_and_SCARICA["congestion_index"]))*1) +0, 2)
 
 ## get only congestion index > 0.5
 # speed_PHF_and_SCARICA = speed_PHF_and_SCARICA[speed_PHF_and_SCARICA.congestion_index >= 0.5]
 
-## merge edges for congestion with the road network to get the geometry
-speed_PHF_and_SCARICA = pd.merge(speed_PHF_and_SCARICA, gdf_edges, on=['u', 'v'], how='left')
-speed_PHF_and_SCARICA.drop_duplicates(['u', 'v'], inplace=True)
+
+## make a geodataframe
 speed_PHF_and_SCARICA = gpd.GeoDataFrame(speed_PHF_and_SCARICA)
 
 ## save data
-speed_PHF_and_SCARICA.to_file(filename='congestion_index_Feb_May_Agu_Nov_2019.geojson', driver='GeoJSON')
+# speed_PHF_and_SCARICA.to_file(filename='congestion_index_Feb_May_Agu_Nov_2019.geojson', driver='GeoJSON')
 # speed_PHF_and_SCARICA.plot()
 
 
@@ -280,7 +310,7 @@ style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
     # data to plot
-    speed_PHF_and_SCARICA[['u','v', 'scales', 'congestion', 'geometry']].to_json(),
+    speed_PHF_and_SCARICA[['u','v', 'scales', 'congestion', 'length', 'geometry']].to_json(),
     show=True,
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
@@ -289,11 +319,11 @@ folium.GeoJson(
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'congestion']
+        fields=['u', 'v', 'congestion', 'length']
     ),
 ).add_to(my_map)
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
-my_map.save(path + "congestion_Feb_May_Agu_Nov_2019_Catania_all_vehicles.html")
-
+# my_map.save(path + "congestion_Feb_May_Agu_Nov_2019_Catania_all_vehicles.html")
+my_map.save(path + "congestion_August_2019_Catania_all_vehicles.html")

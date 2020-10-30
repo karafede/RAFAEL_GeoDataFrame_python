@@ -57,16 +57,12 @@ gdf_edges = gpd.GeoDataFrame(gdf_edges)
 gdf_edges.drop_duplicates(['u', 'v'], inplace=True)
 
 
-# connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
-cur_HAIG = conn_HAIG.cursor()
-
 ## get all the acccuracies from DB
 accuracy_2019_all = pd.read_sql_query('''
                SELECT *
                FROM public.accuracy_2019 
-               WHERE accuracy <= 110 
-               AND accuracy >=100''' , conn_HAIG)
+               WHERE accuracy <= 115 
+               AND accuracy >110''' , conn_HAIG)
 
 accuracy_2019_all = accuracy_2019_all.sort_values('accuracy')
 
@@ -92,8 +88,6 @@ for idx, TRIP_ID in enumerate(trip_idx):
                   SELECT u, v, sequenza, "TRIP_ID"
                   FROM public.mapmatching_2019 
                   WHERE "TRIP_ID"::TEXT = '%s' ''' % trip, conn_HAIG)
-
-
     selected_trip = pd.merge(selected_trip, gdf_edges[['u', 'v', 'length']], on=['u', 'v'], how='left')
     selected_trip.drop_duplicates(['u', 'v'], inplace=True)
     ### find the travelled distance of the matched route
