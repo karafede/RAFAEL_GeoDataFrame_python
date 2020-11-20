@@ -358,9 +358,12 @@ accuracy_2019_100_105 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/a
                                 header = T, sep=",")[-1]
 accuracy_2019_105_110 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_105_110_percent.csv",  
                                 header = T, sep=",")[-1]
+accuracy_2019_110_115 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_110_115_percent.csv",  
+                                header = T, sep=",")[-1]
 accuracy_2019_100_105$accuracy <- (accuracy_2019_100_105$accuracy - 10)
 accuracy_2019_105_110$accuracy <- (accuracy_2019_105_110$accuracy - 10)
-accuracy_2019_90_100 <- rbind(accuracy_2019_90_100, accuracy_2019_100_105, accuracy_2019_105_110)
+accuracy_2019_110_115$accuracy <- (accuracy_2019_110_115$accuracy - 10)
+accuracy_2019_90_100 <- rbind(accuracy_2019_90_100, accuracy_2019_100_105, accuracy_2019_105_110, accuracy_2019_110_115)
  
 
 ###############################################################################
@@ -397,25 +400,25 @@ p <- ggplot(accuracy_2019, aes(x = matched_distance)) +
   aes(y=stat(count)/sum(stat(count))) + 
   scale_y_continuous(labels = scales::percent) +
   theme_bw() +
-  theme( strip.text = element_text(size = 13)) +
+  theme( strip.text = element_text(size = 20)) +
   guides(fill=FALSE) +
-  theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=16)) +
-  theme(axis.text.x=element_text(size=16, colour = "black")) +
-  theme(axis.title.x = element_text(face="bold", colour="black", size=16)) +
+  theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=20)) +
+  theme(axis.text.x=element_text(size=20, colour = "black")) +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=20)) +
   xlab("matched distance (meters)") +
   ylab("frequency (%)") +
   # xlim(0,100)+
-  geom_vline(xintercept = 5200, col="blue", lty=2, size=1) +
-  # geom_vline(xintercept = 800, col="blue", lty=2, size=1) +
-  geom_vline(xintercept = 1600, col="blue", lty=2, size=1) +
+  # geom_vline(xintercept = 5200, col="blue", lty=2, size=1) +
+  # geom_vline(xintercept = 700, col="blue", lty=2, size=1) +
+  geom_vline(xintercept = 700, col="blue", lty=2, size=1) +
   geom_vline(xintercept = 2700, col="blue", lty=2, size=1) +
-  geom_text(aes(x = 4000 , y = 0.15 , label = "2.8 km"), size = 4) +
-  geom_text(aes(x = 6300 , y = 0.15 , label = "5 km"), size = 4) +
-  geom_text(aes(x = 1000 , y = 0.15 , label = "1.5 km"), size = 4) +
-  theme(axis.title.y = element_text(face="bold", colour="black", size=16),
-        axis.text.y  = element_text(angle=0, vjust=0.5, size=16, colour="black")) +
+  geom_text(aes(x = 500 , y = 0.15 , label = "700 m"), size = 5) +
+  geom_text(aes(x = 4000 , y = 0.15 , label = "2.7 km"), size = 5) +
+  # geom_text(aes(x = 1000 , y = 0.15 , label = "1.5 km"), size = 4) +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=20),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=20, colour="black")) +
   ggtitle("Matched distance distribution - Catania") +
-  theme(plot.title = element_text(lineheight=.8, face="bold", size = 16))
+  theme(plot.title = element_text(lineheight=.8, face="bold", size = 20))
 p
 
 
