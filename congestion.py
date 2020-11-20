@@ -114,7 +114,7 @@ viasat_data = pd.read_sql_query('''
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                      WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '08'
+                                      /* WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '02'*/
                                       /*AND dataraw.vehtype::bigint = 2*/
                                       ''', conn_HAIG)
 
@@ -129,7 +129,7 @@ all_data = viasat_data[['u','v', 'timedate']]
 # df_flux = all_data.resample(rule='15Min', on='timedate').size()
 # df_flux = all_data.groupby(['u','v'],sort=False).resample(rule='15Min', on='timedate').size().reset_index().rename(columns={0:'counts'})
 
-### make average for "mean_speed"
+### get "speed"
 speed_uv = viasat_data[['u', 'v', 'timedate', 'speed']]
 speed_uv['hour'] = speed_uv['timedate'].apply(lambda x: x.hour)
 # speed_uv = speed_uv.sort_values(['u', 'v'])
@@ -144,12 +144,11 @@ all_data['hour'] = all_data['timedate'].apply(lambda x: x.hour)
 all_data['date'] = all_data['timedate'].apply(lambda x: x.strftime("%Y-%m-%d"))
 all_data = all_data[['u','v', 'hour', 'date']]
 
-## get the counts for each edge (u,v) pair and for each hour and each day
+## get the counts for each edge (u,v) pair and for each hour (this is a FLUX)
 all_counts_uv = all_data.groupby(['u','v', 'hour', 'date'], sort=False).size().reset_index().rename(columns={0:'FLUX'})
 # get the mean by hour
-# AAA = all_counts_uv.groupby(['u', 'v', 'hour'], sort=False).mean().reset_index().rename(columns={0:'FLUX'})
-all_counts_uv = all_counts_uv.groupby(['u', 'v', 'hour'], sort=False).mean().reset_index()
-# all_counts_uv = all_counts_uv.sort_values(['u', 'v'])
+all_counts_uv = all_counts_uv.groupby(['u', 'v', 'hour'], sort=False).mean().reset_index()  ## FLUX
+# all_counts_uv = all_counts_uv.sort_values(['u', 'v'])¶
 ## check which are the hours with the highest FLUX....
 # all_counts_uv['hour'].hist()
 
@@ -177,7 +176,7 @@ plt.savefig("Peak_Hour_FLUX.png")
 plt.close()
 
 
-fig = plt.hist(max_FLUX_uv['hour'])
+fig = plt.hist(max_FLUX_uv['hour'], bins= 24)   # bins = 24, color = 'gold'
 plt.title('Distribution of Peak Hours')
 plt.xlabel("hour")
 plt.ylabel("Frequency")
@@ -203,13 +202,13 @@ flux_PEAK_HOUR = flux_PEAK_HOUR.rename(columns={'speed': 'speed_PHF'})
 
 fig = plt.hist(flux_PEAK_HOUR['speed_PHF'])
 plt.title('Distribution of speeds @ Peak Hours')
-plt.xlabel("hour")
+plt.xlabel("max flux (vehicles/hour)")
 plt.ylabel("Frequency")
 plt.savefig("speed_at_Peak_Hour.png")
 plt.close()
 
 
-## bet a sottorete by filtering the FLUX (only consider higher fluxes).......
+## get a sottorete by filtering the FLUX (only consider higher fluxes).......
 ## get only fluxes >= 10 vehi/hour
 flux_PEAK_HOUR = flux_PEAK_HOUR[flux_PEAK_HOUR.FLUX >= 10]
 ## check distributiion of SPEEDS
@@ -257,7 +256,7 @@ for idx, node in enumerate(all_uv):
     V = pd.Series(list(speed_PHF_and_SCARICA.v))
     if not (node in U.tolist()) and (node in V.tolist()):
         print("\nThis node exists only in one edge==============================")
-        ### find row to delete (with 'length'> 15 meters
+        ### find row to delete (with 'length'> 28 meters
         if (speed_PHF_and_SCARICA[speed_PHF_and_SCARICA.values == node]['length'].iloc[0] <= 28):
             print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
             row_to_delete = speed_PHF_and_SCARICA[speed_PHF_and_SCARICA.values == node].index
@@ -289,7 +288,7 @@ speed_PHF_and_SCARICA = gpd.GeoDataFrame(speed_PHF_and_SCARICA)
 ## rescale all data by an arbitrary number
 speed_PHF_and_SCARICA["scales"] = round(((speed_PHF_and_SCARICA.congestion_index/max(speed_PHF_and_SCARICA.congestion_index)) * 3) + 0.1 ,1)
 
-# add colors based on 'importance' (vehicles*hours)
+# add colors based on 'congestion_index'
 vmin = min(speed_PHF_and_SCARICA.scales)
 vmax = max(speed_PHF_and_SCARICA.scales)
 # Try to map values to colors in hex
@@ -305,7 +304,7 @@ speed_PHF_and_SCARICA['color'] = speed_PHF_and_SCARICA['scales'].apply(lambda x:
 
 # add colors to map
 my_map = plot_graph_folium_FK(speed_PHF_and_SCARICA, graph_map=None, popup_attribute=None,
-                              zoom=15, fit_bounds=True, edge_width=2, edge_opacity=0.5)
+                              zoom=15, fit_bounds=True, edge_width=4, edge_opacity=0.5)
 style = {'fillColor': '#00000000', 'color': '#00000000'}
 # add 'u' and 'v' as highligths for each edge (in blue)
 folium.GeoJson(
@@ -326,4 +325,6 @@ folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
 # my_map.save(path + "congestion_Feb_May_Agu_Nov_2019_Catania_all_vehicles.html")
-my_map.save(path + "congestion_August_2019_Catania_all_vehicles.html")
+# my_map.save(path + "congestion_August_2019_Catania_all_vehicles.html")
+# my_map.save(path + "congestion_February_2019_Catania_all_vehicles.html")
+my_map.save(path + "congestion_Feb_May_Agu_Nov_2019_Catania_all_vehicles.html")
