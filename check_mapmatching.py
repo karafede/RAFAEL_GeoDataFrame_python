@@ -56,8 +56,6 @@ pd.read_sql_query('''
 SELECT pg_size_pretty( pg_relation_size('public.mapmatching_2019') )''', conn_HAIG)
 
 
-
-
 ################
 ### 2019 #######
 ################
@@ -106,6 +104,8 @@ SELECT pg_size_pretty( pg_relation_size('mapmatching_2019') )''', conn_HAIG)
 
 pd.read_sql_query('''
 SELECT pg_size_pretty( pg_relation_size('mapmatching_2017') )''', conn_HAIG)
+
+
 
 pd.read_sql_query('''
 SELECT pg_size_pretty( pg_relation_size('dataraw') )''', conn_HAIG)

@@ -203,7 +203,6 @@ for idx, row in unique_DATES.iterrows():
 
 ### further operations on routecheck and mapmatching_2019 #####
 
-
 ### create index for 'idterm'
 cur_HAIG.execute("""
 CREATE index routecheck_2019_idterm_idx on public.routecheck_2019(idterm);
