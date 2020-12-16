@@ -32,7 +32,6 @@ import geopandas as gpd
 
 def graph(place_country, distance):  # filter
     # filter out some attributes
-    #### use this to calculate CENTRALITY
     # filter = ('["highway"!~"residential|unclassified|living_street|track|abandoned|path|footway|service|pedestrian|road|'
     #           'raceway|cycleway|steps|construction"]')
     # filter = (
@@ -45,7 +44,6 @@ def graph(place_country, distance):  # filter
     #     '["highway"!~"living_street|abandoned|steps|construction|'
     #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path"]')
 
-    #### use this for MAP-MATCHING
     filter = (
         '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
         'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
@@ -216,6 +214,9 @@ def roads_type_folium(file_graphml, road_type, place_country):
         ave_lat = sum(p[0] for p in gen_poly_unlisted) / len(gen_poly_unlisted)
         ave_lon = sum(p[1] for p in gen_poly_unlisted) / len(gen_poly_unlisted)
     my_map = folium.Map(location=[ave_lat, ave_lon], zoom_start=13, tiles='cartodbpositron') # tiles='cartodbpositron'
+    # folium.TileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    #                  attr="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community").add_to(my_map)
+
     # my_map.save("Catania_motorway.html")
     # my_map.save("Catania_partial.html")
     ##################################################################################
@@ -224,7 +225,7 @@ def roads_type_folium(file_graphml, road_type, place_country):
     for i in range(len(gdf_nodes)):
         folium.CircleMarker(location=[gdf_nodes.y.iloc[i], gdf_nodes.x.iloc[i]],
                             popup=gdf_nodes.osmid.iloc[i],
-                            radius=2,
+                            radius=4,   # 2
                             color="red",
                             fill=True,
                             fill_color="yellow",
@@ -249,8 +250,8 @@ def roads_type_folium(file_graphml, road_type, place_country):
             # roadtype = ' '.join([str(elem) for elem in road_type])
             # roads = re.sub('[/," ",:]', '_', roadtype)
     # my_map.save(name_place_country + "_" + "partial" + ".html")
-    # my_map.save("Catania_partial.html")
-    my_map.save("Fisciano_partial.html")
+    my_map.save("Catania_partial.html")
+    # my_map.save("Fisciano_partial.html")
     return my_map
 
 
