@@ -28,7 +28,13 @@ conn_HAIG <- dbConnect(drv, dbname = "HAIG_Viasat_CT",
                        user = "postgres", password = "superuser")
 
 
+## list all TABLES
 dbListTables(conn_HAIG)
+
+vulnerability =  dbGetQuery(conn_HAIG, "
+                     SELECT *  
+                    FROM \"vulnerability_MONDAY_FEBRUARY_2019\" ")
+
 # check for the public
 # dbExistsTable(conn_HAIG, "idterm_portata")
 ## get fields names of tables in the DB
@@ -47,6 +53,10 @@ idterm_vehtype_portata <- read.csv(paste0("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasa
                                    header = T, sep=",")[-1]
 idterm_vehtype_portata$idterm <- as.factor(idterm_vehtype_portata$idterm)
 idterm_vehtype_portata$vehtype <- as.factor(idterm_vehtype_portata$vehtype)
+
+COUNTS <- idterm_vehtype_portata %>%
+  group_by(vehtype) %>%
+  summarise(counts = length(vehtype))
 
 
 ############################################################################################

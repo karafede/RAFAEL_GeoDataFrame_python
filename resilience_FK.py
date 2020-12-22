@@ -428,6 +428,7 @@ for idx, row in enumerate(MONTHS):
                                           /*limit 10000*/
                                           ''', conn_HAIG, params={MESE})
 
+
     ## get counts ("passaggi") across each EDGE
     all_data = viasat_data[['u', 'v', 'timedate']]
     ### get "speed"

@@ -2,7 +2,7 @@
 ############################
 ######### RUNS #############
 ############################
-
+import os
 from funcs_network_FK import graph
 from funcs_network_FK import cost_assignment
 from funcs_network_FK import roads_type_folium
@@ -10,6 +10,7 @@ from funcs_network_FK import centrality
 # from query_db_viasat import viasat_map_data
 from add_VIASAT_data import viasat_map_data
 import osmnx as ox
+
 
 # input name of City and Country
 place_country = "Catania, Italy"
@@ -61,8 +62,16 @@ Catania.save("partial_OSM.html")
 ### select road type and make a map (to be used as base map for the viasat data)
 # file_graphml = 'Catania__Italy_cost.graphml'
 file_graphml = 'Catania__Italy_60km.graphml'
-# file_graphml = 'Fisciano__Italy.graphml'
+# file_graphml = 'Fisciano__Italy_50km.graphml'
 my_map = roads_type_folium(file_graphml, road_type, place_country)
+
+
+#####################################################################
+##### ---- CENTRALITY ---------- ####################################
+#####################################################################
+
+os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data')
+file_graphml = 'Catania_VIASAT_Italy_for_CENTRALITY_cost.graphml'
 
 # edge centrality (make a map) (bc = betweenness centrality; cc = closeness centrality)
 centrality(file_graphml, place_country, bc=True, cc=False)  # road_type

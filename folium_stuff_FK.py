@@ -16,7 +16,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 from shapely.geometry import LineString
 
-# def make_folium_polyline(edge,             edge_width, edge_opacity, popup_attribute=None)
+# def make_folium_polyline(edge, edge_width, edge_opacity, popup_attribute=None)
 def make_folium_polyline(edge, edge_color, edge_width, edge_opacity, popup_attribute=None):
 
     """
