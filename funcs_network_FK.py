@@ -493,8 +493,8 @@ def roads_type_folium(file_graphml, road_type, place_country):
 def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
     # load grapho
 
-    os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data')
-    file_graphml = 'Catania_VIASAT_Italy_for_CENTRALITY_cost.graphml'
+    # os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data')
+    # file_graphml = 'Catania_VIASAT_Italy_for_CENTRALITY_cost.graphml'
 
     grafo = ox.load_graphml(file_graphml)
     G = ox.load_graphml(file_graphml)
@@ -549,6 +549,10 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
         ## save centrality into a .csv file
         DF_edge_centrality.to_csv("D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\btw_centrality_Catania_AUGUST_VIASAT_cost.csv")  ## only one node..
 
+        ## reload centrality
+        path = 'D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\'
+        DF_edge_centrality = pd.read_csv(path + "btw_centrality_Catania_AUGUST_VIASAT_COST.csv", delimiter=',')
+
         ########################################################
         ##### build the map ####################################
 
@@ -556,6 +560,12 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
         DF_edge_centrality = pd.merge(DF_edge_centrality, gdf_edges, on=['u'], how='left')
         ## remove line with na value
         DF_edge_centrality = DF_edge_centrality[DF_edge_centrality['geometry'].notna()]
+        DF_edge_centrality['v'] = DF_edge_centrality.v.astype('int')
+
+        DF_centrality = DF_edge_centrality[['u', 'v', 'centrality']]
+        DF_centrality.to_csv("D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\btw_centrality_u_v_Catania_AUGUST_VIASAT_cost.csv")  ## only one node..
+
+        DF_edge_centrality = DF_edge_centrality[DF_edge_centrality.centrality > 0]
         DF_edge_centrality = gpd.GeoDataFrame(DF_edge_centrality)
         DF_edge_centrality.drop_duplicates(['u', 'v'], inplace=True)
         # DF_edge_centrality.plot()

@@ -66,6 +66,8 @@ gdf_edges = pd.read_sql_query('''
 gdf_edges['geometry'] = gdf_edges.apply(wkb_tranformation, axis=1)
 gdf_edges.drop(['geom'], axis=1, inplace= True)
 gdf_edges = gpd.GeoDataFrame(gdf_edges)
+AAA = pd.DataFrame(gdf_edges)
+AAA.to_csv('gdf_edges.csv')
 ## eventually....remove duplicates
 gdf_edges.drop_duplicates(['u', 'v'], inplace=True)
 # gdf_edges.plot()
@@ -88,7 +90,6 @@ unique_DATES = pd.read_sql_query(
 # ADD a new field with only date (no time)
 unique_DATES['just_date'] = unique_DATES['dates'].dt.date
 MONTHS = unique_DATES['dates'].dt.month
-
 
 
 # subset database with only one specific date and one specific TRACK_ID)
@@ -124,9 +125,9 @@ viasat_data_pesanti = pd.read_sql_query('''
                           FROM mapmatching_2019
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
-                                      /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                      WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '08' 
-                                      AND dataraw.vehtype::bigint = 2
+                                      /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/ 
+                                      /*WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '08'*/ 
+                                      WHERE dataraw.vehtype::bigint = 2
                                       ''', conn_HAIG)
 
 now2 = datetime.now()
@@ -236,13 +237,13 @@ viasat_data_all = pd.read_sql_query('''
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                       WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '02' 
+                                      /*WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '02'*/ 
                                       /*WHERE dataraw.vehtype::bigint = 2*/
                                       ''', conn_HAIG)
 
 ## 1. get all idterm for all vehicles
 all_idterms = list(viasat_data_all.idterm.unique())
-all_idterms = all_idterms[0:300]
+all_idterms = all_idterms[0:100]
 
 '''
 
@@ -285,7 +286,7 @@ sottorete_speed.plot()
 # del all_data
 # del viasat_data_all
 
-
+'''
 ######################################################################################
 ### get ORIGIN and DESTINATION for each idterm of all vehicles #######################
 ######################################################################################
@@ -321,12 +322,12 @@ for idx, idterm in enumerate(all_idterms):
         all_catania_OD = all_catania_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 ## save data
-# all_catania_OD.to_csv('all_catania_OD_all_vehicles.csv')
+all_catania_OD.to_csv('all_catania_OD_all_vehicles.csv')
 # all_catania_OD.to_csv('all_catania_OD_AUGUST_300_vehicles.csv')
-all_catania_OD.to_csv('all_catania_OD_FEBRUARY_300_vehicles.csv')
+# all_catania_OD.to_csv('all_catania_OD_FEBRUARY_300_vehicles.csv')
 
 
-'''
+
 
 
 
@@ -373,7 +374,9 @@ sottorete_speed = gpd.GeoDataFrame(sottorete_speed)
 ## save data (for all vehicles)
 # sottorete_speed.to_file(filename='sottorete_speed.geojson', driver='GeoJSON')
 # sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles_FEBRUARY.geojson', driver='GeoJSON')
-sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles_AUGUST.geojson', driver='GeoJSON')
+# sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles_AUGUST.geojson', driver='GeoJSON')
+sottorete_speed.to_file(filename='sottorete_speed_counts_all_vehicles.geojson', driver='GeoJSON')
+
 sottorete_speed.plot()
 
 
