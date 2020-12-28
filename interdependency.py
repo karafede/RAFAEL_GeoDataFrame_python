@@ -726,7 +726,7 @@ folium.GeoJson(
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
-my_map.save(path + "counts_TAORMINA_CATANIA_MISTERBI_ACICAS_SS121_24_NOVEMBER_2019.html")
+my_map.save(path + "LOADS_TAORMINA_CATANIA_MISTERBI_ACICAS_SS121_24_NOVEMBER_2019.html")
 
 
 ######################################################################
@@ -1050,7 +1050,7 @@ cb2 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,
                                 ticks=bounds,
                                 spacing='uniform',
                                 orientation='horizontal')
-cb2.set_label('travel_range')
+cb2.set_label('travel time (min)')
 fig.savefig('LEGEND_ISOCHRONES.png')
 
 
