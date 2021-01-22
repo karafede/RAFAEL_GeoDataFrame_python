@@ -33,7 +33,7 @@ dbListTables(conn_HAIG)
 
 vulnerability =  dbGetQuery(conn_HAIG, "
                      SELECT *  
-                    FROM \"vulnerability_WEDNESDAY_FEBRUARY_2019\" ")
+                    FROM \"vulnerability_MORNING_PEAK_FEBRUARY_2019\" ")
 
 # check for the public
 # dbExistsTable(conn_HAIG, "idterm_portata")

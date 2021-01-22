@@ -59,6 +59,7 @@ def wkb_tranformation(line):
 # Create an SQL connection engine to the output DB
 engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
 
+
 ## load EDGES from OSM
 gdf_edges = pd.read_sql_query('''
                             SELECT u,v, length, geom

@@ -163,7 +163,7 @@ all_idterms_SS121B = list(df_SS121B.idterm.unique())
 del df
 
 ###############################################################################
-## get MAP-MATCHING data from DB for a specific day of the month (2019 ########
+## get MAP-MATCHING data from DB for a specific day of the month (2019) ########
 ###############################################################################
 
 from datetime import datetime

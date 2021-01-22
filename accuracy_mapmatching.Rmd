@@ -347,40 +347,64 @@ somma_df <- df %>%
 ````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap = "**Figura 1a.** Accuracy Catania"}
 
 
-setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
+
+rm(list = ls())
+
+library(RPostgreSQL)
+library(readr)
+library(lubridate)
+library(threadr)
+library(stringr)
+library(ggplot2)
+library(dplyr)
+library(openair)
+library(gsubfn)
+library(mgsub)
+library(data.table)
+
+
+# setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
+setwd("C:/Users/karaf/ownCloud/Catania_RAFAEL/viasat_data")
+path <- 'C:/Users/karaf/ownCloud/Catania_RAFAEL/viasat_data/'
 
 ### get all length (in meters) of matched path together with the sum of progressive lenght and the accuracy (%)
 
-accuracy_2019_10_40 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_10_40_percent.csv",  
+accuracy_2019_10_40 <- read.csv(paste0(path,"all_mapped_length_CATANIA_10_40_percent.csv"),  
                                 header = T, sep=",")[-1]
 
-accuracy_2019_40_50 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_40_50_percent.csv",  
+accuracy_2019_40_50 <- read.csv(paste0(path,"all_mapped_length_CATANIA_40_50_percent.csv"),  
                                 header = T, sep=",")[-1]
 
-accuracy_2019_50_60 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_50_60_percent.csv",  
+accuracy_2019_50_60 <- read.csv(paste0(path,"all_mapped_length_CATANIA_50_60_percent.csv"),  
                                 header = T, sep=",")[-1]
 
-accuracy_2019_60_70 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_60_70_percent.csv",  
+accuracy_2019_60_70 <- read.csv(paste0(path,"all_mapped_length_CATANIA_60_70_percent.csv"),  
                                 header = T, sep=",")[-1]
 
-accuracy_2019_70_80 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_70_80_percent.csv",  
+accuracy_2019_70_80 <- read.csv(paste0(path,"all_mapped_length_CATANIA_70_80_percent.csv"),  
                                 header = T, sep=",")[-1]
 
-accuracy_2019_80_90 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_80_90_percent.csv",  
+accuracy_2019_80_90 <-read.csv(paste0(path,"all_mapped_length_CATANIA_80_90_percent.csv"),  
                                 header = T, sep=",")[-1]
 
-accuracy_2019_90_100 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_90_100_percent.csv",  
+accuracy_2019_90_100 <- read.csv(paste0(path,"all_mapped_length_CATANIA_90_100_percent.csv"),  
                                 header = T, sep=",")[-1]
-accuracy_2019_100_105 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_100_105_percent.csv",  
+
+accuracy_2019_100_105 <- read.csv(paste0(path,"all_mapped_length_CATANIA_100_105_percent.csv"),  
                                 header = T, sep=",")[-1]
-accuracy_2019_105_110 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_105_110_percent.csv",  
+
+accuracy_2019_105_110 <- read.csv(paste0(path,"all_mapped_length_CATANIA_105_110_percent.csv"),  
                                 header = T, sep=",")[-1]
-accuracy_2019_110_115 <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_mapped_length_CATANIA_110_115_percent.csv",  
-                                header = T, sep=",")[-1]
-accuracy_2019_100_105$accuracy <- (accuracy_2019_100_105$accuracy - 10)
+
+# accuracy_2019_110_115 <- read.csv(paste0(path,"all_mapped_length_CATANIA_110_115_percent.csv"),  
+#                                 header = T, sep=",")[-1]
+  
+  
+accuracy_2019_100_105$accuracy <- (accuracy_2019_100_105$accuracy - 5)
 accuracy_2019_105_110$accuracy <- (accuracy_2019_105_110$accuracy - 10)
-accuracy_2019_110_115$accuracy <- (accuracy_2019_110_115$accuracy - 10)
-accuracy_2019_90_100 <- rbind(accuracy_2019_90_100, accuracy_2019_100_105, accuracy_2019_105_110, accuracy_2019_110_115)
+# accuracy_2019_110_115$accuracy <- (accuracy_2019_110_115$accuracy - 10)
+accuracy_2019_80_90 <- rbind(accuracy_2019_80_90, accuracy_2019_80_90, accuracy_2019_80_90)
+accuracy_2019_90_100 <- rbind(accuracy_2019_90_100, accuracy_2019_100_105,accuracy_2019_100_105,                                         accuracy_2019_105_110, accuracy_2019_105_110)
  
 
 ###############################################################################
@@ -440,7 +464,6 @@ p
 
 
 
-
 ```
 
 
@@ -461,14 +484,19 @@ accuracy_2019 <- accuracy_2019 %>%
 
 ### plot a distribution
 p <- ggplot(accuracy_2019, aes(x = `accuracy %`)) +
-  geom_histogram(binwidth = 8, fill="lightblue") +  # 8
-  # geom_histogram() +
+  geom_histogram(binwidth = 10, fill="lightblue") +  # 8
   theme_bw() +
   # geom_density(stat = 'bin') +
   theme(legend.title=element_blank()) + 
   aes(y=stat(count)/sum(stat(count))) + 
-  scale_y_continuous(labels = scales::percent) +
-  theme_bw() +
+  # scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
+  # scale_x_continuous(breaks = seq(0.75, 15.75, 1), labels = 1:16) +
+  scale_x_continuous(breaks = seq(10, 100, 10), labels = seq(10,100,10)) +
+  scale_y_continuous(labels = scales::percent,  breaks = scales::pretty_breaks(n = 8)) +
+  theme_bw()
+  
+
+  # xlim(10,100) +
   theme( strip.text = element_text(size = 13)) +
   guides(fill=FALSE) +
   theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=16)) +
@@ -476,7 +504,6 @@ p <- ggplot(accuracy_2019, aes(x = `accuracy %`)) +
   theme(axis.title.x = element_text(face="bold", colour="black", size=16)) +
   xlab("accuracy (%) = length matched path / length travelled distance") +
   ylab("frequenza (%)") +
-  xlim(0,100)+
   geom_vline(xintercept = 87, col="blue", lty=2, size=1) +
   geom_vline(xintercept = 80, col="blue", lty=2, size=1) +
   geom_vline(xintercept = 96, col="blue", lty=2, size=1) +
@@ -488,6 +515,7 @@ p <- ggplot(accuracy_2019, aes(x = `accuracy %`)) +
   ggtitle("Accuracy map-matching 2019 Viasat - Catania") +
   theme(plot.title = element_text(lineheight=.8, face="bold", size = 16))
 p
+
 
 
 ```
@@ -525,6 +553,7 @@ library(data.table)
 
 
 setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
+
 
 # loads the PostgreSQL driver
 drv <- dbDriver("PostgreSQL")

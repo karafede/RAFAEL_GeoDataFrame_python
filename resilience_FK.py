@@ -408,7 +408,7 @@ my_map.save(path + "RESILIENCE_CATANIA.Feb_May_Aug_Nov_2019.html")
 ########################################################################################
 ########################################################################################
 ########################################################################################
-###### loop to generate MONTHLY maps #####################################################
+###### loop to generate MONTHLY maps ###################################################
 
 for idx, row in enumerate(MONTHS):
     MESE = str(row)
@@ -441,11 +441,12 @@ for idx, row in enumerate(MONTHS):
 
     del viasat_data
 
+
     ## get a new field for the HOUR
     all_data['hour'] = all_data['timedate'].apply(lambda x: x.hour)
     # date (day)
     all_data['date'] = all_data['timedate'].apply(lambda x: x.strftime("%Y-%m-%d"))
-    all_data = all_data[['u', 'v', 'hour', 'date']]
+    # all_data = all_data[['u', 'v', 'hour', 'date']]
 
     ## get the counts for each edge (u,v) pair and for each hour (this is a FLUX)
     all_counts_uv = all_data.groupby(['u', 'v', 'hour', 'date'], sort=False).size().reset_index().rename(
@@ -652,3 +653,211 @@ for idx, row in enumerate(MONTHS):
     plt.savefig(path + 'resilience_' +
                 MONTH_name + '_2019' + '_Catania_all_vehicles.png')
     plt.close()
+
+
+
+########################################################################################
+########################################################################################
+########################################################################################
+########################################################################################
+###### loop to generate DAILY data #### ################################################
+
+for idx, row in enumerate(MONTHS):
+    MESE = str(row)
+    print(MESE)
+    #################################################################################
+    ### loop over the months  ########################################################
+    viasat_data = pd.read_sql_query('''
+                           SELECT  
+                              mapmatching_2019.u, mapmatching_2019.v,
+                                   mapmatching_2019.timedate, 
+                                   mapmatching_2019.idtrace,
+                                   dataraw.speed
+                              FROM mapmatching_2019
+                              LEFT JOIN dataraw 
+                                          ON mapmatching_2019.idtrace = dataraw.id                
+                                          WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = %s
+                                          /*limit 10000*/
+                                          ''', conn_HAIG, params={MESE})
+
+
+    ## get counts ("passaggi") across each EDGE
+    all_data = viasat_data[['u', 'v', 'timedate']]
+    ### get "speed"
+    speed_uv = viasat_data[['u', 'v', 'timedate', 'speed']]
+    speed_uv['hour'] = speed_uv['timedate'].apply(lambda x: x.hour)
+
+    ## get day of the week
+    all_data['day_of_week'] = all_data['timedate'].dt.day_name()
+    speed_uv['day_of_week'] = speed_uv['timedate'].dt.day_name()
+
+    ### get AVERAGE of travelled travelled "speed" for each edge and each hour
+    # speed_uv = (speed_uv.groupby(['u', 'v', 'hour']).mean()).reset_index()
+    speed_uv = (speed_uv.groupby(['u', 'v', 'hour', 'day_of_week']).mean()).reset_index()
+    speed_uv['speed'] = speed_uv.speed.astype('int')
+
+    del viasat_data
+
+
+    ## get a new field for the HOUR
+    all_data['hour'] = all_data['timedate'].apply(lambda x: x.hour)
+    # date (day)
+    all_data['date'] = all_data['timedate'].apply(lambda x: x.strftime("%Y-%m-%d"))
+    # all_data = all_data[['u', 'v', 'hour', 'date']]
+
+    ## get the counts for each edge (u,v) pair and for each hour (this is a FLUX)
+    all_counts_uv = all_data.groupby(['u', 'v', 'hour', 'date', 'day_of_week'], sort=False).size().reset_index().rename(
+        columns={0: 'FLUX'})
+    # get the mean by hour
+    all_counts_uv = all_counts_uv.groupby(['u', 'v', 'hour', 'day_of_week'], sort=False).mean().reset_index()  ## FLUX
+
+    all_counts_uv_copy = all_counts_uv
+    speed_uv_copy = speed_uv
+
+
+    ## get unique list of day
+    DAYS = list(all_counts_uv_copy.day_of_week.unique())
+    for idx, day in enumerate(DAYS):
+        DAY = str(day)
+        print(DAY)
+        ## filter by day
+        all_counts_uv = all_counts_uv_copy[all_counts_uv_copy.day_of_week == DAY]
+        speed_uv = speed_uv_copy[all_counts_uv_copy.day_of_week == DAY]
+
+        ## get hour with maximum FLUX for each edge (u.v) pair (PEAK HOUR, ORA di PUNTA)
+        ### https://stackoverflow.com/questions/15705630/get-the-rows-which-have-the-max-count-in-groups-using-groupby
+        max_FLUX_uv = all_counts_uv.sort_values('FLUX', ascending=False).drop_duplicates(['u', 'v'])
+        max_FLUX_uv = max_FLUX_uv.rename(columns={'FLUX': 'max_FLUX'})
+
+        ## to find the FLUX at "rete carica" consider the lower flux
+        min_FLUX_uv = all_counts_uv.sort_values('FLUX', ascending=True).drop_duplicates(['u', 'v'])
+        min_FLUX_uv = min_FLUX_uv.rename(columns={'FLUX': 'min_FLUX'})
+        ## calculate the VOLATILIY of FLUX
+        min_max_FLUX_uv = pd.merge(max_FLUX_uv[['u', 'v', 'max_FLUX']], min_FLUX_uv[['u', 'v', 'min_FLUX']], on=['u', 'v'],
+                                   how='left')
+        min_max_FLUX_uv['volatility'] = (min_max_FLUX_uv.max_FLUX - min_max_FLUX_uv.min_FLUX) / 2
+
+        ## get speed at the PEAK HOUR (merge "speed_uv" with "max_FLUX_uv")
+        flux_PEAK_HOUR = pd.merge(max_FLUX_uv, speed_uv, on=['u', 'v', 'hour'], how='left')
+        flux_PEAK_HOUR = flux_PEAK_HOUR.rename(columns={'speed': 'speed_PHF'})
+        ## get DENSITY at PEAK HOUR
+        ## density  ("flux/speed")  number of vehicles/km
+        flux_PEAK_HOUR = flux_PEAK_HOUR[flux_PEAK_HOUR.speed_PHF > 0]
+        flux_PEAK_HOUR['PHF_density'] = flux_PEAK_HOUR.max_FLUX / flux_PEAK_HOUR.speed_PHF
+
+        ## get speed at RETE SCARICA (merge "speed_uv" with "min_FLUX_uv")
+        flux_RETE_SCARICA = pd.merge(min_FLUX_uv, speed_uv, on=['u', 'v', 'hour'], how='left')
+        flux_RETE_SCARICA = flux_RETE_SCARICA.rename(columns={'speed': 'speed_RETE_SCARICA'})
+
+        ## merge FLUX and speed by 'u','v'' and 'hour' (get a AVERAGE of the FLUX)
+        all_counts_uv = pd.merge(all_counts_uv, speed_uv, on=['u', 'v', 'hour'], how='left')
+        all_counts_uv = all_counts_uv[all_counts_uv.speed > 0]
+        ## conpute DENSITY  ("flux/speed")  number of vehicles/km (it is an AVERAGE value)
+        all_counts_uv['density'] = all_counts_uv.FLUX / all_counts_uv.speed
+
+        del speed_uv
+
+        ## get a sottorete by filtering the FLUX (only consider higher fluxes).......
+        ## get only fluxes >= 10 vehi/hour
+        all_counts_uv = all_counts_uv[all_counts_uv.FLUX >= 10]
+
+        #### --------------------------------------------------------------------- ######
+        ### for each u,v pair make hourly averages and get the CAPACITY DROP (CD)  ######
+        ## make unique list of "u"
+
+        all_u = list(all_counts_uv.u.unique())
+        U = pd.Series(list(all_counts_uv.u))
+
+        rows_CD = pd.DataFrame([])
+        for idx, node in enumerate(all_u):
+            print(idx, node)
+            if (node in U.tolist()):
+                slected_counts_uv = all_counts_uv[all_counts_uv.u == node]
+                # slected_counts_uv = slected_counts_uv.groupby(['hour']).mean().reset_index()
+                if (len(slected_counts_uv) > 1):
+                    # slected_counts_uv.plot.scatter(x='density', y='FLUX')
+                    ## get the density at maximum FLUX and the one just after....for the CAPACITY DROP
+                    counts_CD = slected_counts_uv.sort_values('FLUX', ascending=False)[0:2]
+                    # if (counts_CD.density.iloc[0] < counts_CD.density.iloc[1]):
+                    print("=== CAPACITY DROP OK OK OK =======")
+                    slected_counts_uv['cap_drop'] = ((counts_CD.FLUX.iloc[0] - counts_CD.FLUX.iloc[1]))
+                    rows_CD = rows_CD.append(slected_counts_uv)
+
+        ####################################################################################################################
+
+        del all_counts_uv
+
+        ## build a dataframe with all variables to use for the calculation of the RESILIENCE
+        RS_uv = pd.merge(rows_CD, min_max_FLUX_uv, on=['u', 'v'], how='left')
+        RS_uv.dropna(inplace=True)
+        RS_uv = pd.merge(RS_uv, flux_PEAK_HOUR[['u', 'v', 'speed_PHF', 'PHF_density']], on=['u', 'v'], how='left')
+        RS_uv = pd.merge(RS_uv, flux_RETE_SCARICA[['u', 'v']], on=['u', 'v'], how='left')
+        RS_uv.dropna(inplace=True)
+
+        del flux_RETE_SCARICA
+        del flux_PEAK_HOUR
+        del rows_CD
+
+        ### group by edge...and make an average of all other variables (over all the HOURS)
+        RS_uv = RS_uv[['u', 'v', 'FLUX', 'volatility', 'speed', 'max_FLUX', 'density',
+                       'speed_PHF', 'cap_drop', 'PHF_density']].groupby(['u', 'v']).mean().reset_index()
+
+        ##### --------------- ####
+        ## compute RESISTANCE ####
+        RS_uv['RESISTANCE'] = ((RS_uv.FLUX + RS_uv.volatility) / RS_uv.speed) / (
+                    (RS_uv.max_FLUX + RS_uv.volatility) / RS_uv.speed_PHF)
+        # RS_uv = RS_uv[RS_uv.max_FLUX != RS_uv.cap_drop]
+        RS_uv = RS_uv[RS_uv.max_FLUX > RS_uv.cap_drop]
+
+        ### make consecutive edges...
+        lista_uv = list(RS_uv[['u', 'v']].itertuples(index=False, name=None))
+        output = consec_sort(lista_uv)
+        consecutive_edges = pd.DataFrame(output)
+        consecutive_edges.columns = ['u', 'v']
+        RS_uv = pd.merge(consecutive_edges, RS_uv, on=['u', 'v'], how='left')
+        RS_uv = RS_uv.drop_duplicates(['u', 'v'])
+        ## compute "FLUX_in in"
+        RS_uv['FLUX_in'] = RS_uv.FLUX.shift()
+        ## make column of "FLUX_out"
+        RS_uv['FLUX_out'] = RS_uv['FLUX']
+        ## remove rows with NA values
+        RS_uv.dropna(subset=['FLUX_out'], inplace=True)
+        RS_uv.dropna(subset=['FLUX_in'], inplace=True)
+
+        ##### --------------- ####
+        ## compute RECOVERY ######
+        RS_uv['RECOVERY'] = ((RS_uv.FLUX + (RS_uv.FLUX_in - RS_uv.FLUX_out)) / RS_uv.speed) / (
+                    (RS_uv.max_FLUX - RS_uv.cap_drop) / RS_uv.speed_PHF)
+
+        ## compute RESILIENCE INDEX
+        LPIR = pd.DataFrame([])
+        for i in range(len(RS_uv)):
+            print(i)
+            if (RS_uv.density.iloc[i] <= RS_uv.PHF_density.iloc[i]):
+                delta = 1
+            elif (RS_uv.density.iloc[i] > RS_uv.PHF_density.iloc[i]):
+                delta = 0
+            row = RS_uv.iloc[[i]]
+            print('=== delta ===:', delta)
+            row['resilience'] = row.RESISTANCE * delta + row.RECOVERY * (1 - delta)
+            LPIR = LPIR.append(row)
+
+        del RS_uv
+
+        LPIR = LPIR.sort_values('resilience', ascending=False)
+        LPIR_RESILIENT = LPIR[LPIR.resilience <= 1]
+        ### make the inverse...for the colormap...
+        LPIR_RESILIENT.resilience = 1 - LPIR_RESILIENT.resilience
+        LPIR_not_RESILIENT = LPIR[LPIR.resilience > 1]
+
+        ## merge edges for congestion with the road network to get the geometry
+        LPIR_RESILIENT = pd.merge(LPIR_RESILIENT, gdf_edges, on=['u', 'v'], how='left')
+        LPIR_RESILIENT.drop_duplicates(['u', 'v'], inplace=True)
+
+        ## save to .csv file
+        import calendar
+        MONTH_name = calendar.month_name[int(MESE)]
+        path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/vulnerability_by_days/'
+        LPIR_RESILIENT.to_csv(path + 'DF_RESILIENCE_' + DAY + '_' +
+                                     MONTH_name + '_2019' + '_Catania_all_vehicles.csv')
+

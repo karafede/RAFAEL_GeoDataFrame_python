@@ -565,7 +565,6 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
         DF_centrality = DF_edge_centrality[['u', 'v', 'centrality']]
         DF_centrality.to_csv("D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\btw_centrality_u_v_Catania_AUGUST_VIASAT_cost.csv")  ## only one node..
 
-        DF_edge_centrality = DF_edge_centrality[DF_edge_centrality.centrality > 0]
         DF_edge_centrality = gpd.GeoDataFrame(DF_edge_centrality)
         DF_edge_centrality.drop_duplicates(['u', 'v'], inplace=True)
         # DF_edge_centrality.plot()
@@ -583,6 +582,7 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
 
     ## Normalize to 1
     DF_edge_centrality["centrality"] = round(DF_edge_centrality["scales"] / max(DF_edge_centrality["scales"]), 1)
+    DF_edge_centrality = DF_edge_centrality[DF_edge_centrality.centrality > 0]
 
     ################################################################################
     # create basemap CATANIA
