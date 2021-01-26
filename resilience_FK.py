@@ -857,6 +857,8 @@ for idx, row in enumerate(MONTHS):
         ## save to .csv file
         import calendar
         MONTH_name = calendar.month_name[int(MESE)]
+        LPIR_RESILIENT['month'] = MONTH_name
+        LPIR_RESILIENT['day'] = DAY
         path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/vulnerability_by_days/'
         LPIR_RESILIENT.to_csv(path + 'DF_RESILIENCE_' + DAY + '_' +
                                      MONTH_name + '_2019' + '_Catania_all_vehicles.csv')

@@ -496,6 +496,8 @@ for idx, row in enumerate(MONTHS):
         ## save to .csv file
         import calendar
         MONTH_name = calendar.month_name[int(MESE)]
+        speed_PHF_and_SCARICA['month'] = MONTH_name
+        speed_PHF_and_SCARICA['day'] = DAY
         path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/vulnerability_by_days/'
         speed_PHF_and_SCARICA.to_csv(path + 'DF_congestion_' + DAY + '_' +
                     MONTH_name + '_2019' + '_Catania_all_vehicles.csv')
