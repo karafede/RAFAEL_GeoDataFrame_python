@@ -394,7 +394,8 @@ Catania_Viadotto_Sordo_OD = pd.DataFrame([])
 # viadotto_sordo = [partial_CATANIA_bis, partial_SIRACUSA_bis]
 # viadotto_sordo = pd.concat(viadotto_sordo)
 
-for idx_a, idtrajectory in enumerate(partial_CATANIA_bis.idtrajectory):
+all_trips = list(partial_CATANIA_bis.idtrajectory.unique())
+for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
     ## filter data by idterm and by idtrajectory (trip)
@@ -460,7 +461,8 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
 ### initialize an empty dataframe
 Siracusa_Viadotto_Sordo_OD = pd.DataFrame([])
 
-for idx_a, idtrajectory in enumerate(partial_SIRACUSA_bis.idtrajectory):
+all_trips = list(partial_SIRACUSA_bis.idtrajectory.unique())
+for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
     ## filter data by idterm and by idtrajectory (trip)
@@ -641,8 +643,9 @@ partials = [partial_CATANIA_bis,
              partial_SIRACUSA_bis]
 partials = pd.concat(partials)
 
+all_trips = list(partials.idtrajectory.unique())
 ## nly loop over the idtrajectories crossing the Viadotto Sordo
-for idx_a, idtrajectory in enumerate(partials.idtrajectory):
+for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
     ## filter data by idterm and by idtrajectory (trip)
@@ -753,8 +756,9 @@ partials = [partial_CATANIA_bis,
              partial_SIRACUSA_bis]
 partials = pd.concat(partials)
 
+all_trips = list(partials.idtrajectory.unique())
 ## nly loop over the idtrajectories crossing the Viadotto Sordo
-for idx_a, idtrajectory in enumerate(partials.idtrajectory):
+for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
     ## filter data by idterm and by idtrajectory (trip)
