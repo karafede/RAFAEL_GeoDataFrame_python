@@ -73,7 +73,7 @@ static_data.to_sql("obu", con=connection, schema="public", index=False)
 ##################################################
 
 ### upload Viasat data for ROMA 2019
-viasat_filenames = ['VST_ENEA_ROMA_20191209.csv']
+viasat_filenames = ['VST_ENEA_RM.csv']
 
 ## erase existing table
 # cur_HAIG.execute("DROP TABLE IF EXISTS dataraw CASCADE")
@@ -93,7 +93,6 @@ for csv_file in viasat_filenames:
     # for row in reader:
     #    print(row)
 
-
     slice = 100000  # slice of data to be insert into the DB during the loop
     ## calculate the neccessary number of iteration to carry out in order to upload all data into the DB
     iter = int(round(lines/slice, ndigits=0)) +1
@@ -104,18 +103,18 @@ for csv_file in viasat_filenames:
             # csv_file = viasat_filenames[0]
             # df = pd.read_csv(csv_file, header=None, delimiter=',' ,nrows=slice)
             if i == 0:
-                df = pd.read_csv(csv_file, header=None, delimiter=';', skiprows=1, nrows=slice)
+                df = pd.read_csv(csv_file, header=None, delimiter=',', skiprows=0, nrows=slice)
                 df.columns = ['idrequest', 'idterm', 'timedate', 'latitude', 'longitude',
                               'speed', 'direction', 'grade', 'panel', 'event', 'vehtype',
                               'progressive']
-                df['timedate'] = df['timedate'].map(lambda t: t[:-3])
+                # df['timedate'] = df['timedate'].map(lambda t: t[:-3])
                 # df['id'] = pd.Series(range(i * slice, i * slice + slice))
                 df['timedate'] = df['timedate'].astype('datetime64[ns]')
                 ## upload into the DB
                 df.to_sql("dataraw", con=connection, schema="public",
                           if_exists='append', index=False)
             else:
-                df = pd.read_csv(csv_file, header=None, delimiter=';', skiprows=i * slice, nrows=slice)
+                df = pd.read_csv(csv_file, header=None, delimiter=',', skiprows=i * slice, nrows=slice)
                 # df = pd.read_csv(csv_file, header=None ,delimiter=';', skiprows=i*slice ,nrows=slice, encoding='utf-16')
                 ## define colum names
                 df.columns = ['idrequest', 'idterm', 'timedate', 'latitude', 'longitude',
@@ -293,7 +292,7 @@ viasat_data['timedate'] = viasat_data['timedate'].apply(lambda t: t.replace(seco
 
 viasat_data['date'] = viasat_data['timedate'].apply(lambda x: x.strftime("%Y-%m-%d"))
 # sort dte from old to most recent
-# viasat_data = viasat_data.sort_values('timedate')
+viasat_data = viasat_data.sort_values('timedate')
 # viasat_data.drop_duplicates(['date'], inplace=True)
 viasat_data.to_csv('D:/ENEA_CAS_WORK/ROMA_2019/viasat_data_4080125_NOT_ordered.csv')
 
