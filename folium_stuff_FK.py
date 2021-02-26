@@ -237,12 +237,14 @@ def plot_graph_folium_FK(gdf_edges, graph_map=None, popup_attribute=None,
     # create gdf of the graph edges
     # gdf_edges = graph_to_gdfs(G, nodes=False, fill_edge_geometry=True)
 
-    # get graph centroid
+    ### get graph centroid
     x, y = gdf_edges.unary_union.centroid.xy
     graph_centroid = (y[0], x[0])
 
     # LON_centr = gdf_edges.iloc[0].geometry.centroid.x
     # LAT_centr = gdf_edges.iloc[0].geometry.centroid.y
+    # LAT_centr = 37.510284  ## Catania
+    # LON_centr = 15.092042  ## Catania
     # graph_centroid = (LAT_centr, LON_centr)
 
 

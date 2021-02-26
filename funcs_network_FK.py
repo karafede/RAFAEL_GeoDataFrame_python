@@ -29,17 +29,6 @@ from networkx.utils import py_random_state
 from networkx.utils.decorators import not_implemented_for
 
 
-'''
-G=nx.Graph()
-G.add_edge('a','b',cost=0.1)
-G.add_edge('b','c',cost=1.5)
-G.add_edge('a','c',cost=1.0)
-G.add_edge('c','d',cost=22)
-bet1=nx.betweenness_centrality(G, weight='cost', endpoints=False)
-bet2=nx.betweenness_centrality(G, weight=None, endpoints=False)
-print(bet1, bet2)
-print(bet1, bet2)
-'''
 
 def _single_source_shortest_path_basic(G, s):
     S = []
@@ -550,8 +539,8 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
         DF_edge_centrality.to_csv("D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\btw_centrality_Catania_AUGUST_VIASAT_cost.csv")  ## only one node..
 
         ## reload centrality
-        path = 'D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\'
-        DF_edge_centrality = pd.read_csv(path + "btw_centrality_Catania_AUGUST_VIASAT_COST.csv", delimiter=',')
+        # path = 'D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\'
+        # DF_edge_centrality = pd.read_csv(path + "btw_centrality_Catania_AUGUST_VIASAT_COST.csv", delimiter=',')
 
         ########################################################
         ##### build the map ####################################

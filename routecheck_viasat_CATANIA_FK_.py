@@ -274,7 +274,7 @@ def func(arg):
                             VIASAT_TRIP.reset_index(drop=True, inplace=True)
                             # print(VIASAT_TRIP)
                             timeDiff = VIASAT_TRIP.totalseconds.iloc[0] - VIASAT_TRIP.last_totalseconds.iloc[0]
-                            # progr = VIASAT_TRIP.progressive.iloc[0] - VIASAT_TRIP.last_progressive.iloc[0]
+                            progr = VIASAT_TRIP.progressive.iloc[0] - VIASAT_TRIP.last_progressive.iloc[0]
                             for idx_row, row in VIASAT_TRIP.iterrows():
                                 coords_1 = (row.latitude, row.longitude)
                                 coords_2 = (row.last_lat, row.last_lon)
@@ -367,8 +367,8 @@ def func(arg):
                                     s = "".join(s)
                                     VIASAT_TRIP["anomaly"].iloc[idx_row] = s
                                 if (lDist > 0 and VIASAT_TRIP["anomaly"].iloc[idx_row] != "S"):
-                                    if (row.progressive/lDist < 0.9):
-                                    # if (progr / lDist < 0.9):
+                                    # if (row.progressive/lDist < 0.9):
+                                    if (progr / lDist < 0.9):
                                         s = list(VIASAT_TRIP.iloc[idx_row].anomaly)
                                         s[2] = "c"
                                         s = "".join(s)
@@ -379,14 +379,14 @@ def func(arg):
                                         s[3] = "C"
                                         s = "".join(s)
                                         VIASAT_TRIP["anomaly"].iloc[idx_row] = s
-                                if (timeDiff > 0 and 3.6 * 1000 * row.progressive / timeDiff > 250):
-                                # if (timeDiff > 0 and 3.6 * 1000 * progr / timeDiff > 250):
+                                # if (timeDiff > 0 and 3.6 * 1000 * row.progressive / timeDiff > 250):
+                                if (timeDiff > 0 and 3.6 * 1000 * progr / timeDiff > 250):
                                     s = list(VIASAT_TRIP.iloc[idx_row].anomaly)
                                     s[5] = "V"
                                     s = "".join(s)
                                     VIASAT_TRIP["anomaly"].iloc[idx_row] = s
-                                if (row.panel !=1 and row.progressive > 10000):
-                                # if (row.panel != 1 and progr > 10000):
+                                # if (row.panel !=1 and row.progressive > 10000):
+                                if (row.panel != 1 and progr > 10000):
                                     s = list(VIASAT_TRIP.iloc[idx_row].anomaly)
                                     s[0] = "S"
                                     s = "".join(s)
@@ -400,8 +400,8 @@ def func(arg):
                                     s[0] = "E"
                                     s = "".join(s)
                                     VIASAT_TRIP.at[len(VIASAT_TRIP) - 1, "anomaly"] = s
-                                elif (row.panel != 0 and row.progressive <= 0):
-                                # elif (row.panel != 0 and progr <= 0):
+                                # elif (row.panel != 0 and row.progressive <= 0):
+                                elif (row.panel != 0 and progr <= 0):
                                     s = list(VIASAT_TRIP.iloc[idx_row].anomaly)
                                     s[6] = "d"
                                     s = "".join(s)

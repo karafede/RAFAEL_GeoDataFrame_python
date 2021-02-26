@@ -110,6 +110,10 @@ for idx, row in unique_DATES.iterrows():
 ## (312617273, 6556214429) --> Catania
 ## (518162385, 6532608322) --> Siracusa
 
+## Viadotto San Paolo
+## "Viadotto San Paolo" u,v --> (841721621, 6758675255) --> Catania
+## "Viadotto San Paoo" u,v --> (4096452579, 6758779932) --> Acireale
+
 
 from datetime import datetime
 now1 = datetime.now()
@@ -120,8 +124,8 @@ df =  pd.read_sql_query('''
                             u, v,
                             timedate, mean_speed, idtrace, sequenza
                             FROM mapmatching_2019
-                           WHERE (u, v) in (VALUES (312617273, 6556214429),
-                           (518162385, 6532608322))
+                           WHERE (u, v) in (VALUES (841721621, 6758675255),
+                           (4096452579, 6758779932))
                                  /*LIMIT 10000 */)
                              SELECT path.idterm, path.u, path.v, path.timedate,
                                     path.mean_speed, path.sequenza,
@@ -137,15 +141,15 @@ now2 = datetime.now()
 print(now2 - now1)
 
 ## get all the IDTERM  vehicles passing through the TANGENZIALE OVEST CATANIA
-df_CATANIA = df[(df['u'] == 312617273) & (df['v'] == 6556214429) ]   ## towards CATANIA
-df_SIRACUSA = df[(df['u'] == 518162385) & (df['v'] == 6532608322) ]    ## towards SIRACUSA
+df_CATANIA = df[(df['u'] == 841721621) & (df['v'] == 6758675255) ]   ## towards CATANIA
+df_ACIREALE = df[(df['u'] == 4096452579) & (df['v'] == 6758779932) ]    ## towards ACIREALE
 
 df_CATANIA.drop_duplicates(['idterm'], inplace=True)
-df_SIRACUSA.drop_duplicates(['idterm'], inplace=True)
+df_ACIREALE.drop_duplicates(['idterm'], inplace=True)
 
-# ## make a list of all IDterminals for the direction of Catania and Siracusa
+# ## make a list of all IDterminals for the direction of Catania and Acireale
 all_idterms_CATANIA = list(df_CATANIA.idterm.unique())
-all_idterms_SIRACUSA = list(df_SIRACUSA.idterm.unique())
+all_idterms_ACIREALE = list(df_ACIREALE.idterm.unique())
 
 
 ###############################################################################
@@ -183,31 +187,31 @@ print(now2 - now1)
 
 ### get all data only for the vehicles in the list
 all_CATANIA = viasat_data[viasat_data.idterm.isin(all_idterms_CATANIA)]
-all_SIRACUSA = viasat_data[viasat_data.idterm.isin(all_idterms_SIRACUSA)]
+all_ACIREALE = viasat_data[viasat_data.idterm.isin(all_idterms_ACIREALE)]
 
 
 ## get data with "sequenza" STARTING from the chosen nodes on the TANGENZIALE OVEST CATANIA for each idterm
-pnt_sequenza_CATANIA = all_CATANIA[(all_CATANIA['u'] == 312617273) & (all_CATANIA['v'] == 6556214429) ]
-pnt_sequenza_SIRACUSA = all_SIRACUSA[(all_SIRACUSA['u'] == 518162385) & (all_SIRACUSA['v'] == 6532608322) ]
+pnt_sequenza_CATANIA = all_CATANIA[(all_CATANIA['u'] == 841721621) & (all_CATANIA['v'] == 6758675255) ]
+pnt_sequenza_ACIREALE = all_ACIREALE[(all_ACIREALE['u'] == 4096452579) & (all_ACIREALE['v'] == 6758779932) ]
 
 
 # del viasat_data
 
 ### initialize an empty dataframe
 partial_CATANIA = pd.DataFrame([])
-partial_SIRACUSA = pd.DataFrame([])
+partial_ACIREALE = pd.DataFrame([])
 
 
 ##################
-### SIRACUSA #####
+### ACIREALE #####
 ##################
-for idx, idterm in enumerate(all_idterms_SIRACUSA):
+for idx, idterm in enumerate(all_idterms_ACIREALE):
     print(idterm)
     idterm = int(idterm)
-    ### get starting "sequenza" on the EDGE of Viadotto Sordo
-    sequenza = pnt_sequenza_SIRACUSA[pnt_sequenza_SIRACUSA.idterm == idterm]['sequenza'].iloc[0]
-    sub = all_SIRACUSA[(all_SIRACUSA.idterm == idterm) & (all_SIRACUSA.sequenza >= sequenza)]
-    partial_SIRACUSA = partial_SIRACUSA.append(sub)
+    ### get starting "sequenza" on the EDGE of Viadotto San Paolo
+    sequenza = pnt_sequenza_ACIREALE[pnt_sequenza_ACIREALE.idterm == idterm]['sequenza'].iloc[0]
+    sub = all_ACIREALE[(all_ACIREALE.idterm == idterm) & (all_ACIREALE.sequenza >= sequenza)]
+    partial_ACIREALE = partial_ACIREALE.append(sub)
 
 
 
@@ -217,7 +221,7 @@ for idx, idterm in enumerate(all_idterms_SIRACUSA):
 for idx, idterm in enumerate(all_idterms_CATANIA):
     print(idterm)
     idterm = int(idterm)
-    # get starting "sequenza" on the EDGE of Viadotto Sordo
+    # get starting "sequenza" on the EDGE of Viadotto San Paolo
     sequenza = pnt_sequenza_CATANIA[pnt_sequenza_CATANIA.idterm == idterm]['sequenza'].iloc[0]
     sub = all_CATANIA[(all_CATANIA.idterm == idterm) & (all_CATANIA.sequenza >= sequenza)]
     partial_CATANIA = partial_CATANIA.append(sub)
@@ -227,15 +231,15 @@ for idx, idterm in enumerate(all_idterms_CATANIA):
 ### further filtering with idtrajectory (by trip) ##
 ####################################################
 
-partial_SIRACUSA_bis = pd.DataFrame([])
+partial_ACIREALE_bis = pd.DataFrame([])
 
-for idx, idterm in enumerate(all_idterms_SIRACUSA):
+for idx, idterm in enumerate(all_idterms_ACIREALE):
     print(idterm)
     idterm = int(idterm)
     # get starting "idtrajectory"
-    idtrajectory = pnt_sequenza_SIRACUSA[pnt_sequenza_SIRACUSA.idterm == idterm]['idtrajectory'].iloc[0]
-    sub = partial_SIRACUSA[(partial_SIRACUSA.idterm == idterm) & (partial_SIRACUSA.idtrajectory == idtrajectory)]
-    partial_SIRACUSA_bis = partial_SIRACUSA_bis.append(sub)
+    idtrajectory = pnt_sequenza_ACIREALE[pnt_sequenza_ACIREALE.idterm == idterm]['idtrajectory'].iloc[0]
+    sub = partial_ACIREALE[(partial_ACIREALE.idterm == idterm) & (partial_ACIREALE.idtrajectory == idtrajectory)]
+    partial_ACIREALE_bis = partial_ACIREALE_bis.append(sub)
 
 
 partial_CATANIA_bis = pd.DataFrame([])
@@ -250,12 +254,12 @@ for idx, idterm in enumerate(all_idterms_CATANIA):
 
 
 ## rename partial data
-partial_SIRACUSA = partial_SIRACUSA_bis
+partial_ACIREALE = partial_ACIREALE_bis
 partial_CATANIA = partial_CATANIA_bis
 
 
 ## only select (u,v) from partial data
-SIRACUSA = partial_SIRACUSA[['u','v']]
+ACIREALE = partial_ACIREALE[['u','v']]
 CATANIA = partial_CATANIA[['u','v']]
 
 
@@ -264,7 +268,7 @@ CATANIA = partial_CATANIA[['u','v']]
 #######################################################################
 
 ### get counts for selected edges ###
-counts_uv_SIRACUSA = SIRACUSA.groupby(SIRACUSA.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+counts_uv_ACIREALE = ACIREALE.groupby(ACIREALE.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 counts_uv_CATANIA = CATANIA.groupby(CATANIA.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 
 
@@ -272,10 +276,10 @@ counts_uv_CATANIA = CATANIA.groupby(CATANIA.columns.tolist(), sort=False).size()
 ##### build the map ####################################
 
 ## merge counts with OSM (Open Street Map) edges
-counts_uv_SIRACUSA = pd.merge(counts_uv_SIRACUSA, gdf_edges, on=['u', 'v'], how='left')
-counts_uv_SIRACUSA = gpd.GeoDataFrame(counts_uv_SIRACUSA)
-counts_uv_SIRACUSA.drop_duplicates(['u', 'v'], inplace=True)
-# counts_uv_SIRACUSA.plot()
+counts_uv_ACIREALE = pd.merge(counts_uv_ACIREALE, gdf_edges, on=['u', 'v'], how='left')
+counts_uv_ACIREALE = gpd.GeoDataFrame(counts_uv_ACIREALE)
+counts_uv_ACIREALE.drop_duplicates(['u', 'v'], inplace=True)
+# counts_uv_ACIREALE.plot()
 
 counts_uv_CATANIA = pd.merge(counts_uv_CATANIA, gdf_edges, on=['u', 'v'], how='left')
 counts_uv_CATANIA = gpd.GeoDataFrame(counts_uv_CATANIA)
@@ -283,7 +287,7 @@ counts_uv_CATANIA.drop_duplicates(['u', 'v'], inplace=True)
 # counts_uv_CATANIA.plot()
 
 
-counts_uv_SIRACUSA["scales"] = (counts_uv_SIRACUSA.counts/max(counts_uv_SIRACUSA.counts)) * 7
+counts_uv_ACIREALE["scales"] = (counts_uv_ACIREALE.counts/max(counts_uv_ACIREALE.counts)) * 7
 counts_uv_CATANIA["scales"] = (counts_uv_CATANIA.counts/max(counts_uv_CATANIA.counts)) * 7
 
 ######################################################################################
@@ -291,15 +295,15 @@ counts_uv_CATANIA["scales"] = (counts_uv_CATANIA.counts/max(counts_uv_CATANIA.co
 ### SAVE .CSV file ###################################################################
 
 ## Normalize to 1 and get loads
-counts_uv_SIRACUSA["load(%)"] = round(counts_uv_SIRACUSA["counts"]/max(counts_uv_SIRACUSA["counts"]),4)*100
+counts_uv_ACIREALE["load(%)"] = round(counts_uv_ACIREALE["counts"]/max(counts_uv_ACIREALE["counts"]),4)*100
 counts_uv_CATANIA["load(%)"] = round(counts_uv_CATANIA["counts"]/max(counts_uv_CATANIA["counts"]),4)*100
 ## save to .csv file
-LOADS_SIRACUSA_UV = pd.DataFrame(counts_uv_SIRACUSA[['u','v','load(%)']])
+LOADS_ACIREALE_UV = pd.DataFrame(counts_uv_ACIREALE[['u','v','load(%)']])
 LOADS_CATANIA_UV = pd.DataFrame(counts_uv_CATANIA[['u','v','load(%)']])
 
-counts_uv = [LOADS_SIRACUSA_UV, LOADS_CATANIA_UV]
+counts_uv = [LOADS_ACIREALE_UV, LOADS_CATANIA_UV]
 counts_uv = pd.concat(counts_uv)
-counts_uv.to_csv('LOADS_Viadotto_Sordo_CATANIA_21_NOVEMBER_2019.csv')
+counts_uv.to_csv('LOADS_Viadotto_SanPaolo_CATANIA_21_NOVEMBER_2019.csv')
 
 
 ################################################################################
@@ -310,7 +314,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 #################################################################################
 
 folium.GeoJson(
-counts_uv_SIRACUSA[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
+counts_uv_ACIREALE[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
     style_function=lambda x: {
         'fillColor': 'blue',
         'color': 'blue',
@@ -345,7 +349,7 @@ highlight_function=lambda x: {'weight':3,
     ).add_to(my_map)
 
 
-my_map.save("LOADS_Viadotto_Sordo_CATANIA_21_NOVEMBER_2019.html")
+my_map.save("LOADS_Viadotto_SanPaolo_CATANIA_21_NOVEMBER_2019.html")
 
 
 ##################################################################################################################
@@ -354,19 +358,16 @@ my_map.save("LOADS_Viadotto_Sordo_CATANIA_21_NOVEMBER_2019.html")
 ##################################################################################################################
 ##################################################################################################################
 ##################################################################################################################
-############# introduce an INTERRUPTION in the "Viadotto Sordo" ##################################################
-#############---------------------------------------------------##################################################
+############# introduce an INTERRUPTION in the "Viadotto San Paolo" ##############################################
+#############------------------both directions---------------------------------##################################################
 
 penalty = 25000  # PENALTY time or DISRUPTION time (seconds of closure of the link (u,v))
 
-## add a disruption time on the Viadotto Sordo
+## add a disruption time on the Viadotto San Paolo
 ### load grafo
 file_graphml = 'CATANIA_VIASAT_cost.graphml'
 grafo = ox.load_graphml(file_graphml)
 # ox.plot_graph(grafo)
-
-# zipped_CATANIA = zip([312617273], [6556214429])   ### Viadotto Sordo ---> Catania (u,v)
-# zipped_SIRACUSA = zip([518162385], [6532608322])   ### Viadotto Sordo ---> Siracusa (u,v)
 
 ###########################################
 ######## ----> CATANIA ####################
@@ -379,7 +380,7 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
         # print(attr)
 
 for u, v, key, attr in grafo.edges(keys=True, data=True):
-    zipped_CATANIA = zip([312617273], [6556214429]) ### Viadotto Sordo ---> Catania (u,v)
+    zipped_CATANIA = zip([841721621], [6758675255]) ### Viadotto San Paolo ---> Catania (u,v)
     if (u, v) in zipped_CATANIA:
         print(u, v)
         print("gotta!=====================================================")
@@ -390,9 +391,8 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
 
 
 ### initialize an empty dataframe
-Catania_Viadotto_Sordo_OD = pd.DataFrame([])
-# viadotto_sordo = [partial_CATANIA_bis, partial_SIRACUSA_bis]
-# viadotto_sordo = pd.concat(viadotto_sordo)
+Catania_Viadotto_SanPaolo_OD = pd.DataFrame([])
+
 
 all_trips = list(partial_CATANIA_bis.idtrajectory.unique())
 for idx_a, idtrajectory in enumerate(all_trips):
@@ -406,16 +406,16 @@ for idx_a, idtrajectory in enumerate(all_trips):
     DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
     data['ORIGIN'] = ORIGIN
     data['DESTINATION'] = DESTINATION
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.append(data)
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.append(data)
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
     ## reset index
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
     
 # loop ever each ORIGIN --> DESTINATION pair
 all_EDGES_CATANIA = pd.DataFrame([])
-O = list(Catania_Viadotto_Sordo_OD.ORIGIN.unique())
-D = list(Catania_Viadotto_Sordo_OD.DESTINATION.unique())
+O = list(Catania_Viadotto_SanPaolo_OD.ORIGIN.unique())
+D = list(Catania_Viadotto_SanPaolo_OD.DESTINATION.unique())
 zipped_OD = zip(O, D)
 for (i, j) in zipped_OD:
     print(i,j)
@@ -437,10 +437,11 @@ all_EDGES_CATANIA.columns = ['u', 'v']
 
 
 ######################################
-##### ---> SIRACUSA ##################
+##### ---> ACIREALE ##################
 
 file_graphml = 'CATANIA_VIASAT_cost.graphml'
 grafo = ox.load_graphml(file_graphml)
+
 
 for u, v, key, attr in grafo.edges(keys=True, data=True):
     # print(attr)
@@ -449,8 +450,8 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
         attr['VIASAT_cost'] = float(attr.get("VIASAT_cost"))
 
 for u, v, key, attr in grafo.edges(keys=True, data=True):
-    zipped_SIRACUSA = zip([518162385], [6532608322]) ### Viadotto Sordo ---> Siracusa (u,v)
-    if (u, v) in zipped_SIRACUSA:
+    zipped_ACIREALE = zip([4096452579], [6758779932]) ### Viadotto San Paolo ---> Acireale (u,v)
+    if (u, v) in zipped_ACIREALE:
         print(u, v)
         print("gotta!=====================================================")
         attr['VIASAT_cost'] = float(attr['VIASAT_cost']) + penalty
@@ -459,29 +460,29 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
         grafo.add_edge(u, v, key, attr_dict=attr)
 
 ### initialize an empty dataframe
-Siracusa_Viadotto_Sordo_OD = pd.DataFrame([])
+Acireale_Viadotto_SanPaolo_OD = pd.DataFrame([])
 
-all_trips = list(partial_SIRACUSA_bis.idtrajectory.unique())
+all_trips = list(partial_ACIREALE_bis.idtrajectory.unique())
 for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
     ## filter data by idterm and by idtrajectory (trip)
-    data = all_SIRACUSA[all_SIRACUSA.idtrajectory == idtrajectory]
+    data = all_ACIREALE[all_ACIREALE.idtrajectory == idtrajectory]
     ## sort data by "sequenza'
     data = data.sort_values('sequenza')
     ORIGIN = data[data.sequenza == min(data.sequenza)][['u']].iloc[0][0]
     DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
     data['ORIGIN'] = ORIGIN
     data['DESTINATION'] = DESTINATION
-    Siracusa_Viadotto_Sordo_OD = Siracusa_Viadotto_Sordo_OD.append(data)
-    Siracusa_Viadotto_Sordo_OD = Siracusa_Viadotto_Sordo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
+    Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.append(data)
+    Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
     ## reset index
-    Siracusa_Viadotto_Sordo_OD = Siracusa_Viadotto_Sordo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
+    Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 # loop ever each ORIGIN --> DESTINATION pair
-all_EDGES_SIRACUSA = pd.DataFrame([])
-O = list(Siracusa_Viadotto_Sordo_OD.ORIGIN.unique())
-D = list(Siracusa_Viadotto_Sordo_OD.DESTINATION.unique())
+all_EDGES_ACIREALE = pd.DataFrame([])
+O = list(Acireale_Viadotto_SanPaolo_OD.ORIGIN.unique())
+D = list(Acireale_Viadotto_SanPaolo_OD.DESTINATION.unique())
 zipped_OD = zip(O, D)
 for (i, j) in zipped_OD:
     print(i, j)
@@ -492,14 +493,14 @@ for (i, j) in zipped_OD:
             shortest_OD_path_VIASAT_penalty = nx.shortest_path(grafo, i, j,
                                                                weight='VIASAT_cost')
             path_edges = list(zip(shortest_OD_path_VIASAT_penalty, shortest_OD_path_VIASAT_penalty[1:]))
-            all_EDGES_SIRACUSA = all_EDGES_SIRACUSA.append(path_edges)
+            all_EDGES_ACIREALE = all_EDGES_ACIREALE.append(path_edges)
         except ValueError:
             print('Contradictory paths found:', 'negative weights?')
     except (nx.NodeNotFound, nx.exception.NetworkXNoPath):
         print('O-->D NodeNotFound', 'i:', i, 'j:', j)
 
 ## neams columns
-all_EDGES_SIRACUSA.columns = ['u', 'v']
+all_EDGES_ACIREALE.columns = ['u', 'v']
 
 #######################################################################
 ## count how many times an edge ('u', 'v') occur in the geodataframe ##
@@ -507,7 +508,7 @@ all_EDGES_SIRACUSA.columns = ['u', 'v']
 
 ### get counts for selected edges ###
 counts_uv_disruption_CATANIA = all_EDGES_CATANIA.groupby(all_EDGES_CATANIA.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
-counts_uv_disruption_SIRACUSA = all_EDGES_SIRACUSA.groupby(all_EDGES_SIRACUSA.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+counts_uv_disruption_ACIREALE = all_EDGES_ACIREALE.groupby(all_EDGES_ACIREALE.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 
 ########################################################
 ##### build the map ####################################
@@ -520,13 +521,13 @@ counts_uv_disruption_CATANIA.drop_duplicates(['u', 'v'], inplace=True)
 
 
 ## merge counts with OSM (Open Street Map) edges
-counts_uv_disruption_SIRACUSA = pd.merge(counts_uv_disruption_SIRACUSA, gdf_edges, on=['u', 'v'], how='left')
-counts_uv_disruption_SIRACUSA = gpd.GeoDataFrame(counts_uv_disruption_SIRACUSA)
-counts_uv_disruption_SIRACUSA.drop_duplicates(['u', 'v'], inplace=True)
-# counts_uv_disruption_SIRACUSA.plot()
+counts_uv_disruption_ACIREALE = pd.merge(counts_uv_disruption_ACIREALE, gdf_edges, on=['u', 'v'], how='left')
+counts_uv_disruption_ACIREALE = gpd.GeoDataFrame(counts_uv_disruption_ACIREALE)
+counts_uv_disruption_ACIREALE.drop_duplicates(['u', 'v'], inplace=True)
+# counts_uv_disruption_ACIREALE.plot()
 
 counts_uv_disruption_CATANIA["scales"] = (counts_uv_disruption_CATANIA.counts/max(counts_uv_disruption_CATANIA.counts)) * 7
-counts_uv_disruption_SIRACUSA["scales"] = (counts_uv_disruption_SIRACUSA.counts/max(counts_uv_disruption_SIRACUSA.counts)) * 7
+counts_uv_disruption_ACIREALE["scales"] = (counts_uv_disruption_ACIREALE.counts/max(counts_uv_disruption_ACIREALE.counts)) * 7
 
 ######################################################################################
 ######################################################################################
@@ -534,15 +535,15 @@ counts_uv_disruption_SIRACUSA["scales"] = (counts_uv_disruption_SIRACUSA.counts/
 
 ## Normalize to 1 and get loads
 counts_uv_disruption_CATANIA["load(%)"] = round(counts_uv_disruption_CATANIA["counts"]/max(counts_uv_disruption_CATANIA["counts"]),4)*100
-counts_uv_disruption_SIRACUSA["load(%)"] = round(counts_uv_disruption_SIRACUSA["counts"]/max(counts_uv_disruption_SIRACUSA["counts"]),4)*100
+counts_uv_disruption_ACIREALE["load(%)"] = round(counts_uv_disruption_ACIREALE["counts"]/max(counts_uv_disruption_ACIREALE["counts"]),4)*100
 ## save to .csv file
 LOADS_DISRUPTION_CATANIA_UV = pd.DataFrame(counts_uv_disruption_CATANIA[['u','v','load(%)']])
-LOADS_DISRUPTION_SIRACUSA_UV = pd.DataFrame(counts_uv_disruption_SIRACUSA[['u','v','load(%)']])
+LOADS_DISRUPTION_ACIREALE_UV = pd.DataFrame(counts_uv_disruption_ACIREALE[['u','v','load(%)']])
 
 counts_uv = [LOADS_DISRUPTION_CATANIA_UV,
-             LOADS_DISRUPTION_SIRACUSA_UV]
+             LOADS_DISRUPTION_ACIREALE_UV]
 counts_uv = pd.concat(counts_uv)
-counts_uv.to_csv('LOADS_DISRUPTION_Viadotto_Sordo_CATANIA_21_NOVEMBER_2019.csv')
+counts_uv.to_csv('LOADS_DISRUPTION_Viadotto_SanPaolo_CATANIA_21_NOVEMBER_2019.csv')
 
 
 ################################################################################
@@ -571,7 +572,7 @@ highlight_function=lambda x: {'weight':3,
 
 
 folium.GeoJson(
-counts_uv_disruption_SIRACUSA[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
+counts_uv_disruption_ACIREALE[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
     style_function=lambda x: {
         'fillColor': 'blue',
         'color': 'blue',
@@ -587,13 +588,12 @@ highlight_function=lambda x: {'weight':3,
         fields=['u', 'v', 'load(%)']),
     ).add_to(my_map)
 
-my_map.save("LOADS_DISRUPTION_Viadotto_Sordo_CATANIA_21_NOVEMBER_2019.html")
-# my_map.save("LOADS_DISRUPTION_Viadotto_Sordo_SIRACUSA_21_NOVEMBER_2019.html")
+my_map.save("LOADS_DISRUPTION_Viadotto_SanPaolo_CATANIA_21_NOVEMBER_2019.html")
 
 ## several checks ### -------------
-AAA = pd.DataFrame(counts_uv_disruption_CATANIA[counts_uv_disruption_CATANIA.u == 312617273])
-AAA = pd.DataFrame(counts_uv_disruption_CATANIA[counts_uv_disruption_CATANIA.u == 518162385])
-AAAA = pd.DataFrame(counts_uv[counts_uv.u == 312617273])
+# AAA = pd.DataFrame(counts_uv_disruption_CATANIA[counts_uv_disruption_CATANIA.u == 312617273])
+# AAA = pd.DataFrame(counts_uv_disruption_CATANIA[counts_uv_disruption_CATANIA.u == 518162385])
+# AAAA = pd.DataFrame(counts_uv[counts_uv.u == 312617273])
 
 
 
@@ -603,7 +603,7 @@ AAAA = pd.DataFrame(counts_uv[counts_uv.u == 312617273])
 ##################################################################################################
 ##################################################################################################
 ##################################################################################################
-## consider all counts ###########################################################################
+## one direction by time #########################################################################
 
 #### -------------------------------- ######
 ### get counts for all edges ###############
@@ -618,6 +618,7 @@ penalty = 25000  # PENALTY time or DISRUPTION time (seconds of closure of the li
 file_graphml = 'CATANIA_VIASAT_cost.graphml'
 grafo = ox.load_graphml(file_graphml)
 
+
 for u, v, key, attr in grafo.edges(keys=True, data=True):
     # print(attr)
     # print(attr.get("VIASAT_cost"))
@@ -626,7 +627,7 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
         # print(attr)
 
 for u, v, key, attr in grafo.edges(keys=True, data=True):
-    zipped_CATANIA = zip([312617273], [6556214429]) ### Viadotto Sordo ---> Catania (u,v)
+    zipped_CATANIA = zip([841721621], [6758675255]) ### Viadotto San Paolo ---> Catania (u,v)
     if (u, v) in zipped_CATANIA:
         print(u, v)
         print("gotta!=====================================================")
@@ -636,15 +637,15 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
         grafo.add_edge(u, v, key, attr_dict=attr)
 
 ### initialize an empty dataframe
-Catania_Viadotto_Sordo_OD = pd.DataFrame([])
+Catania_Viadotto_SanPaolo_OD = pd.DataFrame([])
 
 
 partials = [partial_CATANIA_bis,
-             partial_SIRACUSA_bis]
+             partial_ACIREALE_bis]
 partials = pd.concat(partials)
 
 all_trips = list(partials.idtrajectory.unique())
-## nly loop over the idtrajectories crossing the Viadotto Sordo
+## nly loop over the idtrajectories crossing the Viadotto San Paolo
 for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
@@ -656,15 +657,15 @@ for idx_a, idtrajectory in enumerate(all_trips):
     DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
     data['ORIGIN'] = ORIGIN
     data['DESTINATION'] = DESTINATION
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.append(data)
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.append(data)
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
     ## reset index
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 # loop ever each ORIGIN --> DESTINATION pair
 all_EDGES_CATANIA = pd.DataFrame([])
-O = list(Catania_Viadotto_Sordo_OD.ORIGIN.unique())
-D = list(Catania_Viadotto_Sordo_OD.DESTINATION.unique())
+O = list(Catania_Viadotto_SanPaolo_OD.ORIGIN.unique())
+D = list(Catania_Viadotto_SanPaolo_OD.DESTINATION.unique())
 zipped_OD = zip(O, D)
 for (i, j) in zipped_OD:
     print(i, j)
@@ -696,7 +697,7 @@ counts_uv_disruption_CATANIA["scales"] = (counts_uv_disruption_CATANIA.counts/ma
 ## Normalize to 1 and get loads
 counts_uv_disruption_CATANIA["load(%)"] = round(counts_uv_disruption_CATANIA["counts"]/max(counts_uv_disruption_CATANIA["counts"]),4)*100
 ## save csv
-counts_uv_disruption_CATANIA.to_csv('DISRUPTION_Viadotto_Sordo_verso_CATANIA_21_NOVEMBER_2019.csv')
+counts_uv_disruption_CATANIA.to_csv('DISRUPTION_Viadotto_SanPaplo_verso_CATANIA_21_NOVEMBER_2019.csv')
 
 ################################################################################
 # create basemap CATANIA
@@ -706,7 +707,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 #################################################################################
 
 folium.GeoJson(
-counts_uv_disruption_CATANIA[['u','v', 'counts', 'scales', 'geometry']].to_json(),
+counts_uv_disruption_CATANIA[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
     style_function=lambda x: {
         'fillColor': 'red',
         'color': 'red',
@@ -719,14 +720,14 @@ highlight_function=lambda x: {'weight':3,
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'counts']),
+        fields=['u', 'v', 'load(%)']),
     ).add_to(my_map)
 
-my_map.save("DISRUPTION_Viadotto_Sordo_verso_CATANIA_21_NOVEMBER_2019.html")
+my_map.save("DISRUPTION_Viadotto_SanPaolo_verso_CATANIA_21_NOVEMBER_2019.html")
 
 
 #####################################################
-######## ----> direzione SIRACUSA ###################
+######## ----> direzione ACIREALE ###################
 
 penalty = 25000  # PENALTY time or DISRUPTION time (seconds of closure of the link (u,v))
 file_graphml = 'CATANIA_VIASAT_cost.graphml'
@@ -739,9 +740,10 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
         attr['VIASAT_cost'] = float(attr.get("VIASAT_cost"))
         # print(attr)
 
+
 for u, v, key, attr in grafo.edges(keys=True, data=True):
-    zipped_SIRACUSA = zip([518162385], [6532608322])  ### Viadotto Sordo ---> Siracusa (u,v)
-    if (u, v) in zipped_SIRACUSA:
+    zipped_ACIREALE = zip([4096452579], [6758779932])  ### Viadotto San Paolo ---> Acireale (u,v)
+    if (u, v) in zipped_ACIREALE:
         print(u, v)
         print("gotta!=====================================================")
         attr['VIASAT_cost'] = float(attr['VIASAT_cost']) + penalty
@@ -750,14 +752,14 @@ for u, v, key, attr in grafo.edges(keys=True, data=True):
         grafo.add_edge(u, v, key, attr_dict=attr)
 
 ### initialize an empty dataframe
-Catania_Viadotto_Sordo_OD = pd.DataFrame([])
+Catania_Viadotto_SanPaolo_OD = pd.DataFrame([])
 
 partials = [partial_CATANIA_bis,
-             partial_SIRACUSA_bis]
+             partial_ACIREALE_bis]
 partials = pd.concat(partials)
 
 all_trips = list(partials.idtrajectory.unique())
-## nly loop over the idtrajectories crossing the Viadotto Sordo
+## nly loop over the idtrajectories crossing the Viadotto San Paolo
 for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
@@ -769,15 +771,15 @@ for idx_a, idtrajectory in enumerate(all_trips):
     DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
     data['ORIGIN'] = ORIGIN
     data['DESTINATION'] = DESTINATION
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.append(data)
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.append(data)
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
     ## reset index
-    Catania_Viadotto_Sordo_OD = Catania_Viadotto_Sordo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
+    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 # loop ever each ORIGIN --> DESTINATION pair
-all_EDGES_SIRACUSA = pd.DataFrame([])
-O = list(Catania_Viadotto_Sordo_OD.ORIGIN.unique())
-D = list(Catania_Viadotto_Sordo_OD.DESTINATION.unique())
+all_EDGES_ACIREALE = pd.DataFrame([])
+O = list(Catania_Viadotto_SanPaolo_OD.ORIGIN.unique())
+D = list(Catania_Viadotto_SanPaolo_OD.DESTINATION.unique())
 zipped_OD = zip(O, D)
 for (i, j) in zipped_OD:
     print(i, j)
@@ -788,28 +790,28 @@ for (i, j) in zipped_OD:
             shortest_OD_path_VIASAT_penalty = nx.shortest_path(grafo, i, j,
                                                                weight='VIASAT_cost')
             path_edges = list(zip(shortest_OD_path_VIASAT_penalty, shortest_OD_path_VIASAT_penalty[1:]))
-            all_EDGES_SIRACUSA = all_EDGES_SIRACUSA.append(path_edges)
+            all_EDGES_ACIREALE = all_EDGES_ACIREALE.append(path_edges)
         except ValueError:
             print('Contradictory paths found:', 'negative weights?')
     except (nx.NodeNotFound, nx.exception.NetworkXNoPath):
         print('O-->D NodeNotFound', 'i:', i, 'j:', j)
 
 ## neams columns
-all_EDGES_SIRACUSA.columns = ['u', 'v']
+all_EDGES_ACIREALE.columns = ['u', 'v']
 
-counts_uv_disruption_SIRACUSA = all_EDGES_SIRACUSA.groupby(all_EDGES_SIRACUSA.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+counts_uv_disruption_ACIREALE = all_EDGES_ACIREALE.groupby(all_EDGES_ACIREALE.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 
-counts_uv_disruption_SIRACUSA = pd.merge(counts_uv_disruption_SIRACUSA, gdf_edges, on=['u', 'v'], how='left')
-counts_uv_disruption_SIRACUSA = gpd.GeoDataFrame(counts_uv_disruption_SIRACUSA)
-counts_uv_disruption_SIRACUSA.drop_duplicates(['u', 'v'], inplace=True)
-# counts_uv_disruption_SIRACUSA.plot()
+counts_uv_disruption_ACIREALE = pd.merge(counts_uv_disruption_ACIREALE, gdf_edges, on=['u', 'v'], how='left')
+counts_uv_disruption_ACIREALE = gpd.GeoDataFrame(counts_uv_disruption_ACIREALE)
+counts_uv_disruption_ACIREALE.drop_duplicates(['u', 'v'], inplace=True)
+# counts_uv_disruption_ACIREALE.plot()
 
-counts_uv_disruption_SIRACUSA["scales"] = (counts_uv_disruption_SIRACUSA.counts/max(counts_uv_disruption_SIRACUSA.counts)) * 7
+counts_uv_disruption_ACIREALE["scales"] = (counts_uv_disruption_ACIREALE.counts/max(counts_uv_disruption_ACIREALE.counts)) * 7
 
 ## Normalize to 1 and get loads
-counts_uv_disruption_SIRACUSA["load(%)"] = round(counts_uv_disruption_SIRACUSA["counts"]/max(counts_uv_disruption_SIRACUSA["counts"]),4)*100
+counts_uv_disruption_ACIREALE["load(%)"] = round(counts_uv_disruption_ACIREALE["counts"]/max(counts_uv_disruption_ACIREALE["counts"]),4)*100
 ## save csv
-counts_uv_disruption_SIRACUSA.to_csv('DISRUPTION_Viadotto_Sordo_verso_SIRACUSA_21_NOVEMBER_2019.csv')
+counts_uv_disruption_ACIREALE.to_csv('DISRUPTION_Viadotto_SanPaolo_verso_ACIREALE_21_NOVEMBER_2019.csv')
 
 ################################################################################
 # create basemap CATANIA
@@ -819,7 +821,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 #################################################################################
 
 folium.GeoJson(
-counts_uv_disruption_SIRACUSA[['u','v', 'counts', 'scales', 'geometry']].to_json(),
+counts_uv_disruption_ACIREALE[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
     style_function=lambda x: {
         'fillColor': 'blue',
         'color': 'blue',
@@ -832,9 +834,9 @@ highlight_function=lambda x: {'weight':3,
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'counts']),
+        fields=['u', 'v', 'load(%)']),
     ).add_to(my_map)
 
-my_map.save("DISRUPTION_Viadotto_Sordo_verso_SIRACUSA_21_NOVEMBER_2019.html")
+my_map.save("DISRUPTION_Viadotto_SanPaolo_verso_ACIREALE_21_NOVEMBER_2019.html")
 
 

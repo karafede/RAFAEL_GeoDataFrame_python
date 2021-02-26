@@ -230,8 +230,6 @@ conn_HAIG.commit()
 
 
 
-
-
 ### create index for 'longitude'
 cur_HAIG.execute("""
 CREATE index routecheck_2019_lon_idx on public.routecheck_2019(longitude);
@@ -244,6 +242,27 @@ cur_HAIG.execute("""
 CREATE index routecheck_2019_lat_idx on public.routecheck_2019(latitude);
 """)
 conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_2019_grade_idx on public.routecheck_2019("grade");
+""")
+conn_HAIG.commit()
+
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_2019_anomaly_idx on public.routecheck_2019("anomaly");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_2019_speed_idx on public.routecheck_2019("speed");
+""")
+conn_HAIG.commit()
+
+
 
 
 ##############################################################

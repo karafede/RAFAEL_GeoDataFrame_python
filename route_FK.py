@@ -70,6 +70,23 @@ all_VIASAT_IDterminals = pd.read_sql_query(
 all_VIASAT_IDterminals['idterm'] = all_VIASAT_IDterminals['idterm'].astype('Int64')
 all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
 
+# ### get all terminals corresponding to 'cars' (from routecheck_2019)
+# viasat_cars = pd.read_sql_query('''
+#               SELECT idterm, vehtype
+#               FROM public.routecheck_2019
+#               WHERE vehtype = '1' ''', conn_HAIG)
+# # make an unique list
+# idterms_cars = list(viasat_cars.idterm.unique())
+# ## save 'all_ID_TRACKS' as list
+# with open("idterms_cars.txt", "w") as file:
+#     file.write(str(idterms_cars))
+
+
+## reload 'idterms_cars' as list
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterms_cars.txt", "r") as file:
+    idterms_cars = eval(file.readline())
+
+
 idterm = 3120299
 
 ### initialize an empty dataframe
@@ -122,6 +139,7 @@ for last_track_idx, idterm in enumerate(all_ID_TRACKS):
                        - triptime_s
         if breaktime_s < 0:
             breaktime_s = None
+        ### build the final dataframe ("route" table)
         df_ROUTE = pd.DataFrame({'idtrajectory': [idtrajectory],
                                  'idterm': [idterm],
                                  'idtrace_o': [idtrace_o],

@@ -103,12 +103,14 @@ for idx, row in unique_DATES.iterrows():
 
 
 ## divide data by directions througn the TANGENZIALE DI Catania
-## (294034837, 6754556102) --> Taormina
-## (476455543, 4064451884)  --> Catania
+## (4096452579, 6758779932) --> Acireale (Viadotto San Paolo)
+## (841721621, 6758675255)  --> Catania (Viadotto San Paolo)
 ## (488537136, 1767590558) --> Misterbianco
 ## (637681763, 370190911) --> AciCastello
 ## (293556912, 708283295) --> SS121A
 ## (293558366, 708685571) --> SS121B
+
+
 
 from datetime import datetime
 now1 = datetime.now()
@@ -119,8 +121,8 @@ df =  pd.read_sql_query('''
                             u, v,
                             timedate, mean_speed, idtrace, sequenza
                             FROM mapmatching_2019
-                           WHERE (u, v) in (VALUES (294034837, 6754556102),
-                           (476455543, 4064451884), (488537136, 1767590558),
+                           WHERE (u, v) in (VALUES (4096452579, 6758779932),
+                           (841721621, 6758675255), (488537136, 1767590558),
                            (637681763, 370190911), (293556912, 708283295),
                             (293558366, 708685571))
                                  /*LIMIT 1000*/ )
@@ -130,7 +132,7 @@ df =  pd.read_sql_query('''
                                     dataraw.id
                         FROM path
                             LEFT JOIN dataraw ON path.idtrace = dataraw.id   
-                            WHERE date(path.timedate) = '2019-11-24'
+                            WHERE date(path.timedate) = '2019-11-21'
                             /*WHERE EXTRACT(MONTH FROM path.timedate) = '02'*/
                                  ''', conn_HAIG)
 
@@ -138,14 +140,14 @@ now2 = datetime.now()
 print(now2 - now1)
 
 ## get all the IDTERM  vehicles passing through the TANGENZIALE OVEST CATANIA
-df_TAORMINA = df[(df['u'] == 294034837) & (df['v'] == 6754556102) ]   ## towards Taormina
-df_CATANIA = df[(df['u'] == 476455543) & (df['v'] == 4064451884) ]    ## towards Catania
+df_ACIREALE = df[(df['u'] == 4096452579) & (df['v'] == 6758779932) ]   ## towards Acireale
+df_CATANIA = df[(df['u'] == 841721621) & (df['v'] == 6758675255) ]    ## towards Catania
 df_Misterbianco = df[(df['u'] == 488537136) & (df['v'] == 1767590558) ]    ## towards Misterbianco
 df_Acicastello = df[(df['u'] == 637681763) & (df['v'] == 370190911) ]    ## towards AciCastello
 df_SS121A = df[(df['u'] == 293556912) & (df['v'] == 708283295) ]    ## around Misterbianco area
 df_SS121B = df[(df['u'] == 293558366) & (df['v'] == 708685571) ]    ## around Misterbianco area
 
-df_TAORMINA.drop_duplicates(['idterm'], inplace=True)
+df_ACIREALE.drop_duplicates(['idterm'], inplace=True)
 df_CATANIA.drop_duplicates(['idterm'], inplace=True)
 df_Misterbianco.drop_duplicates(['idterm'], inplace=True)
 df_SS121A.drop_duplicates(['idterm'], inplace=True)
@@ -153,7 +155,7 @@ df_SS121B.drop_duplicates(['idterm'], inplace=True)
 
 
 # ## make a list of all IDterminals for the direction of Salerno and Avellino
-all_idterms_TAORMINA = list(df_TAORMINA.idterm.unique())
+all_idterms_ACIREALE = list(df_ACIREALE.idterm.unique())
 all_idterms_CATANIA = list(df_CATANIA.idterm.unique())
 all_idterms_Misterbianco = list(df_Misterbianco.idterm.unique())
 all_idterms_Acicastello = list(df_Acicastello.idterm.unique())
@@ -181,7 +183,7 @@ viasat_data = pd.read_sql_query('''
                        FROM mapmatching_2019
                        LEFT JOIN dataraw 
                                    ON mapmatching_2019.idtrace = dataraw.id  
-                                   WHERE date(mapmatching_2019.timedate) = '2019-11-24'
+                                   WHERE date(mapmatching_2019.timedate) = '2019-11-21'
                                    /*WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '02'*/
                                    /*AND dataraw.vehtype::bigint = 1*/
                     ''', conn_HAIG)
@@ -195,7 +197,7 @@ print(now2 - now1)
 ##### Get counts only for trips on SELECTED EDGES ########
 
 ### get all data only for the vehicles in the list
-all_TAORMINA = viasat_data[viasat_data.idterm.isin(all_idterms_TAORMINA)]
+all_ACIREALE = viasat_data[viasat_data.idterm.isin(all_idterms_ACIREALE)]
 all_CATANIA = viasat_data[viasat_data.idterm.isin(all_idterms_CATANIA)]
 all_Misterbianco = viasat_data[viasat_data.idterm.isin(all_idterms_Misterbianco)]
 all_Acicastello = viasat_data[viasat_data.idterm.isin(all_idterms_Acicastello)]
@@ -203,8 +205,8 @@ all_SS121A = viasat_data[viasat_data.idterm.isin(all_idterms_SS121A)]
 all_SS121B = viasat_data[viasat_data.idterm.isin(all_idterms_SS121B)]
 
 ## get data with "sequenza" STARTING from the chosen nodes on the TANGENZIALE OVEST CATANIA for each idterm
-pnt_sequenza_TAORMNINA = all_TAORMINA[(all_TAORMINA['u'] == 294034837) & (all_TAORMINA['v'] == 6754556102) ]
-pnt_sequenza_CATANIA = all_CATANIA[(all_CATANIA['u'] == 476455543) & (all_CATANIA['v'] == 4064451884) ]
+pnt_sequenza_ACIREALE = all_ACIREALE[(all_ACIREALE['u'] == 4096452579) & (all_ACIREALE['v'] == 6758779932) ]
+pnt_sequenza_CATANIA = all_CATANIA[(all_CATANIA['u'] == 841721621) & (all_CATANIA['v'] == 6758675255) ]
 pnt_sequenza_Misterbianco = all_Misterbianco[(all_Misterbianco['u'] == 488537136) & (all_Misterbianco['v'] == 1767590558) ]
 pnt_sequenza_Acicastello = all_Acicastello[(all_Acicastello['u'] == 637681763) & (all_Acicastello['v'] == 370190911) ]
 pnt_sequenza_SS121A = all_SS121A[(all_SS121A['u'] == 293556912) & (all_SS121A['v'] == 708283295) ]
@@ -213,7 +215,7 @@ pnt_sequenza_SS121B = all_SS121B[(all_SS121B['u'] == 293558366) & (all_SS121B['v
 # del viasat_data
 
 ### initialize an empty dataframe
-partial_TAORMINA = pd.DataFrame([])
+partial_ACIREALE = pd.DataFrame([])
 partial_CATANIA = pd.DataFrame([])
 partial_Misterbianco = pd.DataFrame([])
 partial_Acicastello = pd.DataFrame([])
@@ -221,15 +223,15 @@ partial_SS121A = pd.DataFrame([])
 partial_SS121B = pd.DataFrame([])
 
 ##################
-### TAORMINA #####
+### ACIREALE #####
 ##################
-for idx, idterm in enumerate(all_idterms_TAORMINA):
+for idx, idterm in enumerate(all_idterms_ACIREALE):
     print(idterm)
     idterm = int(idterm)
     ### get starting "sequenza"
-    sequenza = pnt_sequenza_TAORMNINA[pnt_sequenza_TAORMNINA.idterm == idterm]['sequenza'].iloc[0]
-    sub = all_TAORMINA[(all_TAORMINA.idterm == idterm) & (all_TAORMINA.sequenza >= sequenza)]
-    partial_TAORMINA = partial_TAORMINA.append(sub)
+    sequenza = pnt_sequenza_ACIREALE[pnt_sequenza_ACIREALE.idterm == idterm]['sequenza'].iloc[0]
+    sub = all_ACIREALE[(all_ACIREALE.idterm == idterm) & (all_ACIREALE.sequenza >= sequenza)]
+    partial_ACIREALE = partial_ACIREALE.append(sub)
 
 
 
@@ -299,15 +301,15 @@ for idx, idterm in enumerate(all_idterms_SS121B):
 ### further filtering with idtrajectory (by trip) ##
 ####################################################
 
-partial_TAORMINA_bis = pd.DataFrame([])
+partial_ACIREALE_bis = pd.DataFrame([])
 
-for idx, idterm in enumerate(all_idterms_TAORMINA):
+for idx, idterm in enumerate(all_idterms_ACIREALE):
     print(idterm)
     idterm = int(idterm)
     # get starting "idtrajectory"
-    idtrajectory = pnt_sequenza_TAORMNINA[pnt_sequenza_TAORMNINA.idterm == idterm]['idtrajectory'].iloc[0]
-    sub = partial_TAORMINA[(partial_TAORMINA.idterm == idterm) & (partial_TAORMINA.idtrajectory == idtrajectory)]
-    partial_TAORMINA_bis = partial_TAORMINA_bis.append(sub)
+    idtrajectory = pnt_sequenza_ACIREALE[pnt_sequenza_ACIREALE.idterm == idterm]['idtrajectory'].iloc[0]
+    sub = partial_ACIREALE[(partial_ACIREALE.idterm == idterm) & (partial_ACIREALE.idtrajectory == idtrajectory)]
+    partial_ACIREALE_bis = partial_ACIREALE_bis.append(sub)
 
 
 partial_CATANIA_bis = pd.DataFrame([])
@@ -368,7 +370,7 @@ for idx, idterm in enumerate(all_idterms_SS121B):
 
 
 ## rename partial data
-partial_TAORMINA = partial_TAORMINA_bis
+partial_ACIREALE = partial_ACIREALE_bis
 partial_CATANIA = partial_CATANIA_bis
 partial_Misterbianco = partial_Misterbianco_bis
 partial_Acicastello = partial_Acicastello_bis
@@ -376,7 +378,7 @@ partial_SS121A = partial_SS121A_bis
 partial_SS121B = partial_SS121B_bis
 
 ## only select (u,v) from partial data
-TAORMINA = partial_TAORMINA[['u','v']]
+ACIREALE = partial_ACIREALE[['u','v']]
 CATANIA = partial_CATANIA[['u','v']]
 MISTERBIANCO = partial_Misterbianco[['u','v']]
 ACICASTELLO = partial_Acicastello[['u','v']]
@@ -388,7 +390,7 @@ SS121B = partial_SS121B[['u','v']]
 #######################################################################
 
 ### get counts for selected edges ###
-counts_uv_TAORMINA = TAORMINA.groupby(TAORMINA.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
+counts_uv_ACIREALE = ACIREALE.groupby(ACIREALE.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 counts_uv_CATANIA = CATANIA.groupby(CATANIA.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 counts_uv_Misterbianco = MISTERBIANCO.groupby(MISTERBIANCO.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 counts_uv_Acicastello = ACICASTELLO.groupby(ACICASTELLO.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
@@ -400,10 +402,10 @@ counts_uv_SS121B = SS121B.groupby(SS121B.columns.tolist(), sort=False).size().re
 ##### build the map ####################################
 
 ## merge counts with OSM (Open Street Map) edges
-counts_uv_TAORMINA = pd.merge(counts_uv_TAORMINA, gdf_edges, on=['u', 'v'], how='left')
-counts_uv_TAORMINA = gpd.GeoDataFrame(counts_uv_TAORMINA)
-counts_uv_TAORMINA.drop_duplicates(['u', 'v'], inplace=True)
-# counts_uv_TAORMINA.plot()
+counts_uv_ACIREALE = pd.merge(counts_uv_ACIREALE, gdf_edges, on=['u', 'v'], how='left')
+counts_uv_ACIREALE = gpd.GeoDataFrame(counts_uv_ACIREALE)
+counts_uv_ACIREALE.drop_duplicates(['u', 'v'], inplace=True)
+# counts_uv_ACIREALE.plot()
 
 counts_uv_CATANIA = pd.merge(counts_uv_CATANIA, gdf_edges, on=['u', 'v'], how='left')
 counts_uv_CATANIA = gpd.GeoDataFrame(counts_uv_CATANIA)
@@ -591,12 +593,12 @@ my_map.save(path + "counts_CATANIA_24_NOVEMBER_2019.html")
 
 #### Color Map ##################################################################
 #################################################################################
-## ---> TAORMINA --- + ---> CATANIA  Tangenziale Ovest Catania###################
+## ---> Acireale --- + ---> CATANIA  Tangenziale Ovest Catania###################
 #################################################################################
 
-### MAKE a map with percentace (%) flows from TAORMINA and to CATANIA
+### MAKE a map with percentace (%) flows from ACIREALE and to CATANIA
 Catania_partial = pd.DataFrame(counts_uv_CATANIA)
-Taormina_partial = pd.DataFrame(counts_uv_TAORMINA)
+Acireale_partial = pd.DataFrame(counts_uv_ACIREALE)
 Misterbianco_partial = pd.DataFrame(counts_uv_Misterbianco)
 Acicastello_partial = pd.DataFrame(counts_uv_Acicastello)
 SS121A_partial = pd.DataFrame(counts_uv_SS121A)
@@ -616,16 +618,16 @@ Catania_partial["load (%)"] = round(Catania_partial["scales"]/max(Catania_partia
 
 
 ## mormalize separately and get colors
-Taormina_partial["scales"] = round(((Taormina_partial.counts/max(Taormina_partial.counts)))  ,1)
+Acireale_partial["scales"] = round(((Acireale_partial.counts/max(Acireale_partial.counts)))  ,1)
 # add colors based on 'counts'
-vmin = min(Taormina_partial.scales)
-vmax = max(Taormina_partial.scales)
+vmin = min(Acireale_partial.scales)
+vmax = max(Acireale_partial.scales)
 # Try to map values to colors in hex
 norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
 mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.YlOrRd)  # scales of Reds (or "coolwarm" , "bwr", °cool°)  gist_yarg --> grey to black, YlOrRd
-Taormina_partial['color'] = Taormina_partial['scales'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
+Acireale_partial['color'] = Acireale_partial['scales'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
 ## Normalize to 1
-Taormina_partial["load (%)"] = round(Taormina_partial["scales"]/max(Taormina_partial["scales"]),2)*100
+Acireale_partial["load (%)"] = round(Acireale_partial["scales"]/max(Acireale_partial["scales"]),2)*100
 
 
 ## mormalize separately and get colors
@@ -682,13 +684,12 @@ SS121B_partial["load (%)"] = round(SS121B_partial["scales"]/max(SS121B_partial["
 
 
 
-## merge CATANIA with TAORMINA, MISTERBIANCO, ACICASTELLO and SS121 counts and keep the max count....
-merged_loads = pd.concat([Catania_partial, Taormina_partial,
+## merge CATANIA with ACIREALE, MISTERBIANCO, ACICASTELLO and SS121 counts and keep the max count....
+merged_loads = pd.concat([Catania_partial, Acireale_partial,
                          Misterbianco_partial, Acicastello_partial,
                           SS121A_partial, SS121B_partial]).groupby(['u','v'], as_index=False)['load (%)'].max()
 merged_loads = pd.merge(merged_loads, gdf_edges, on=['u', 'v'], how='left')
 merged_loads = gpd.GeoDataFrame(merged_loads)
-# Taormina_Catania.plot()
 merged_loads = merged_loads[merged_loads["load (%)"] > 5]
 
 ## get colors
@@ -703,7 +704,7 @@ merged_loads['color'] = merged_loads['scales'].apply(lambda x: mcolors.to_hex(ma
 
 
 my_map = plot_graph_folium_FK(merged_loads, graph_map=None, popup_attribute=None,
-                              zoom=15, fit_bounds=True, edge_width=5, edge_opacity=1)
+                              zoom=15, fit_bounds=True, edge_width=4, edge_opacity=1)
 
 style = {'fillColor': '#00000000', 'color': '#00000000'}
 
@@ -715,7 +716,7 @@ folium.GeoJson(
     style_function=lambda x:style,
     highlight_function=lambda x: {'weight':3,
         'color':'blue',
-        'fillOpacity':1
+        'fillOpacity':0.8
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
@@ -726,7 +727,7 @@ folium.GeoJson(
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
-my_map.save(path + "LOADS_TAORMINA_CATANIA_MISTERBI_ACICAS_SS121_24_NOVEMBER_2019.html")
+my_map.save(path + "LOADS_ACIREALE_CATANIA_MISTERBI_ACICAS_SS121_21_NOVEMBER_2019.html")
 
 
 ######################################################################
@@ -771,18 +772,18 @@ fig.savefig('LEGEND_loads.png')
 ##################################################################
 ##################################################################
 #### ---- ISOCHRONES by "trajectory" ---------------##############
-## starting from Tangenziale Ovest Catania towards Taormina #####
+## starting from Tangenziale Ovest Catania towards Acireale #####
 ##################################################################
 ##################################################################
 
 ###########################
-## --> TAORMINA ###########
+## --> ACIREALE ###########
 ###########################
 
 
 ## get the counts for each edge (u,v) pair and for each "TRAJECTORY" (TRIP)
 # get the mean by u,v and "idtrajectory" of the SPEED
-speed_uv = partial_TAORMINA[['u', 'v', 'idtrajectory', 'speed']]
+speed_uv = partial_ACIREALE[['u', 'v', 'idtrajectory', 'speed']]
 speed_uv = (speed_uv.groupby(['u', 'v', 'idtrajectory']).mean()).reset_index()
 speed_uv = pd.merge(speed_uv, gdf_edges[['u','v','length']], on=['u', 'v'], how='left')
 ## calculate travel times on each edge for edge within each "idtrajectory"
@@ -848,6 +849,7 @@ for i in range(len(traveltime_trajectory)):
 
 ## get geometry from the OSM network
 traveltime_trajectory = pd.merge(traveltime_trajectory, gdf_edges, on=['u', 'v'], how='left')
+traveltime_trajectory = traveltime_trajectory[traveltime_trajectory.travel_range > 0]
 traveltime_trajectory = gpd.GeoDataFrame(traveltime_trajectory)
 # traveltime_trajectory.plot()
 
@@ -889,7 +891,7 @@ folium.GeoJson(
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
-my_map.save(path + "travel_time_TAORMINA_24_NOVEMBER_2019.html")
+my_map.save(path + "travel_time_ACIREALE_21_NOVEMBER_2019.html")
 
 
 ###############################################################################
@@ -913,7 +915,6 @@ speed_uv['travel_time'] = ((speed_uv.length/1000)/(speed_uv.speed))*60  ## in mi
 ## sum all travel times all nodes fo the same "idtrajectory"
 traveltime_trajectory = (speed_uv[['idtrajectory','travel_time']].groupby(['idtrajectory']).sum()).reset_index()
 ## check which are the trajectories with the highest travel time....
-traveltime_trajectory['travel_time'].hist()
 traveltime_trajectory = traveltime_trajectory[traveltime_trajectory.travel_time < 120]
 traveltime_trajectory['travel_time'].hist()
 
@@ -1014,7 +1015,7 @@ folium.GeoJson(
 folium.TileLayer('cartodbdark_matter').add_to(my_map)
 folium.LayerControl().add_to(my_map)
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
-my_map.save(path + "travel_time_CATANIA_24_NOVEMBER_2019.html")
+my_map.save(path + "travel_time_CATANIA_21_NOVEMBER_2019.html")
 
 
 

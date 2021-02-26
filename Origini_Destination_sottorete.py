@@ -390,3 +390,14 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 ################################################################################
 # folium.GeoJson('sottorete_FLUX.geojson').add_to((my_map))
 # my_map.save("sottorete_FLUX.html")
+
+
+
+
+all_trips = pd.read_sql_query('''
+                       SELECT  
+                          mapmatching_2019.idtrajectory
+                          FROM mapmatching_2019                                                         
+                                      ''', conn_HAIG)
+
+all_trips = list(all_trips.idtrajectory.unique())
