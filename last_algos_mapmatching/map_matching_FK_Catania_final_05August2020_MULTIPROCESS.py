@@ -63,6 +63,13 @@ grafo_ALL = ox.load_graphml(file_graphml)
 # gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
 gdf_nodes_ALL, gdf_edges_ALL = ox.graph_to_gdfs(grafo_ALL)
 
+'''
+AAA = gdf_edges_ALL.drop_duplicates(['u', 'v'])
+AAA = pd.DataFrame(AAA)
+len(AAA)
+sum(AAA.length)
+'''
+
 ########################################################################################
 ########## DATABASE OPERATIONS #########################################################
 ########################################################################################
@@ -172,7 +179,7 @@ def func(arg):
                 SELECT * FROM public.routecheck_2019 
                 WHERE "idterm" = '%s' ''' % track_ID, conn_HAIG)
     ### FILTERING #############################################
-    viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
+    # viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
     viasat_data = viasat_data[viasat_data.anomaly != "EQc3456"]
     viasat_data = viasat_data[viasat_data.anomaly != "EQc3T5d"]
     if int(track_ID) not in idterms_fleet:

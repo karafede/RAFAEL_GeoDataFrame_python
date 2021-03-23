@@ -68,6 +68,7 @@ gdf_nodes_ALL, gdf_edges_ALL = ox.graph_to_gdfs(grafo_ALL)
 ########################################################################################
 
 '''
+
 AAA = gdf_edges_ALL.drop_duplicates(['u', 'v'])
 AAA = pd.DataFrame(AAA)
 len(AAA)
@@ -83,7 +84,40 @@ BBB = gdf_edges_ALL[gdf_edges_ALL['highway']== "motorway_link"]
 BBB.drop_duplicates(['u', 'v'], inplace=True)
 BBB = pd.DataFrame(BBB)
 sum(BBB.length) + sum(AAA.length)
+
+    
+os.chdir('D:/ENEA_CAS_WORK/SENTINEL/viasat_data')
+file_graphml = 'Fisciano__Italy_50km_cost.graphml'
+grafo_ALL = ox.load_graphml(file_graphml)
+for u, v, key, attr in grafo_ALL.edges(keys=True, data=True):
+    if len(attr['cost']) > 0:
+        attr['cost'] = float(attr.get("cost"))
+gdf_nodes_ALL, gdf_edges_ALL = ox.graph_to_gdfs(grafo_ALL)
+BBB = pd.DataFrame(gdf_edges_ALL)
+
+## find new max speed on each edge
+BBB['new_maxspeed'] = (BBB.length/1000)/(BBB.cost/3600)   ## units are km/h
+BBB['highway'] = BBB['highway'].str.replace(']', '')
+
+### get only urban roads
+# urban_roads = ['primary', 'secondary', 'tertiary',  'residential']
+# URBAN = BBB[BBB.highway.isin(urban_roads)]
+URBAN = BBB[BBB.new_maxspeed <= 50]
+URBAN.drop_duplicates(['u', 'v'], inplace=True)
+URBAN = pd.DataFrame(URBAN)
+print("length urban roads(km): ", sum(URBAN.length)/1000)
+print("number of urban roads: ", len(URBAN))
+
+# EXTRAURBAN = BBB[~BBB.highway.isin(urban_roads)]
+EXTRAURBAN = BBB[BBB.new_maxspeed > 50]
+EXTRAURBAN.drop_duplicates(['u', 'v'], inplace=True)
+EXTRAURBAN = pd.DataFrame(EXTRAURBAN)
+print("length extraurban roads(km): ", sum(EXTRAURBAN.length)/1000)
+print("number of extraurban roads: ", len(EXTRAURBAN))
+
 '''
+
+BBB = pd.DataFrame(gdf_edges_ALL)
 
 # connect to new DB to be populated with Viasat data after route-check
 conn_HAIG = db_connect.connect_HAIG_Viasat_SA()
@@ -187,7 +221,7 @@ def func(arg):
                 SELECT * FROM public.routecheck_2019 
                 WHERE "idterm" = '%s' ''' % track_ID, conn_HAIG)
     ### FILTERING #############################################
-    viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
+    # viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
     viasat_data = viasat_data[viasat_data.anomaly != "EQc3456"]
     viasat_data = viasat_data[viasat_data.anomaly != "EQc3T5d"]
     if int(track_ID) not in idterms_fleet:
