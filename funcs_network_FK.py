@@ -508,18 +508,24 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
 
     if cc:
         c_name = "close_centrality"
-        edge_centrality = nx.closeness_centrality(nx.line_graph(grafo))
+        # edge_centrality = nx.closeness_centrality(nx.line_graph(grafo))
+        edge_centrality = nx.closeness_centrality(grafo)
         ## make a dataframe
         DF_edge_centrality = pd.Series(edge_centrality).reset_index()
-        DF_edge_centrality.columns = ['u', 'v', 'centrality']
+        # DF_edge_centrality.columns = ['u', 'v', 'centrality']
+        DF_edge_centrality.columns = ['u', 'centrality']
         ## save centrality into a .csv file
         DF_edge_centrality.to_csv("D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\close_centrality_Catania_AUGUST.csv")  ## only one node..
+        ## reload centrality
+        # path = 'D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\'
+        # DF_edge_centrality = pd.read_csv(path + "close_centrality_Catania_AUGUST.csv", delimiter=',')
 
         ########################################################
         ##### build the map ####################################
 
         gdf_edges = ox.graph_to_gdfs(G, nodes=False, fill_edge_geometry=True)
-        DF_edge_centrality = pd.merge(DF_edge_centrality, gdf_edges, on=['u', 'v'], how='left')
+        # DF_edge_centrality = pd.merge(DF_edge_centrality, gdf_edges, on=['u', 'v'], how='left')
+        DF_edge_centrality = pd.merge(DF_edge_centrality, gdf_edges, on=['u'], how='left')
         ## remove line with na value
         DF_edge_centrality = DF_edge_centrality[DF_edge_centrality['geometry'].notna()]
         DF_edge_centrality = gpd.GeoDataFrame(DF_edge_centrality)
@@ -549,10 +555,9 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
         DF_edge_centrality = pd.merge(DF_edge_centrality, gdf_edges, on=['u'], how='left')
         ## remove line with na value
         DF_edge_centrality = DF_edge_centrality[DF_edge_centrality['geometry'].notna()]
-        DF_edge_centrality['v'] = DF_edge_centrality.v.astype('int')
-
-        DF_centrality = DF_edge_centrality[['u', 'v', 'centrality']]
-        DF_centrality.to_csv("D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\btw_centrality_u_v_Catania_AUGUST_VIASAT_cost.csv")  ## only one node..
+        DF_edge_centrality['v'] = DF_edge_centrality.v.astype('int')   ### negative "v" are the nodes not connected
+        DF_centrality = DF_edge_centrality[['u', 'centrality']]   ### only for nodes
+        # DF_centrality.to_csv("D:\\ENEA_CAS_WORK\\Catania_RAFAEL\\viasat_data\\btw_centrality_u_v_Catania_AUGUST_VIASAT_cost.csv")  ## only one node..
 
         DF_edge_centrality = gpd.GeoDataFrame(DF_edge_centrality)
         DF_edge_centrality.drop_duplicates(['u', 'v'], inplace=True)
@@ -563,14 +568,15 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
 
     # add colors based on 'centrality'
     vmin = min(DF_edge_centrality.scales)
+    vmin = 2.4
     vmax = max(DF_edge_centrality.scales)
     # Try to map values to colors in hex
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
-    mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.YlOrRd)  # scales of Reds (or "coolwarm" , "bwr", °cool°)  gist_yarg --> grey to black, YlOrRd
+    mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.gist_rainbow_r)  # scales of Reds (or "coolwarm" , "bwr", °cool°)  gist_yarg --> grey to black, YlOrRd
     DF_edge_centrality['color'] = DF_edge_centrality['scales'].apply(lambda x: mcolors.to_hex(mapper.to_rgba(x)))
 
     ## Normalize to 1
-    DF_edge_centrality["centrality"] = round(DF_edge_centrality["scales"] / max(DF_edge_centrality["scales"]), 1)
+    DF_edge_centrality["centrality"] = round(DF_edge_centrality["scales"] / max(DF_edge_centrality["scales"]), 3)
     DF_edge_centrality = DF_edge_centrality[DF_edge_centrality.centrality > 0]
 
     ################################################################################
@@ -585,7 +591,7 @@ def centrality(file_graphml, place_country, bc=False, cc=False): #road_type
     ########################################
     from folium_stuff_FK_map_matching import plot_graph_folium_FK
     my_map = plot_graph_folium_FK(DF_edge_centrality, graph_map=None, popup_attribute=None,
-                                  zoom=15, fit_bounds=True, edge_width=3, edge_opacity=0.5)
+                                  zoom=15, fit_bounds=True, edge_width=2, edge_opacity=0.5)
     style = {'fillColor': '#00000000', 'color': '#00000000'}
     folium.GeoJson(
         # data to plot

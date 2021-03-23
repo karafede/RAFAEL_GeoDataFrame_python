@@ -1,4 +1,7 @@
 
+#####################################
+### build route from routecheck #####
+#####################################
 
 import os
 os.chdir('D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data')
@@ -32,17 +35,28 @@ from shapely import wkb
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from folium_stuff_FK_map_matching import plot_graph_folium_FK
 from PIL import Image
+
+
+import multiprocessing as mp
+from multiprocessing import Process, freeze_support, Manager
+from time import sleep
+from collections import deque
+from multiprocessing.managers import BaseManager
+import contextlib
+from multiprocessing import Manager
+from multiprocessing import Pool
+
+import dill as Pickle
+from joblib import Parallel, delayed
+from joblib.externals.loky import set_loky_pickler
+set_loky_pickler('pickle')
+from multiprocessing import Pool,RLock
+
 
 # today date
 today = date.today()
 today = today.strftime("%b-%d-%Y")
-
-os.chdir('D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data')
-os.getcwd()
-
-
 
 # idtrajectory;
 # idterm;
@@ -62,37 +76,37 @@ os.getcwd()
 conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
 cur_HAIG = conn_HAIG.cursor()
 
+# Create an SQL connection engine to the output DB
+engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_CT')
 
-# get all ID terminal of Viasat data
-all_VIASAT_IDterminals = pd.read_sql_query(
-    ''' SELECT *
-        FROM public.obu''', conn_HAIG)
-all_VIASAT_IDterminals['idterm'] = all_VIASAT_IDterminals['idterm'].astype('Int64')
-all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
-
-# ### get all terminals corresponding to 'cars' (from routecheck_2019)
-# viasat_cars = pd.read_sql_query('''
-#               SELECT idterm, vehtype
-#               FROM public.routecheck_2019
-#               WHERE vehtype = '1' ''', conn_HAIG)
-# # make an unique list
-# idterms_cars = list(viasat_cars.idterm.unique())
-# ## save 'all_ID_TRACKS' as list
-# with open("idterms_cars.txt", "w") as file:
-#     file.write(str(idterms_cars))
+### erase existing table...if exists....
+# cur_HAIG.execute("DROP TABLE IF EXISTS route_2019 CASCADE")
+# conn_HAIG.commit()
 
 
-## reload 'idterms_cars' as list
-with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterms_cars.txt", "r") as file:
-    idterms_cars = eval(file.readline())
+# get all terminals corresponding to 'cars' and 'fleet' (from routecheck_2019)
+ID_vehicles = pd.read_sql_query('''
+               SELECT idterm, vehtype
+               FROM public.routecheck_2019
+               /*WHERE vehtype = '1'*/
+               ''', conn_HAIG)
+# make an unique list
+idterms = list(ID_vehicles.idterm.unique())
+## save 'all_ID_TRACKS' as list
+with open("idterms_2019.txt", "w") as file:
+    file.write(str(idterms))
+
+# ## reload all 'idterms' as list
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterms_2019.txt", "r") as file:
+   idterms = eval(file.readline())
 
 
-idterm = 3120299
+# idterm = 4057114
 
-### initialize an empty dataframe
-route_CATANIA = pd.DataFrame([])
+def func(arg):
+    last_idterm_idx, idterm = arg
 
-for last_track_idx, idterm in enumerate(all_ID_TRACKS):
+# for last_track_idx, idterm in enumerate(idterms_cars):
     print(idterm)
     idterm = str(idterm)
     # print('VIASAT GPS track:', track_ID)
@@ -108,13 +122,17 @@ for last_track_idx, idterm in enumerate(all_ID_TRACKS):
 
     all_trips = list(viasat_data.idtrajectory.unique())
     for idx, idtrajectory in enumerate(all_trips):
-        print(idtrajectory)
+        ### initialize an empty dataframe
+        route_CATANIA = pd.DataFrame([])
+        # print(idtrajectory)
         ## filter data by idterm and by idtrajectory (trip)
         data = viasat_data[viasat_data.idtrajectory == idtrajectory]
         idtrace_o = data[data.segment == min(data.segment)][['id']].iloc[0][0]
         idtrace_d = data[data.segment == max(data.segment)][['id']].iloc[0][0]
-        latitude = data[data.segment == min(data.segment)][['latitude']].iloc[0][0]  ## at the ORIGIN
-        longitude = data[data.segment == min(data.segment)][['longitude']].iloc[0][0]  ## at the ORIGIN
+        latitude_o = data[data.segment == min(data.segment)][['latitude']].iloc[0][0]  ## at the ORIGIN
+        longitude_o = data[data.segment == min(data.segment)][['longitude']].iloc[0][0]  ## at the ORIGIN
+        latitude_d = data[data.segment == max(data.segment)][['latitude']].iloc[0][0]  ## at the DESTINATION
+        longitude_d = data[data.segment == max(data.segment)][['longitude']].iloc[0][0]  ## at the DESTINATION
         timedate = str(data[data.segment == min(data.segment)][['timedate']].iloc[0][0])  ## at the ORIGIN
         ## trip distance in meters (sum of the increment of the "progressive"
         ## add a field with the "previous progressive"
@@ -124,8 +142,11 @@ for last_track_idx, idterm in enumerate(all_ID_TRACKS):
         ## compute increments of the distance (in meters)
         data['increment'] = data.progressive - data.last_progressive
         ## sum all the increments
-        tripdistance_m = sum(data['increment'])
-        ## trip time in seconds
+        # tripdistance_m = sum(data['increment'])
+        tripdistance_m = sum(data['increment'][1:len(data['increment'])])
+        if tripdistance_m < 0:
+            tripdistance_m = 0
+        ## trip time in seconds (duration)
         time_o = data[data.segment == min(data.segment)][['path_time']].iloc[0][0]
         time_d = data[data.segment == max(data.segment)][['path_time']].iloc[0][0]
         triptime_s = time_d - time_o
@@ -144,11 +165,34 @@ for last_track_idx, idterm in enumerate(all_ID_TRACKS):
                                  'idterm': [idterm],
                                  'idtrace_o': [idtrace_o],
                                  'idtrace_d': [idtrace_d],
-                                 'latitude': [latitude],
-                                 'longitude': [longitude],
-                                 'timedate': [timedate],
+                                 'latitude_o': [latitude_o],
+                                 'longitude_o': [longitude_o],
+                                 'latitude_d': [latitude_d],
+                                 'longitude_d': [longitude_d],
+                                 'timedate_o': [timedate],
                                  'tripdistance_m': [tripdistance_m],
                                  'triptime_s': [triptime_s],
                                  'checkcode': [checkcode],
                                  'breaktime_s': [breaktime_s]})
         route_CATANIA = route_CATANIA.append(df_ROUTE)
+        connection = engine.connect()
+        route_CATANIA.to_sql("route_2019", con=connection, schema="public",
+                           if_exists='append')
+        connection.close()
+
+
+################################################
+##### run all script using multiprocessing #####
+################################################
+
+## check how many processer we have available:
+# print("available processors:", mp.cpu_count())
+
+if __name__ == '__main__':
+    # pool = mp.Pool(processes=mp.cpu_count()) ## use all available processors
+    pool = mp.Pool(processes=55)     ## use 60 processors
+    print("++++++++++++++++ POOL +++++++++++++++++", pool)
+    results = pool.map(func, [(last_idterm_idx, idterm) for last_idterm_idx, idterm in enumerate(idterms)])
+    pool.close()
+    pool.close()
+    pool.join()

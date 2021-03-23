@@ -127,6 +127,30 @@ pd.read_sql_query('''
 SELECT pg_size_pretty( pg_database_size('HAIG_Viasat_CT') )''', conn_HAIG)
 
 
+##########################################
+### add index to route_2019
+
+### change type of "idterm" from text to bigint
+cur_HAIG.execute("""
+ALTER TABLE public.route_2019 ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+ALTER TABLE public.routecheck_2019 ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
+""")
+conn_HAIG.commit()
+
+
+### create index for 'idterm'
+cur_HAIG.execute("""
+CREATE index route_idterm_idx on public.route_2019(idterm);
+""")
+conn_HAIG.commit()
+
+
+
 
 ####################################################################################################
 ####################################################################################################
