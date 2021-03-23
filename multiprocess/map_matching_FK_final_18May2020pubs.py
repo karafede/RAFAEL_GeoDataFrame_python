@@ -128,7 +128,7 @@ viasat_data = pd.read_sql_query('''
               SELECT * FROM public.routecheck_2019 
               WHERE "idterm" = '%s' ''' % track_ID, conn_HAIG)
 ### FILTERING #############################################
-viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
+# viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
 viasat_data = viasat_data[viasat_data.anomaly != "EQc3456"]
 viasat_data = viasat_data[viasat_data.anomaly != "EQc3T5d"]
 if int(track_ID) not in idterms_fleet:
