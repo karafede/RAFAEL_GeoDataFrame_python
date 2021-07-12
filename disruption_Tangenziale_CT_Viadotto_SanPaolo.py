@@ -61,7 +61,12 @@ def wkb_tranformation(line):
    return wkb.loads(line.geom, hex=True)
 
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
+engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_CT')
+conn_sized = engine.connect().execution_options(stream_results=True)
+
+gdf_edges = pd.read_sql_query('''
+                            SELECT u,v, length, geom
+                            FROM "OSM_edges" ''',conn_sized)
 
 ## load EDGES from OSM
 gdf_edges = pd.read_sql_query('''
@@ -73,6 +78,8 @@ gdf_edges = gpd.GeoDataFrame(gdf_edges)
 ## eventually....remove duplicates
 gdf_edges.drop_duplicates(['u', 'v'], inplace=True)
 # gdf_edges.plot()
+# save first as geojson file
+# gdf_edges.to_file(filename='grafo_CATANIA.geojson', driver='GeoJSON')
 
 
 # make a list of unique dates (only dates not times!)
@@ -154,10 +161,42 @@ all_idterms_CATANIA = list(df_CATANIA.idterm.unique())
 ## get MAP-MATCHING data from DB for a specific day of the month (2019) ########
 ###############################################################################
 
+# from datetime import datetime
+# now1 = datetime.now()
+#
+# #### get all VIASAT data from map-matching (automobili e mezzi pesanti) on selected date
+### you can put everything in a look by loading batch of data and process data in batches
+### in this way you can reduce the memory load...
+# ## https://pythonspeed.com/articles/pandas-sql-chunking/
+# for chunk_dataframe in pd.read_sql_query('''
+#                     SELECT
+#                        mapmatching_2019.u, mapmatching_2019.v,
+#                             mapmatching_2019.timedate, mapmatching_2019.mean_speed,
+#                             mapmatching_2019.idtrace, mapmatching_2019.sequenza,
+#                             mapmatching_2019.idtrajectory,
+#                             dataraw.idterm, dataraw.vehtype,
+#                             dataraw.speed
+#                        FROM mapmatching_2019
+#                        LEFT JOIN dataraw
+#                                    ON mapmatching_2019.idtrace = dataraw.id
+#                                    WHERE date(mapmatching_2019.timedate) = '2019-11-21'
+#                                    /*WHERE EXTRACT(MONTH FROM mapmatching_2019.timedate) = '02'*/
+#                                    /*AND dataraw.vehtype::bigint = 1*/
+#                                    /*LIMIT 10000*/
+#                     ''', conn_sized, chunksize=1000):
+#     print(
+#         f"Got dataframe w/{len(chunk_dataframe)} rows"
+#     )
+#     #### do something....
+#     #### ................
+#
+# now2 = datetime.now()
+# print(now2 - now1)
+
+
 from datetime import datetime
 now1 = datetime.now()
 
-#### get all VIASAT data from map-matching (automobili e mezzi pesanti) on selected date
 viasat_data = pd.read_sql_query('''
                     SELECT  
                        mapmatching_2019.u, mapmatching_2019.v,
@@ -185,7 +224,6 @@ print(now2 - now1)
 
 ### get all data only for the vehicles in the list
 all_CATANIA = viasat_data[viasat_data.idterm.isin(all_idterms_CATANIA)]
-
 
 ## get data with "sequenza" STARTING from the chosen nodes on the TANGENZIALE OVEST CATANIA for each idterm
 pnt_sequenza_CATANIA = all_CATANIA[(all_CATANIA['u'] == 841721621) & (all_CATANIA['v'] == 6758675255) ]
@@ -257,7 +295,8 @@ counts_uv_CATANIA["load(%)"] = round(counts_uv_CATANIA["counts"]/max(counts_uv_C
 ## save to .csv file
 LOADS_CATANIA_UV = pd.DataFrame(counts_uv_CATANIA[['u','v','load(%)']])
 
-LOADS_CATANIA_UV.to_csv('LOADS_Viadotto_SanPaolo_CATANIA_only_21_NOVEMBER_2019.csv')
+LOADS_CATANIA_UV_to_save = pd.DataFrame(counts_uv_CATANIA[['u','v','load(%)', 'geometry']])
+LOADS_CATANIA_UV_to_save.to_csv('LOADS_Viadotto_SanPaolo_CATANIA_only_21_NOVEMBER_2019.csv')
 
 ################################################################################
 # create basemap CATANIA
@@ -456,20 +495,21 @@ for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
     ## filter data by idterm and by idtrajectory (trip)
-    data = all_CATANIA[all_CATANIA.idtrajectory == idtrajectory]
-    ## sort data by "sequenza'
-    data = data.sort_values('sequenza')
-    ORIGIN = data[data.sequenza == min(data.sequenza)][['u']].iloc[0][0]
-    DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
-    data['ORIGIN'] = ORIGIN
-    data['DESTINATION'] = DESTINATION
-    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.append(data)
-    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
-    ## reset index
-    Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
+    if idtrajectory >=0:
+        data = all_CATANIA[all_CATANIA.idtrajectory == idtrajectory]
+        ## sort data by "sequenza'
+        data = data.sort_values('sequenza')
+        ORIGIN = data[data.sequenza == min(data.sequenza)][['u']].iloc[0][0]
+        DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
+        data['ORIGIN'] = ORIGIN
+        data['DESTINATION'] = DESTINATION
+        Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.append(data)
+        Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
+        ## reset index
+        Catania_Viadotto_SanPaolo_OD = Catania_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 # AAA = pd.DataFrame([])
-all_EDGES_CATANIA = pd.DataFrame(columns=['u', 'v', 'idtrajectory', 'travel_time'])
+all_EDGES_CATANIA = pd.DataFrame(['u', 'v', 'idtrajectory', 'travel_time'])
 # loop ever each ORIGIN --> DESTINATION pair
 O = list(Catania_Viadotto_SanPaolo_OD.ORIGIN.unique())
 D = list(Catania_Viadotto_SanPaolo_OD.DESTINATION.unique())
@@ -500,6 +540,7 @@ for (i, j) in zipped_OD:
         print('O-->D NodeNotFound', 'i:', i, 'j:', j)
 
 ## name columns
+all_EDGES_CATANIA = all_EDGES_CATANIA[all_EDGES_CATANIA['travel_time'].notna()]
 all_EDGES_CATANIA['travel_time'] = all_EDGES_CATANIA['travel_time'].astype(np.int64)
 
 #######################################################################
@@ -528,7 +569,9 @@ counts_uv_disruption_CATANIA["scales"] = (counts_uv_disruption_CATANIA.counts/ma
 counts_uv_disruption_CATANIA["load(%)"] = round(counts_uv_disruption_CATANIA["counts"]/max(counts_uv_disruption_CATANIA["counts"]),4)*100
 ## save to .csv file
 LOADS_DISRUPTION_CATANIA_UV = pd.DataFrame(counts_uv_disruption_CATANIA[['u','v','load(%)']])
-LOADS_DISRUPTION_CATANIA_UV.to_csv('LOADS_DISRUPTION_Viadotto_SanPaolo_CATANIA_only_21_NOVEMBER_2019.csv')
+
+LOADS_DISRUPTION_CATANIA_UV_to_save = pd.DataFrame(counts_uv_disruption_CATANIA[['u','v','load(%)', 'geometry']])
+LOADS_DISRUPTION_CATANIA_UV_to_save.to_csv('LOADS_DISRUPTION_Viadotto_SanPaolo_CATANIA_only_21_NOVEMBER_2019.csv')
 
 
 ################################################################################
@@ -631,7 +674,6 @@ high_load_trajectories = pd.merge(high_load_trajectories, gdf_edges, on=['u', 'v
 high_load_trajectories = gpd.GeoDataFrame(high_load_trajectories)
 
 ### join all edges within a single trip.....
-### work in progress.....
 # combine them into a multi-linestring
 from shapely.ops import linemerge
 
@@ -639,14 +681,15 @@ list_trajectories = list(high_load_trajectories.idtrajectory.unique())
 for idx, idtrajectory in enumerate(list_trajectories):
     new_trajectory = pd.DataFrame([])
     print(idtrajectory)
-    idtrajectory = int(idtrajectory)   ## 231
+    idtrajectory = int(idtrajectory) ## 207; 30
     ## select all edges from a single nre trip
     trip = high_load_trajectories[high_load_trajectories.idtrajectory == idtrajectory]
     ## create a list for all LINESTRINGs of the geometry field (for each edge)
     multi_line = geometry.MultiLineString(list(trip.geometry))
-    merged_line = linemerge(multi_line)
+    # merged_line = linemerge(multi_line)
     try:
-        merged_line = gpd.GeoDataFrame(merged_line)
+        # merged_line = gpd.GeoDataFrame(merged_line)
+        merged_line = gpd.GeoDataFrame(multi_line)
         merged_line.columns = ['geometry']
         merged_line.plot()
         new_trajectory = merged_line
@@ -658,9 +701,9 @@ for idx, idtrajectory in enumerate(list_trajectories):
         ## save to. cvs file
         path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
         pd_trajectory = high_load_trajectories[high_load_trajectories.idtrajectory == idtrajectory]
-        pd_trajectory = pd.DataFrame(pd_trajectory[['u', 'v',
+        pd_trajectory = pd.DataFrame(pd_trajectory[['u', 'v', 'geometry',
                                                     'idtrajectory', 'travel_time', 'load(%)', 'length']])
-        pd_trajectory.columns = ['u','v',
+        pd_trajectory.columns = ['u','v', 'geometry',
                                  'idtrajectory', 'travel_time_trip (min)', 'load(%)', 'length(meters)']
         pd_trajectory.to_csv(
             path + "new_path_" + str(idtrajectory) + "_travel_time_DISRUPTION_CATANIA_21_NOVEMBER_2019.csv")
@@ -805,8 +848,11 @@ counts_uv_ACIREALE["scales"] = (counts_uv_ACIREALE.counts/max(counts_uv_ACIREALE
 ## Normalize to 1 and get loads
 counts_uv_ACIREALE["load(%)"] = round(counts_uv_ACIREALE["counts"]/max(counts_uv_ACIREALE["counts"]),4)*100
 ## save to .csv file
+
 LOADS_ACIREALE_UV = pd.DataFrame(counts_uv_ACIREALE[['u','v','load(%)']])
-LOADS_ACIREALE_UV.to_csv('LOADS_Viadotto_SanPaolo_ACIREALE_only_21_NOVEMBER_2019.csv')
+
+LOADS_ACIREALE_UV_to_save = pd.DataFrame(counts_uv_ACIREALE[['u','v','load(%)', 'geometry']])
+LOADS_ACIREALE_UV_to_save.to_csv('LOADS_Viadotto_SanPaolo_ACIREALE_only_21_NOVEMBER_2019.csv')
 
 ################################################################################
 # create basemap CATANIA
@@ -878,20 +924,21 @@ for idx_a, idtrajectory in enumerate(all_trips):
     # print(idx_a)
     # print(idtrajectory)
     ## filter data by idterm and by idtrajectory (trip)
-    data = all_ACIREALE[all_ACIREALE.idtrajectory == idtrajectory]
-    ## sort data by "sequenza'
-    data = data.sort_values('sequenza')
-    ORIGIN = data[data.sequenza == min(data.sequenza)][['u']].iloc[0][0]
-    DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
-    data['ORIGIN'] = ORIGIN
-    data['DESTINATION'] = DESTINATION
-    Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.append(data)
-    Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
-    ## reset index
-    Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
+    if idtrajectory >= 0:
+        data = all_ACIREALE[all_ACIREALE.idtrajectory == idtrajectory]
+        ## sort data by "sequenza'
+        data = data.sort_values('sequenza')
+        ORIGIN = data[data.sequenza == min(data.sequenza)][['u']].iloc[0][0]
+        DESTINATION = data[data.sequenza == max(data.sequenza)][['v']].iloc[0][0]
+        data['ORIGIN'] = ORIGIN
+        data['DESTINATION'] = DESTINATION
+        Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.append(data)
+        Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.drop_duplicates(['u', 'v', 'ORIGIN', 'DESTINATION'])
+        ## reset index
+        Acireale_Viadotto_SanPaolo_OD = Acireale_Viadotto_SanPaolo_OD.reset_index(level=0)[['u', 'v', 'ORIGIN', 'DESTINATION']]
 
 
-all_EDGES_ACIREALE = pd.DataFrame(columns=['u', 'v', 'idtrajectory', 'travel_time'])
+all_EDGES_ACIREALE = pd.DataFrame(['u', 'v', 'idtrajectory', 'travel_time'])
 # loop ever each ORIGIN --> DESTINATION pair
 O = list(Acireale_Viadotto_SanPaolo_OD.ORIGIN.unique())
 D = list(Acireale_Viadotto_SanPaolo_OD.DESTINATION.unique())
@@ -922,6 +969,7 @@ for (i, j) in zipped_OD:
         print('O-->D NodeNotFound', 'i:', i, 'j:', j)
 
 ## name columns
+all_EDGES_ACIREALE = all_EDGES_ACIREALE[all_EDGES_ACIREALE['travel_time'].notna()]
 all_EDGES_ACIREALE['travel_time'] = all_EDGES_ACIREALE['travel_time'].astype(np.int64)
 
 
@@ -953,7 +1001,9 @@ counts_uv_disruption_ACIREALE["load(%)"] = round(
     counts_uv_disruption_ACIREALE["counts"]/max(counts_uv_disruption_ACIREALE["counts"]),4)*100
 ## save to .csv file
 LOADS_DISRUPTION_ACIREALE_UV = pd.DataFrame(counts_uv_disruption_ACIREALE[['u','v','load(%)']])
-LOADS_DISRUPTION_ACIREALE_UV.to_csv('LOADS_DISRUPTION_Viadotto_SanPaolo_ACIREALE_only_21_NOVEMBER_2019.csv')
+
+LOADS_DISRUPTION_ACIREALE_UV_to_save = pd.DataFrame(counts_uv_disruption_ACIREALE[['u','v','load(%)','geometry']])
+LOADS_DISRUPTION_ACIREALE_UV_to_save.to_csv('LOADS_DISRUPTION_Viadotto_SanPaolo_ACIREALE_only_21_NOVEMBER_2019.csv')
 
 ################################################################################
 # create basemap CATANIA
@@ -1061,14 +1111,15 @@ list_trajectories = list(high_load_trajectories.idtrajectory.unique())
 for idx, idtrajectory in enumerate(list_trajectories):
     new_trajectory = pd.DataFrame([])
     print(idtrajectory)
-    idtrajectory = int(idtrajectory)   ## 231
+    idtrajectory = int(idtrajectory)
     ## select all edges from a single nre trip
     trip = high_load_trajectories[high_load_trajectories.idtrajectory == idtrajectory]
     ## create a list for all LINESTRINGs of the geometry field (for each edge)
     multi_line = geometry.MultiLineString(list(trip.geometry))
-    merged_line = linemerge(multi_line)
+    # merged_line = linemerge(multi_line)
     try:
-        merged_line = gpd.GeoDataFrame(merged_line)
+        # merged_line = gpd.GeoDataFrame(merged_line)
+        merged_line = gpd.GeoDataFrame(multi_line)
         merged_line.columns = ['geometry']
         merged_line.plot()
         new_trajectory = merged_line
@@ -1080,9 +1131,9 @@ for idx, idtrajectory in enumerate(list_trajectories):
         ## save to. cvs file
         path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
         pd_trajectory = high_load_trajectories[high_load_trajectories.idtrajectory == idtrajectory]
-        pd_trajectory = pd.DataFrame(pd_trajectory[['u', 'v',
+        pd_trajectory = pd.DataFrame(pd_trajectory[['u', 'v','geometry',
                                                     'idtrajectory', 'travel_time', 'load(%)', 'length']])
-        pd_trajectory.columns = ['u','v',
+        pd_trajectory.columns = ['u','v','geometry',
                                  'idtrajectory', 'travel_time_trip (min)', 'load(%)', 'length(meters)']
         pd_trajectory.to_csv(
             path + "new_path_" + str(idtrajectory) + "_travel_time_DISRUPTION_ACIREALE_21_NOVEMBER_2019.csv")
