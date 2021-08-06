@@ -55,6 +55,14 @@ conn_HAIG <- dbConnect(drv, dbname = "HAIG_Viasat_CT",
                        host = "10.0.0.1", port = 5432,       
                        user = "postgres", password = "superuser")
 
+### count how many records for vehicle type
+count_idterm = dbGetQuery(conn_HAIG, "SELECT vehtype, COUNT(*)
+                                      FROM dataraw 
+                                      group by vehtype ")
+### count how many idterm for vehicle type
+count_vehtype = dbGetQuery(conn_HAIG, "SELECT vehtype, COUNT(*)
+                                      FROM idterm_portata 
+                                      group by vehtype ")
 
 ## check all available tables
 # dbListTables(conn_HAIG)
@@ -83,17 +91,30 @@ all_TRIPS <- read_csv("all_TRIPS.CATANIA.csv")[-1]
 #                                    WHERE idterm = '5440008' and idtrajectory = '62215211' and speed > 30 
 #                                     ")
 
-stop_time = Sys.time()
-diff <- (stop_time - start_time)
-diff
+
+all_breaktime = dbGetQuery(conn_HAIG, "SELECT breaktime_s 
+                             FROM route_2019
+                                    ")
+all_breaktime_pos <- all_breaktime %>%
+  mutate(breaktime_m = breaktime_s/60) %>%
+  filter(breaktime_m < 10)   ## less than 10 minutes (that is the time of a normal trip)
+
+
+(nrow(all_breaktime_pos)/nrow(all_breaktime))*100
+
 
 ## make a list of unique TRIP_ID
-list_all_TRIPS <- unique(all_TRIPS$TRIP_ID) 
-length(list_all_TRIPS)
-## SELECT only concatenated TRIPS
-list_TRIPS_conc <- grep("_conc_", list_all_TRIPS)
-length(list_TRIPS_conc)
-(length(list_TRIPS_conc)/length(list_all_TRIPS))*100 ###(87%)
+# list_all_TRIPS <- unique(all_TRIPS$TRIP_ID)
+# length(list_all_TRIPS)
+# ## SELECT only concatenated TRIPS
+# list_TRIPS_conc <- grep("_conc_", list_all_TRIPS)
+# length(list_TRIPS_conc)
+# (length(list_TRIPS_conc)/length(list_all_TRIPS))*100 ###(87%)
+
+
+
+
+
 
 
 ````
@@ -122,7 +143,12 @@ length(list_TRIPS_conc)
 
 ### Load all trips
 
-data_GG <- read_csv("df_Viag_0_26541.csv")[-1]
+# data_GG <- read_csv("df_Viag_0_26541.csv")[-1]
+data_GG <- read_csv("route_CATANIA_GG.csv")[-1]
+# data_GG = dbGetQuery(conn_HAIG, "SELECT *
+#                                     FROM \"route_2019_GG\"
+#                                     ")
+
 data_GG <- data_GG %>%
   select(Id_Term,
          Id_Viaggi,
@@ -131,6 +157,7 @@ data_GG <- data_GG %>%
          D_Sosta_Dur,
          Viag_Km,
          Viag_Durata)
+# write_csv(data_GG, "route_CATANIA_GG.csv")
 data_GG$speed_trip = (data_GG$Viag_Km)/(data_GG$Viag_Durata)  ## km/h
 data_GG$hour <- hour(data_GG$O_Data)
 data_GG$day <- weekdays(as.Date(data_GG$O_Data))
@@ -273,10 +300,11 @@ p <- ggplot(data = passaggi_20kmh,
 #                                      route_2019.tripdistance_m,
 #                                      route_2019.triptime_s,
 #                                      route_2019.timedate_o,
+#                                      route_2019.breaktime_s,
 #                                      idterm_portata.idterm, idterm_portata.vehtype
 #                                     FROM route_2019
 #                                   LEFT JOIN idterm_portata
-#                                    ON route_2019.idterm = idterm_portata.idterm  
+#                                    ON route_2019.idterm = idterm_portata.idterm
 #                                     ")
 # write_csv(data_FK, "route_CATANIA.csv")
 
@@ -310,7 +338,8 @@ data_FK <- data_FK %>%
 trips <- data_FK %>%
   filter(tripdistance_m > 0 & tripdistance_m < 150000 &
            triptime_s > 60 & triptime_s < 20500 & 
-         speed_trip < 150 & speed_trip > 15) 
+         speed_trip < 150 & speed_trip > 15 &
+           breaktime_s > 60 & breaktime_s < 100000) 
 
 # ## quick check -----------------------
 # ## travelled distance
@@ -709,7 +738,7 @@ p
 ### tempi di sosta #########
 ### ----------- ############
 
-#### Istogramma di tutti i viaggi con tempi di sosta ad intervalli di 2 minuti
+#### Istogramma di tutti i viaggi con tempi di viaggio ad intervalli di 2 minuti
 
 ## convert stop time into minutes
 trips <- as.data.frame(trips)
@@ -718,18 +747,18 @@ trips$triptime_min <- (trips$triptime_s)/60
 
 ### auto ###
 BBB <- NULL
-bin_stop = seq(from = 0, to = 80, by = 2)   ## max 2 ore trip = 120 minutes (2 hour trip)
+bin_trip = seq(from = 0, to = 80, by = 2)   ## max 2 ore trip = 120 minutes (2 hour trip)
 
-for (i in 1:length(bin_stop)){
+for (i in 1:length(bin_trip)){
   if (i==1){
     AAA <- trips %>%
       filter(vehtype == "auto") %>%
-      filter(triptime_min <= bin_stop[i])  %>%
+      filter(triptime_min <= bin_trip[i])  %>%
       summarise(counts = length(idtrajectory))
   }else{
     AAA <- trips %>%
        filter(vehtype == "auto") %>%
-      filter(triptime_min <= bin_stop[i] & triptime_min >= bin_stop[i-1]) %>%
+      filter(triptime_min <= bin_trip[i] & triptime_min >= bin_trip[i-1]) %>%
       summarise(counts = length(idtrajectory))
    
   }
@@ -737,7 +766,7 @@ for (i in 1:length(bin_stop)){
   
 }
 
-viaggi_5min_auto <- as.data.frame(cbind(bin_stop, BBB))
+viaggi_5min_auto <- as.data.frame(cbind(bin_trip, BBB))
 viaggi_5min_auto <- na.omit(viaggi_5min_auto)
 viaggi_5min_auto$vehtype <- "auto"
 viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
@@ -746,19 +775,19 @@ viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
 
 ### veicoli commerciali ###
 BBB <- NULL
-bin_stop = seq(from = 0, to = 80, by = 2)   ## max 2 ore trip = 120 minutes (2 hour trip)
+bin_trip = seq(from = 0, to = 80, by = 2)   ## max 2 ore trip = 120 minutes (2 hour trip)
 
 
-for (i in 1:length(bin_stop)){
+for (i in 1:length(bin_trip)){
   if (i==1){
     AAA <- trips %>%
       filter(vehtype == "veicoli commerciali") %>%
-      filter(triptime_min <= bin_stop[i])  %>%
+      filter(triptime_min <= bin_trip[i])  %>%
       summarise(counts = length(idtrajectory))
   }else{
     AAA <- trips %>%
        filter(vehtype == "veicoli commerciali") %>%
-      filter(triptime_min <= bin_stop[i] & triptime_min >= bin_stop[i-1]) %>%
+      filter(triptime_min <= bin_trip[i] & triptime_min >= bin_trip[i-1]) %>%
       summarise(counts = length(idtrajectory))
    
   }
@@ -767,7 +796,7 @@ for (i in 1:length(bin_stop)){
 }
 
 
-viaggi_5min_commerciali <- as.data.frame(cbind(bin_stop, BBB))
+viaggi_5min_commerciali <- as.data.frame(cbind(bin_trip, BBB))
 viaggi_5min_commerciali <- na.omit(viaggi_5min_commerciali)
 viaggi_5min_commerciali$vehtype <- "veicoli commerciali"
 viaggi_5min_commerciali$N_tot_trips <- sum(viaggi_5min_commerciali$counts)
@@ -779,11 +808,11 @@ viaggi_5min$perc_count <- round((viaggi_5min$counts/viaggi_5min$N_tot_trips)*100
 
 
 ## plot
-viaggi_5min$bin_stop <- as.factor(viaggi_5min$bin_stop)
-viaggi_5min$bin_stop <- as.numeric(viaggi_5min$bin_stop)
+viaggi_5min$bin_trip <- as.factor(viaggi_5min$bin_trip)
+viaggi_5min$bin_trip <- as.numeric(viaggi_5min$bin_trip)
 
 p <- ggplot(data = viaggi_5min,
-              aes(bin_stop, perc_count, fill = bin_stop)) + guides(fill=FALSE) +
+              aes(bin_trip, perc_count, fill = bin_trip)) + guides(fill=FALSE) +
     geom_bar(stat = "identity") + 
     guides(fill=FALSE) +
     facet_wrap(~vehtype) +
@@ -794,7 +823,7 @@ p <- ggplot(data = viaggi_5min,
     theme(axis.text.x=element_text(size=13,face="bold", colour = "black")) +
     theme(axis.title.x = element_blank()) +                  # Remove x-axis label
     ylab("(%)") +            # Set y-axis label
-    xlab(expression(paste("tempo di sosta (minuti)"))) +
+    xlab(expression(paste("tempo di viaggio (minuti)"))) +
     theme(axis.title.x = element_text(face="bold", colour="black", size=16),
           axis.text.x  = element_text(angle=0, vjust=0.5, size=16, hjust = 0.5)) + 
     theme(axis.title.y = element_text(face="bold", colour="black", size=20),
@@ -814,14 +843,14 @@ p <- ggplot(data = viaggi_5min,
 
 ````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 8.** Numero di viaggi per durata temporale (5 min)."}
 
-## summary statistics for stop time #############
+## summary statistics for trip time #############
 
 
 ############################
-### tempi di sosta #########
+### tempi di viaggio #######
 ### ----------- ############
 
-#### Istogramma di tutti i viaggi con tempi di sosta ad intervalli di 5 minuti
+#### Istogramma di tutti i viaggi con tempi di viaggio ad intervalli di 5 minuti
 
 ## convert stop time into minutes
 trips <- as.data.frame(trips)
@@ -830,18 +859,134 @@ trips$triptime_min <- (trips$triptime_s)/60
 
 ### auto ###
 BBB <- NULL
+bin_trip = seq(from = 0, to = 80, by = 5)   ## max 2 ore trip = 120 minutes (2 hour trip)
+
+for (i in 1:length(bin_trip)){
+  if (i==1){
+    AAA <- trips %>%
+      filter(vehtype == "auto") %>%
+      filter(triptime_min <= bin_trip[i])  %>%
+      summarise(counts = length(idtrajectory))
+  }else{
+    AAA <- trips %>%
+       filter(vehtype == "auto") %>%
+      filter(triptime_min <= bin_trip[i] & triptime_min >= bin_trip[i-1]) %>%
+      summarise(counts = length(idtrajectory))
+   
+  }
+  BBB<- rbind(BBB, AAA)
+  
+}
+
+viaggi_5min_auto <- as.data.frame(cbind(bin_trip, BBB))
+viaggi_5min_auto <- na.omit(viaggi_5min_auto)
+viaggi_5min_auto$vehtype <- "auto"
+viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
+
+
+### veicoli commerciali ###
+BBB <- NULL
 bin_stop = seq(from = 0, to = 80, by = 5)   ## max 2 ore trip = 120 minutes (2 hour trip)
+
+
+for (i in 1:length(bin_trip)){
+  if (i==1){
+    AAA <- trips %>%
+      filter(vehtype == "veicoli commerciali") %>%
+      filter(triptime_min <= bin_trip[i])  %>%
+      summarise(counts = length(idtrajectory))
+  }else{
+    AAA <- trips %>%
+       filter(vehtype == "veicoli commerciali") %>%
+      filter(triptime_min <= bin_trip[i] & triptime_min >= bin_trip[i-1]) %>%
+      summarise(counts = length(idtrajectory))
+   
+  }
+  BBB<- rbind(BBB, AAA)
+  
+}
+
+viaggi_5min_commerciali <- as.data.frame(cbind(bin_trip, BBB))
+viaggi_5min_commerciali <- na.omit(viaggi_5min_commerciali)
+viaggi_5min_commerciali$vehtype <- "veicoli commerciali"
+viaggi_5min_commerciali$N_tot_trips <- sum(viaggi_5min_commerciali$counts)
+
+viaggi_5min <- rbind(viaggi_5min_auto,
+                        viaggi_5min_commerciali)
+## calculate percentage of trips
+## calculate percentage of trips by vehtype
+viaggi_5min$perc_count <- round((viaggi_5min$counts/viaggi_5min$N_tot_trips)*100, digits = 1)
+
+
+
+## plot
+viaggi_5min$bin_trip <- as.factor(viaggi_5min$bin_trip)
+
+p <- ggplot(data = viaggi_5min,
+              aes(bin_trip, perc_count, fill = bin_trip)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    guides(fill=FALSE) +
+    facet_wrap(~vehtype) +
+    ylim(0, 30) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 15)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=13,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("(%)") +            # Set y-axis label
+    xlab(expression(paste("tempo di viaggio (minuti)"))) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13),
+          axis.text.x  = element_text(angle=0, vjust=0.5, size=10, hjust = 0.5)) + 
+    theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+    # scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
+    ggtitle("Percentuale di viaggi per durata temporale") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+  p
+
+
+````
+
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 9.** Numero di viaggi per sosta temporale (5 min)."}
+
+## summary statistics for stop time #############
+
+
+############################
+### tempi di sosta FK ######
+### ----------- ############
+
+#### Istogramma di tutti i viaggi con tempi di sosta ad intervalli di 5 minuti
+
+## convert stop time into minutes
+trips <- as.data.frame(trips)
+trips$breaktime_min <- (trips$breaktime_s)/60
+
+# ## quick check -----------------------
+# ## tempo di ssta
+# ggplot(trips, aes(breaktime_min)) +
+# geom_density()
+
+
+
+### auto ###
+BBB <- NULL
+bin_stop = seq(from = 0, to = 120, by = 10)   
 
 for (i in 1:length(bin_stop)){
   if (i==1){
     AAA <- trips %>%
       filter(vehtype == "auto") %>%
-      filter(triptime_min <= bin_stop[i])  %>%
+      filter(breaktime_min <= bin_stop[i])  %>%
       summarise(counts = length(idtrajectory))
   }else{
     AAA <- trips %>%
        filter(vehtype == "auto") %>%
-      filter(triptime_min <= bin_stop[i] & triptime_min >= bin_stop[i-1]) %>%
+      filter(breaktime_min <= bin_stop[i] & breaktime_min >= bin_stop[i-1]) %>%
       summarise(counts = length(idtrajectory))
    
   }
@@ -857,19 +1002,19 @@ viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
 
 ### veicoli commerciali ###
 BBB <- NULL
-bin_stop = seq(from = 0, to = 80, by = 5)   ## max 2 ore trip = 120 minutes (2 hour trip)
+bin_stop = seq(from = 0, to = 120, by = 10)   ## max 2 ore trip = 120 minutes (2 hour trip)
 
 
 for (i in 1:length(bin_stop)){
   if (i==1){
     AAA <- trips %>%
       filter(vehtype == "veicoli commerciali") %>%
-      filter(triptime_min <= bin_stop[i])  %>%
+      filter(breaktime_min <= bin_stop[i])  %>%
       summarise(counts = length(idtrajectory))
   }else{
     AAA <- trips %>%
        filter(vehtype == "veicoli commerciali") %>%
-      filter(triptime_min <= bin_stop[i] & triptime_min >= bin_stop[i-1]) %>%
+      filter(breaktime_min <= bin_stop[i] & breaktime_min >= bin_stop[i-1]) %>%
       summarise(counts = length(idtrajectory))
    
   }
@@ -893,12 +1038,13 @@ viaggi_5min$perc_count <- round((viaggi_5min$counts/viaggi_5min$N_tot_trips)*100
 ## plot
 viaggi_5min$bin_stop <- as.factor(viaggi_5min$bin_stop)
 
+
 p <- ggplot(data = viaggi_5min,
-              aes(bin_stop, perc_count, fill = bin_stop)) + guides(fill=FALSE) +
+              aes(bin_stop, perc_count, fill = vehtype)) + guides(fill=FALSE) +
     geom_bar(stat = "identity") + 
     guides(fill=FALSE) +
     facet_wrap(~vehtype) +
-    ylim(0, 30) +
+    # ylim(0, 30) +
     theme_bw() +
     theme( strip.text = element_text(size = 15)) +
     theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
@@ -911,12 +1057,132 @@ p <- ggplot(data = viaggi_5min,
     theme(axis.title.y = element_text(face="bold", colour="black", size=14),
           axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
     # scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
-    ggtitle("Percentuale di viaggi per durata temporale") + 
+    ggtitle("Percentuale di soste per durata temporale") + 
     theme(plot.title = element_text(lineheight=.8, face="bold"))
   p
 
 
 ````
+
+
+
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 9.** Numero di viaggi per sosta temporale (5 min)."}
+
+## summary statistics for stop time #############
+
+
+############################
+### tempi di sosta GG #####
+### ----------- ############
+
+#### Istogramma di tutti i viaggi con tempi di sosta ad intervalli di 5 minuti
+
+## convert stop time into minutes
+data_GG <- as.data.frame(data_GG)
+trips <- data_GG %>%
+  filter(D_Sosta_Dur < 24)   # D_Sosta_Dur in units of HOURS
+trips$D_Sosta_Dur <- (trips$D_Sosta_Dur)*60
+
+# ## quick check -----------------------
+# ## tempo di sosta
+ggplot(trips, aes(D_Sosta_Dur)) +
+geom_density()
+
+
+
+### auto ###
+BBB <- NULL
+bin_stop = seq(from = 0, to = 1000, by = 10)   
+
+for (i in 1:length(bin_stop)){
+  if (i==1){
+    AAA <- trips %>%
+      filter(vehtype == "auto") %>%
+      filter(D_Sosta_Dur <= bin_stop[i])  %>%
+      summarise(counts = length(Id_Viaggi))
+  }else{
+    AAA <- trips %>%
+       filter(vehtype == "auto") %>%
+      filter(D_Sosta_Dur <= bin_stop[i] & D_Sosta_Dur >= bin_stop[i-1]) %>%
+      summarise(counts = length(Id_Viaggi))
+   
+  }
+  BBB<- rbind(BBB, AAA)
+  
+}
+
+viaggi_5min_auto <- as.data.frame(cbind(bin_stop, BBB))
+viaggi_5min_auto <- na.omit(viaggi_5min_auto)
+viaggi_5min_auto$vehtype <- "auto"
+viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
+
+
+### veicoli commerciali ###
+BBB <- NULL
+bin_stop = seq(from = 0, to = 1000, by = 10)   ## max 2 ore trip = 120 minutes (2 hour trip)
+
+
+for (i in 1:length(bin_stop)){
+  if (i==1){
+    AAA <- trips %>%
+      filter(vehtype == "veicoli commerciali") %>%
+      filter(D_Sosta_Dur <= bin_stop[i])  %>%
+      summarise(counts = length(Id_Viaggi))
+  }else{
+    AAA <- trips %>%
+       filter(vehtype == "veicoli commerciali") %>%
+      filter(D_Sosta_Dur <= bin_stop[i] & D_Sosta_Dur >= bin_stop[i-1]) %>%
+      summarise(counts = length(Id_Viaggi))
+   
+  }
+  BBB<- rbind(BBB, AAA)
+  
+}
+
+viaggi_5min_commerciali <- as.data.frame(cbind(bin_stop, BBB))
+viaggi_5min_commerciali <- na.omit(viaggi_5min_commerciali)
+viaggi_5min_commerciali$vehtype <- "veicoli commerciali"
+viaggi_5min_commerciali$N_tot_trips <- sum(viaggi_5min_commerciali$counts)
+
+viaggi_5min <- rbind(viaggi_5min_auto,
+                        viaggi_5min_commerciali)
+## calculate percentage of trips
+## calculate percentage of trips by vehtype
+viaggi_5min$perc_count <- round((viaggi_5min$counts/viaggi_5min$N_tot_trips)*100, digits = 1)
+
+
+
+## plot
+viaggi_5min$bin_stop <- as.factor(viaggi_5min$bin_stop)
+
+p <- ggplot(data = viaggi_5min,
+              aes(bin_stop, perc_count, fill = vehtype)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    # facet_wrap(~vehtype) +
+    # ylim(0, 30) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 15)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=13,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("(%)") +            # Set y-axis label
+    xlab(expression(paste("tempo di sosta (minuti)"))) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13),
+          axis.text.x  = element_text(angle=90, vjust=0.5, size=5, hjust = 0.5)) + 
+    theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+    # scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
+    ggtitle("Percentuale di soste per durata temporale") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+  p
+
+
+````
+
 
 *<br/><br/>*
 *<br/><br/>*
@@ -930,41 +1196,98 @@ p <- ggplot(data = viaggi_5min,
 ````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 9.** Tempo medio di viaggio per giorno della settimana."}
 
 
-## summary statistics by DAY of the WEEK #############
-### duration of the trip by day of the week ##########
+# ## summary statistics by DAY of the WEEK #############
+# ### duration of the trip by day of the week ##########
+# 
+# 
+# triptime_weekdays <- trips %>%
+#   group_by(month, day) %>%
+#   summarise(mean_trip_time = mean(triptime_min, na.rm = T)) 
+# 
+# 
+# triptime_weekdays <- as.data.frame(triptime_weekdays)
+# categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+# 
+# p <- ggplot(data = triptime_weekdays,
+#             aes(day, mean_trip_time, fill = day)) + guides(fill=FALSE) +
+#   geom_bar(stat="identity") +
+#   facet_wrap( ~ month, scales = "free_y") +
+#   guides(fill=FALSE) +
+#   scale_x_discrete(limits = categories) +
+#   ylim(0, 20) +
+#   theme_bw() +
+#   theme( strip.text = element_text(size = 15)) +
+#   theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+#   theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+#   theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+#   ylab("minuti") +            # Set y-axis label
+#   theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+#         axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+#   xlab("") +            # Set y-axis label
+#   theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+#         axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+#   # geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+#   geom_hline(yintercept = 15, col="black", lty=2, size=1) +
+#   ggtitle("tempo medio di viaggio per giorno della settimana") + 
+#   theme(plot.title = element_text(lineheight=.8, face="bold"))
+# p
 
 
-triptime_weekdays <- trips %>%
-  group_by(month, day) %>%
-  summarise(mean_trip_time = mean(triptime_min, na.rm = T)) 
+````
 
 
-triptime_weekdays <- as.data.frame(triptime_weekdays)
-categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
 
-p <- ggplot(data = triptime_weekdays,
-            aes(day, mean_trip_time, fill = day)) + guides(fill=FALSE) +
-  geom_bar(stat="identity") +
-  facet_wrap( ~ month, scales = "free_y") +
-  guides(fill=FALSE) +
-  scale_x_discrete(limits = categories) +
-  ylim(0, 20) +
-  theme_bw() +
-  theme( strip.text = element_text(size = 15)) +
-  theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
-  theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
-  theme(axis.title.x = element_blank()) +                  # Remove x-axis label
-  ylab("minuti") +            # Set y-axis label
-  theme(axis.title.y = element_text(face="bold", colour="black", size=14),
-        axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
-  xlab("") +            # Set y-axis label
-  theme(axis.title.x = element_text(face="bold", colour="black", size=14),
-        axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
-  # geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
-  geom_hline(yintercept = 15, col="black", lty=2, size=1) +
-  ggtitle("tempo medio di viaggio per giorno della settimana") + 
-  theme(plot.title = element_text(lineheight=.8, face="bold"))
-p
+*<br/><br/>*
+
+
+
+*<br/><br/>*
+*<br/><br/>*
+*<br/><br/>*
+*<br/><br/>*
+*<br/><br/>*
+*<br/><br/>*
+*<br/><br/>*
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 9.** Tempo medio di viaggio per giorno della settimana."}
+
+
+# ## summary statistics by DAY of the WEEK #############
+# ### duration of the trip by day of the week ##########
+# 
+# 
+# triptime_weekdays <- trips %>%
+#   group_by(month, day) %>%
+#   summarise(mean_trip_time = mean(triptime_min, na.rm = T)) 
+# 
+# 
+# triptime_weekdays <- as.data.frame(triptime_weekdays)
+# categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+# 
+# p <- ggplot(data = triptime_weekdays,
+#             aes(day, mean_trip_time, fill = day)) + guides(fill=FALSE) +
+#   geom_bar(stat="identity") +
+#   facet_wrap( ~ month, scales = "free_y") +
+#   guides(fill=FALSE) +
+#   scale_x_discrete(limits = categories) +
+#   ylim(0, 20) +
+#   theme_bw() +
+#   theme( strip.text = element_text(size = 15)) +
+#   theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+#   theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+#   theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+#   ylab("minuti") +            # Set y-axis label
+#   theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+#         axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+#   xlab("") +            # Set y-axis label
+#   theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+#         axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+#   # geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+#   geom_hline(yintercept = 15, col="black", lty=2, size=1) +
+#   ggtitle("tempo medio di viaggio per giorno della settimana") + 
+#   theme(plot.title = element_text(lineheight=.8, face="bold"))
+# p
 
 
 ````
@@ -977,38 +1300,38 @@ p
 ````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 9.** Tempo medio di viaggio per ora della giornata."}
 
 
-## summary statistics by HOUR of the DAY #############
-### duration of the trip by hour of the day ##########
-
-
-triptime_hour <- trips %>%
-  group_by(month, hour, vehtype) %>%
-  summarise(mean_trip_time = mean(triptime_min, na.rm = T)) 
-
-
-p <- ggplot(data = triptime_hour,
-              aes(hour, mean_trip_time, fill = hour)) + guides(fill=FALSE) +
-    geom_bar(stat = "identity") + 
-    # facet_wrap( ~ month, scales = "free_y") +
-    facet_grid(month ~ vehtype, scales = "free", space = "free") +
-    guides(fill=FALSE) +
-    ylim(0, 50) +
-    theme_bw() +
-    theme( strip.text = element_text(size = 15)) +
-    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
-    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
-    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
-    ylab("minuti") +            # Set y-axis label
-    theme(axis.title.y = element_text(face="bold", colour="black", size=14),
-          axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
-    xlab("") +            # Set y-axis label
-    theme(axis.title.x = element_text(face="bold", colour="black", size=12),
-          axis.text.x  = element_text(angle=0, vjust=1, hjust=0.5, size=10)) +
-    scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)) +
-    # geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
-    ggtitle("tempo medio di viaggio per ora della giornata") + 
-    theme(plot.title = element_text(lineheight=.8, face="bold"))
-p
+# ## summary statistics by HOUR of the DAY #############
+# ### duration of the trip by hour of the day ##########
+# 
+# 
+# triptime_hour <- trips %>%
+#   group_by(month, hour, vehtype) %>%
+#   summarise(mean_trip_time = mean(triptime_min, na.rm = T)) 
+# 
+# 
+# p <- ggplot(data = triptime_hour,
+#               aes(hour, mean_trip_time, fill = hour)) + guides(fill=FALSE) +
+#     geom_bar(stat = "identity") + 
+#     # facet_wrap( ~ month, scales = "free_y") +
+#     facet_grid(month ~ vehtype, scales = "free", space = "free") +
+#     guides(fill=FALSE) +
+#     ylim(0, 50) +
+#     theme_bw() +
+#     theme( strip.text = element_text(size = 15)) +
+#     theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+#     theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+#     theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+#     ylab("minuti") +            # Set y-axis label
+#     theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+#           axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+#     xlab("") +            # Set y-axis label
+#     theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+#           axis.text.x  = element_text(angle=0, vjust=1, hjust=0.5, size=10)) +
+#     scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)) +
+#     # geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+#     ggtitle("tempo medio di viaggio per ora della giornata") + 
+#     theme(plot.title = element_text(lineheight=.8, face="bold"))
+# p
 
 
 
@@ -1024,37 +1347,37 @@ p
 ### duration of the trip by day of the week ##########
 
 
-triptime_weekdays <- trips %>%
-  group_by(month, day, vehtype) %>%
-  summarise(mean_trip_time = mean(triptime_min, na.rm = T)) 
-
-
-triptime_weekdays <- as.data.frame(triptime_weekdays)
-categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
-
-p <- ggplot(data = triptime_weekdays,
-            aes(day, mean_trip_time, fill = day)) + guides(fill=FALSE) +
-  geom_bar(stat="identity") +
-  facet_grid(month ~ vehtype, scales = "free", space = "free") +
-  guides(fill=FALSE) +
-  scale_x_discrete(limits = categories) +
-  # ylim(0, 20) +
-  theme_bw() +
-  theme( strip.text = element_text(size = 15)) +
-  theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
-  theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
-  theme(axis.title.x = element_blank()) +                  # Remove x-axis label
-  ylab("minuti") +            # Set y-axis label
-  theme(axis.title.y = element_text(face="bold", colour="black", size=14),
-        axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
-  xlab("") +            # Set y-axis label
-  theme(axis.title.x = element_text(face="bold", colour="black", size=14),
-        axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
-  # geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
-  # geom_hline(yintercept = 15, col="black", lty=2, size=1) +
-  ggtitle("tempo medio di viaggio per giorno della settimana") + 
-  theme(plot.title = element_text(lineheight=.8, face="bold"))
-p
+# triptime_weekdays <- trips %>%
+#   group_by(month, day, vehtype) %>%
+#   summarise(mean_trip_time = mean(triptime_min, na.rm = T)) 
+# 
+# 
+# triptime_weekdays <- as.data.frame(triptime_weekdays)
+# categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+# 
+# p <- ggplot(data = triptime_weekdays,
+#             aes(day, mean_trip_time, fill = day)) + guides(fill=FALSE) +
+#   geom_bar(stat="identity") +
+#   facet_grid(month ~ vehtype, scales = "free", space = "free") +
+#   guides(fill=FALSE) +
+#   scale_x_discrete(limits = categories) +
+#   # ylim(0, 20) +
+#   theme_bw() +
+#   theme( strip.text = element_text(size = 15)) +
+#   theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+#   theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+#   theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+#   ylab("minuti") +            # Set y-axis label
+#   theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+#         axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+#   xlab("") +            # Set y-axis label
+#   theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+#         axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+#   # geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+#   # geom_hline(yintercept = 15, col="black", lty=2, size=1) +
+#   ggtitle("tempo medio di viaggio per giorno della settimana") + 
+#   theme(plot.title = element_text(lineheight=.8, face="bold"))
+# p
 
 
 ````

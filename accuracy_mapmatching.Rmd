@@ -364,8 +364,9 @@ library(data.table)
 
 
 # setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
-setwd("C:/Users/karaf/ownCloud/Catania_RAFAEL/viasat_data")
+# setwd("C:/Users/karaf/ownCloud/Catania_RAFAEL/viasat_data")
 path <- 'C:/Users/karaf/ownCloud/Catania_RAFAEL/viasat_data/'
+path <- 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/'
 
 ### get all length (in meters) of matched path together with the sum of progressive lenght and the accuracy (%)
 
