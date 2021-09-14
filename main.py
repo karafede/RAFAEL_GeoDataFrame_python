@@ -233,6 +233,23 @@ engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_C
 
 #### setup multiprocessing.......
 
+
+# long time run...
+## create a consecutive ID for each row
+cur_HAIG.execute("""
+alter table "route" add id serial PRIMARY KEY
+     """)
+conn_HAIG.commit()
+
+
+## create an ndex on the "id" field
+cur_HAIG.execute("""
+CREATE index route_id_idx on public.route("id");
+""")
+conn_HAIG.commit()
+
+
+
 ### change type of "idterm" from text to bigint
 cur_HAIG.execute("""
 ALTER TABLE public.route ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
@@ -245,6 +262,52 @@ cur_HAIG.execute("""
 CREATE index route_idterm_idx on public.route(idterm);
 """)
 conn_HAIG.commit()
+
+
+
+
+### create index for 'idtrajectory'
+cur_HAIG.execute("""
+CREATE index route_idtrajectory_idx on public.route(idtrajectory);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'tripdistance_m'
+cur_HAIG.execute("""
+CREATE index route_tripdistance_idx on public.route(tripdistance_m);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'timedate_o'
+cur_HAIG.execute("""
+CREATE index route_timedate_idx on public.route(timedate_o);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'breaktime_s'
+cur_HAIG.execute("""
+CREATE index route_breaktime_idx on public.route(breaktime_s);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'triptime_s'
+cur_HAIG.execute("""
+CREATE index route_triptime_s_idx on public.route(triptime_s);
+""")
+conn_HAIG.commit()
+
+
+
+### create index for 'deviation_pos_m'
+cur_HAIG.execute("""
+CREATE index route_deviation_pos_idx on public.route(deviation_pos_m);
+""")
+conn_HAIG.commit()
+
 
 
 ##### convert "geometry" field on LINESTRING
