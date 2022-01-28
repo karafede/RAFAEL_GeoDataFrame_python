@@ -1,4 +1,5 @@
 
+
 import os
 import glob
 import pandas as pd
@@ -10,8 +11,10 @@ os.chdir('D:/ViaSat/Catania')
 cwd = os.getcwd()
 
 # connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
+# conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
+conn_HAIG = db_connect.connect_HAIG_SALERNO()
 cur_HAIG = conn_HAIG.cursor()
+
 
 ##########################################################
 ### Check mapmatching DB #################################
@@ -22,31 +25,45 @@ cur_HAIG = conn_HAIG.cursor()
 # get all ID terminal of Viasat data
 all_VIASAT_TRIP_IDs = pd.read_sql_query(
     ''' SELECT "TRIP_ID" 
-        FROM public.mapmatching_2019 ''', conn_HAIG)
+        FROM public.mapmatching ''', conn_HAIG)
+
 
 # make a list of all unique trips
 all_TRIP_IDs = list(all_VIASAT_TRIP_IDs.TRIP_ID.unique())
 
-print(len(all_VIASAT_TRIP_IDs))
+print("all matched records:", len(all_VIASAT_TRIP_IDs))
 print("trip number:", len(all_TRIP_IDs))
 
 ## get all terminals (unique number of vehicles)
 idterm = list((all_VIASAT_TRIP_IDs.TRIP_ID.str.split('_', expand=True)[0]).unique())
+## make all elements floats
+idterm = [int(i) for i in idterm]
 print("vehicle number:", len(idterm))
 
-
 ## reload 'all_ID_TRACKS' as list
-with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
+with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
     all_ID_TRACKS = eval(file.readline())
+###### only for 09 October 2019 ###################################
 print(len(all_ID_TRACKS))
-## make difference between all idterm and matched idterms
+## make difference between all idterm and matched idterms lists
 all_ID_TRACKS_DIFF = list(set(all_ID_TRACKS) - set(idterm))
 print(len(all_ID_TRACKS_DIFF))
 # ## save 'all_ID_TRACKS' as list
-with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019_new.txt", "w") as file:
+with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019_new.txt", "w") as file:
     file.write(str(all_ID_TRACKS_DIFF))
 
-######################################
+
+
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+
 ######################################
 ######################################
 ### check the size of a table ########
@@ -54,6 +71,15 @@ with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019_new.tx
 
 pd.read_sql_query('''
 SELECT pg_size_pretty( pg_relation_size('public.mapmatching_2019') )''', conn_HAIG)
+
+pd.read_sql_query('''
+SELECT pg_size_pretty( pg_relation_size('public.dataraw') )''', conn_HAIG)
+
+pd.read_sql_query('''
+SELECT pg_size_pretty( pg_relation_size('public.routecheck') )''', conn_HAIG)
+
+pd.read_sql_query('''
+SELECT pg_size_pretty( pg_relation_size('public.mapmatching_all') )''', conn_HAIG)
 
 
 ################
@@ -104,7 +130,6 @@ SELECT pg_size_pretty( pg_relation_size('mapmatching_2019') )''', conn_HAIG)
 
 pd.read_sql_query('''
 SELECT pg_size_pretty( pg_relation_size('mapmatching_2017') )''', conn_HAIG)
-
 
 
 pd.read_sql_query('''

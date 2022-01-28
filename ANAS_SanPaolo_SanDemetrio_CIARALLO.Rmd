@@ -1,0 +1,342 @@
+---
+title: "Piani Emergenza ANAS"
+author:
+- Federico Karagulian
+date: "ultima versione `r format(Sys.time(), '%d %B %Y, %H:%M')`"
+output:
+  word_document: 
+    reference_docx: word_style_FK.docx
+  pdf_document: default
+  html_document: default
+  number_sections: true
+  bookdown::word_document: default
+---
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.**"}
+
+
+rm(list = ls())
+
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(readr)
+library(broom)
+library(threadr)
+library(dplyr)
+library(dygraphs)
+library(ggpmisc)
+library(plotly)
+library(GGally)
+library(htmlwidgets)
+library(htmltools)
+library(webshot)
+library(ggrepel)
+library(openair)
+library(widgetframe)
+library(grid)
+library(gridExtra)
+library(pander)
+library(varhandle)
+library(RPostgreSQL)
+library(lubridate)
+library(threadr)
+library(stringr)
+library(ggplot2)
+library(dplyr)
+library(openair)
+library(gsubfn)
+library(mgsub)
+
+
+setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data")
+wd <- "viasat_data/"
+options(scipen=5)
+options(warn=-1)
+
+
+
+# loads the PostgreSQL driver
+drv <- dbDriver("PostgreSQL")
+
+conn_HAIG <- dbConnect(drv, dbname = "HAIG_CATANIA",
+                       host = "10.1.0.1", port = 5432,       
+                       user = "postgres", password = "superuser")
+dbListTables(conn_HAIG)
+
+## get nodes and routes....
+edges =  dbGetQuery(conn_HAIG, "
+                     SELECT *  
+                     FROM net.edges ")
+
+
+nodes =  dbGetQuery(conn_HAIG, "
+                     SELECT *  
+                     FROM net.nodes ")
+
+
+### ---> emergency path from VVF catana Nord to Mote Ka Tira
+MONTEKA_SANPAOLO <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/MONTEKA_SANPAOLO.csv", header = T)
+VVF_NORD_MONTEKA <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/VVF_NORD_MONTEKA.csv", header = T)
+VVF_SUD_SanDemetrio <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/VVF_SUD_SanDemetrio.csv", header = T)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ##########################################################################
+# #### get all loads (on the EDGES) from Viadotto San Paolo, NO CLOSURE ####
+# ##########################################################################
+# 
+# ## "Viadotto San Paolo" u,v --> (841721621, 6758675255) # Descending
+# ## "Viadotto San Paoo" u,v --> (4096452579, 6758779932) # Ascending
+# 
+# df_open_CATANIA <- read_csv(paste0(wd,'LOADS_Viadotto_SanPaolo_CATANIA_only_21_NOVEMBER_2019.csv'))[-1]
+# df_open_ACIREALE <- read_csv(paste0(wd,'LOADS_Viadotto_SanPaolo_ACIREALE_only_21_NOVEMBER_2019.csv'))[-1]
+# ## sort by largest load(%)
+# df_open_CATANIA <- df_open_ACIREALE[order(-df_open_ACIREALE$`load(%)`),]
+# df_open_ACIREALE <- df_open_ACIREALE[order(-df_open_ACIREALE$`load(%)`),]
+# 
+# df_closed_ACIREALE <- read.csv(paste0(wd,'LOADS_DISRUPTION_Viadotto_SanPaolo_ACIREALE_only_21_NOVEMBER_2019.csv'))
+# ### rename one column
+# colnames(df_closed_ACIREALE)[colnames(df_closed_ACIREALE) == "load..."] <- 'loads(%)'
+# df_closed_ACIREALE <- df_closed_ACIREALE %>%
+#   select(u,v,`loads(%)`)
+# 
+# ### rename one column
+# df_closed_CATANIA <- read.csv(paste0(wd,'LOADS_DISRUPTION_Viadotto_SanPaolo_CATANIA_only_21_NOVEMBER_2019.csv'))
+# ### rename one column
+# colnames(df_closed_CATANIA)[colnames(df_closed_CATANIA) == "load..."] <- 'loads(%)'
+# df_closed_CATANIA <- df_closed_CATANIA %>%
+#   select(u,v,`loads(%)`)
+# ## sort by largest load(%)
+# df_closed_CATANIA <- df_closed_CATANIA[order(-df_closed_CATANIA$`loads(%)`),]
+# df_closed_ACIREALE <- df_closed_ACIREALE[order(-df_closed_ACIREALE$`loads(%)`),]
+# 
+# 
+#   
+# ## load EDGE files with all info of the road network over Catania
+# EDGES <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/gdf_edges.csv")[-1]
+# EDGES <- as.data.frame(EDGES)
+# ## skip "geometry"
+# EDGES <- EDGES[, names(EDGES)[which(names(EDGES) != "geometry")]]
+# # remove duplicates of u & v
+# EDGES <- EDGES[-1] %>%
+#   distinct(u, v, .keep_all = TRUE) 
+# EDGES$ID <- 1:nrow(EDGES)
+# 
+# ## join EDGES with df_open_CATANIA
+# df_open_CATANIA <- df_open_CATANIA %>%
+#   left_join(EDGES, by = c("u", "v"))
+# 
+# 
+# ## join EDGES with df_open_ACIREALE
+# df_open_ACIREALE <- df_open_ACIREALE %>%
+#   left_join(EDGES, by = c("u", "v"))
+# 
+# ## join EDGES with df_closed_CATANIA
+# df_closed_CATANIA <- df_closed_CATANIA %>%
+#   left_join(EDGES, by = c("u", "v"))
+# 
+# ## filter loads up to 51%
+# df_closed_CATANIA$ID <- 1:nrow(df_closed_CATANIA)
+# df_closed_CATANIA <- df_closed_CATANIA %>%
+#   filter(`loads(%)` > 51) %>%
+#   group_by(name, ID) %>%
+#   summarise(loads = mean(`loads(%)`))
+# 
+# ## sort by loading
+# df_closed_CATANIA <- df_closed_CATANIA[order(-df_closed_CATANIA$loads),]
+# ## remove empty lines
+# df_closed_CATANIA <- df_closed_CATANIA[-which(df_closed_CATANIA$name == ""), ]
+# ## distinct rows by name
+# df_closed_CATANIA <- df_closed_CATANIA %>% 
+#   distinct(name, .keep_all = TRUE)
+# 
+# df_closed_CATANIA$loads <- round(df_closed_CATANIA$loads, 0)
+# 
+# df_closed_CATANIA <- df_closed_CATANIA %>%
+#   left_join(EDGES[ ,c("ID", "ref")], by = c("ID"))
+# 
+# 
+# Caption <- paste0("**Tabella 1**. Closure viadotto San Paolo towards Catania.")
+# set.caption(Caption)
+# panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+# panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+# panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+# pander(df_closed_CATANIA, emphasize.strong.cols = 1, missing = "")
+# 
+# ```
+# 
+# *<br/><br/>*
+# *<br/><br/>*
+# 
+# ````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 2.**"}
+# 
+# ## join EDGES with df_closed_ACIREALE
+# df_closed_ACIREALE <- df_closed_ACIREALE %>%
+#   left_join(EDGES, by = c("u", "v"))
+# ## filter loads up to 51%
+# df_closed_ACIREALE$ID <- 1:nrow(df_closed_ACIREALE)
+# df_closed_ACIREALE <- df_closed_ACIREALE %>%
+#   filter(`loads(%)` > 51) %>%
+#   group_by(name, ID) %>%
+#   summarise(loads = mean(`loads(%)`))
+# ## sort by loading
+# df_closed_ACIREALE <- df_closed_ACIREALE[order(-df_closed_ACIREALE$loads),]
+# ## remove empty lines
+# df_closed_ACIREALE <- df_closed_ACIREALE[-which(df_closed_ACIREALE$name == ""), ]
+# ## distinct rows by name
+# df_closed_ACIREALE <- df_closed_ACIREALE %>% 
+#   distinct(name, .keep_all = TRUE)
+# 
+# df_closed_ACIREALE$loads <- round(df_closed_ACIREALE$loads, 0)
+# 
+# df_closed_ACIREALE <- df_closed_ACIREALE %>%
+#   left_join(EDGES[ ,c("ID", "ref")], by = c("ID"))
+
+
+Caption <- paste0("**Tabella 2**. Closure viadotto San Paolo towards Acireale")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(df_closed_ACIREALE, emphasize.strong.cols = 1, missing = "")
+
+
+````
+
+
+*<br/><br/>*
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 3.**"}
+
+### find the road sequence for the new path during the closure of viadotto San Paolo
+## 142, 161  --> Acireale (Messina)
+## 207, 30 --> Catania
+
+df_closed_ACIREALE_142 <- read.csv(paste0(wd,'new_path_142_travel_time_DISRUPTION_ACIREALE_21_NOVEMBER_2019.csv'))[-1]
+### rename columns
+names(df_closed_ACIREALE_142) <- c('u', 'v', 'idtrajectory', 'travel_time',  'loads(%)', 'lunghezza_arco')
+
+  
+## load EDGE files with all info of the road network over Catania
+EDGES <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/gdf_edges.csv")[-1]
+EDGES <- as.data.frame(EDGES)
+## skip "geometry"
+EDGES <- EDGES[, names(EDGES)[which(names(EDGES) != "geometry")]]
+# remove duplicates of u & v
+EDGES <- EDGES[-1] %>%
+  distinct(u, v, .keep_all = TRUE) 
+EDGES$ID <- 1:nrow(EDGES)
+
+
+## join EDGES with df_closed_ACIREALE_142
+df_closed_ACIREALE_142 <- df_closed_ACIREALE_142 %>%
+  left_join(EDGES, by = c("u", "v"))
+
+## remove empty lines
+df_closed_ACIREALE_142 <- df_closed_ACIREALE_142[-which(df_closed_ACIREALE_142$name == ""), ]
+
+## distinct rows by name
+df_closed_ACIREALE_142 <- df_closed_ACIREALE_142 %>% 
+  distinct(name, .keep_all = TRUE)
+
+df_closed_ACIREALE_142$loads <- round(df_closed_ACIREALE_142$loads, 0)
+
+## get selected field
+df_closed_ACIREALE_142 <- df_closed_ACIREALE_142 %>%
+  select(name, ref, idtrajectory, travel_time,  `loads(%)`, length)
+
+
+
+Caption <- paste0("**Tabella 3**. Percorso alternativo verso Messina (N. 142)")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(df_closed_ACIREALE_142, emphasize.strong.cols = 1, missing = "")
+
+
+````
+
+
+*<br/><br/>*
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 4.**"}
+
+### find the road sequence for the new path during the closure of viadotto San Paolo
+## 142, 161  --> Acireale (Messina)
+## 207, 30 --> Catania
+
+df_closed_CATANIA_207 <- read.csv(paste0(wd,'new_path_207_travel_time_DISRUPTION_CATANIA_21_NOVEMBER_2019.csv'))[-1]
+### rename columns
+names(df_closed_CATANIA_207) <- c('u', 'v', 'idtrajectory', 'travel_time',  'loads(%)', 'lunghezza_arco')
+
+  
+## load EDGE files with all info of the road network over Catania
+EDGES <- read.csv("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/gdf_edges.csv")[-1]
+EDGES <- as.data.frame(EDGES)
+## skip "geometry"
+EDGES <- EDGES[, names(EDGES)[which(names(EDGES) != "geometry")]]
+# remove duplicates of u & v
+EDGES <- EDGES[-1] %>%
+  distinct(u, v, .keep_all = TRUE) 
+EDGES$ID <- 1:nrow(EDGES)
+
+
+## join EDGES with df_closed_ACIREALE_142
+df_closed_CATANIA_207 <- df_closed_CATANIA_207 %>%
+  left_join(EDGES, by = c("u", "v"))
+
+## remove empty lines
+df_closed_CATANIA_207 <- df_closed_CATANIA_207[-which(df_closed_CATANIA_207$name == ""), ]
+
+## distinct rows by name
+df_closed_CATANIA_207 <- df_closed_CATANIA_207 %>% 
+  distinct(name, .keep_all = TRUE)
+
+df_closed_CATANIA_207$loads <- round(df_closed_CATANIA_207$loads, 0)
+
+## get selected field
+df_closed_CATANIA_207 <- df_closed_CATANIA_207 %>%
+  select(name, ref, idtrajectory, travel_time,  `loads(%)`, length)
+
+
+Caption <- paste0("**Tabella 4**. Percorso alternativo verso Catania (N. 207)")
+set.caption(Caption)
+panderOptions("table.emphasize.rownames", FALSE) # remove row.names from the table
+panderOptions("table.split.table", Inf) # to avoid to split tables if rows are too long
+panderOptions('table.alignment.default', function(df) ifelse(sapply(df, is.numeric), 'right', 'left')) # right alignment for numeric, left otherwise
+pander(df_closed_CATANIA_207, emphasize.strong.cols = 1, missing = "")
+
+
+````
+
+

@@ -51,8 +51,8 @@ setwd("D:/ENEA_CAS_WORK/Catania_RAFAEL")
 drv <- dbDriver("PostgreSQL")
 
 ## connect to the Brescia PostgreSQL DB
-conn_HAIG <- dbConnect(drv, dbname = "HAIG_Viasat_CT",
-                       host = "10.0.0.1", port = 5432,       
+conn_HAIG <- dbConnect(drv, dbname = "HAIG_ROMA",
+                       host = "10.1.0.1", port = 5432,       
                        user = "postgres", password = "superuser")
 
 ### count how many records for vehicle type
@@ -144,15 +144,15 @@ all_breaktime_pos <- all_breaktime %>%
 ### Load all trips
 
 # data_GG <- read_csv("df_Viag_0_26541.csv")[-1]
-data_GG <- read_csv("route_CATANIA_GG.csv")[-1]
+data_GG <- read_csv("route_CATANIA_GG.csv")
 # data_GG = dbGetQuery(conn_HAIG, "SELECT *
 #                                     FROM \"route_2019_GG\"
 #                                     ")
 
 data_GG <- data_GG %>%
-  select(Id_Term,
+  select(idterm,
          Id_Viaggi,
-         Veh_Type,
+         vehtype,
          O_Data,
          D_Sosta_Dur,
          Viag_Km,
@@ -163,11 +163,11 @@ data_GG$hour <- hour(data_GG$O_Data)
 data_GG$day <- weekdays(as.Date(data_GG$O_Data))
 data_GG$month <- month(as.Date(data_GG$O_Data))
 ### rename data
-data_GG$Veh_Type <- gsub(1, "auto", (data_GG$Veh_Type))
-data_GG$Veh_Type <- gsub(2, "veicoli commerciali", (data_GG$Veh_Type))
+data_GG$vehtype <- gsub(1, "auto", (data_GG$vehtype))
+data_GG$vehtype <- gsub(2, "veicoli commerciali", (data_GG$vehtype))
 ## rename columns
-colnames(data_GG)[colnames(data_GG) == 'Veh_Type'] <- 'vehtype'
-colnames(data_GG)[colnames(data_GG) == 'Id_Term'] <- 'idterm'
+# colnames(data_GG)[colnames(data_GG) == 'Veh_Type'] <- 'vehtype'
+# colnames(data_GG)[colnames(data_GG) == 'Id_Term'] <- 'idterm'
 
 
 trips <- data_GG %>%
@@ -296,32 +296,165 @@ p <- ggplot(data = passaggi_20kmh,
 
 ### load all TRIPS
 
-# data_FK = dbGetQuery(conn_HAIG, "SELECT route_2019.idtrajectory,
-#                                      route_2019.tripdistance_m,
-#                                      route_2019.triptime_s,
-#                                      route_2019.timedate_o,
-#                                      route_2019.breaktime_s,
+# data_FK = dbGetQuery(conn_HAIG, "SELECT route.idtrajectory,
+#                                      route.tripdistance_m,
+#                                      route.triptime_s,
+#                                      route.timedate_o,
+#                                      route.breaktime_s,
 #                                      idterm_portata.idterm, idterm_portata.vehtype
-#                                     FROM route_2019
+#                                     FROM route
 #                                   LEFT JOIN idterm_portata
-#                                    ON route_2019.idterm = idterm_portata.idterm
+#                                    ON route.idterm = idterm_portata.idterm
 #                                     ")
+
+data_FK = dbGetQuery(conn_HAIG, "SELECT route.idtrajectory,
+                                          route.idterm,
+                                          route.tripdistance_m,
+                                          route.timedate_o,
+                                          route.breaktime_s,
+                                          route.triptime_s,
+                                          route.deviation_pos_m,
+                                          idterm_portata.vehtype
+                                   FROM route
+                                   LEFT JOIN idterm_portata
+                                        ON route.idterm = idterm_portata.idterm
+                                          ")
+
+
+
+# data_FK <- read_csv("route_BRESCIA.csv")
+## get month
+data_FK <- data_FK %>%
+  mutate(month = month(timedate_o))
+# unique(data_FK$month)   # 3 11 for Brescia
+
+
+
+### only for SALERNO
+# data_FK$year <- year(as.Date(data_FK$timedate_o))
+# data_FK <- data_FK %>%
+#   filter(year == "2019")
+# data_FK <- data_FK %>%
+#   select(- year)
+# data_FK <- data_FK %>%
+#   filter(month %in% c(9)) 
+
+
+### ---> for CATANIA
+# shift time (UTC zones)
+# data_FK_Feb_Nov <- data_FK %>%
+#   filter(month %in% c(2,11)) %>%
+#   mutate(timedate_o = timedate_o - hours(1))
+# data_FK_May_Aug <- data_FK %>%
+#   filter(month %in% c(5,8)) %>%
+#   mutate(timedate_o = timedate_o + hours(0))
+# data_FK <- rbind(data_FK_Feb_Nov, data_FK_May_Aug)
+# remove(data_FK_Feb_Nov, data_FK_May_Aug)
+# # ---> CATANIA
+# data_FK <- data_FK %>%
+#   filter(month %in% c(2,5,8,11))
+
+
+### ---> for BRESCIA
+## shift time (UTC zones)
+# data_FK_March <- data_FK %>%
+#   filter(month %in% c(3)) %>%
+#   mutate(timedate_o = timedate_o + hours(0))
+# data_FK_Nov <- data_FK %>%
+#   filter(month %in% c(11)) %>%
+#   mutate(timedate_o = timedate_o - hours(1))
+# 
+# data_FK <- rbind(data_FK_Nov, data_FK_March)
+# remove(data_FK_March, data_FK_Nov)
+# data_FK <- data_FK %>%
+#   filter(month %in% c(3,11))
+
+
+### ---> for ROMA
+data_FK <- data_FK %>%
+  filter(month %in% c(10))
+
+
+
+data_FK <- data_FK %>%
+  select(- month)
+data_FK$deviation_pos_m <- round(data_FK$deviation_pos_m, digits = 0)
+
+## get consecutive unique id for each "idtrajectory"
+AAA <- data_FK[order(data_FK$idtrajectory, data_FK$idterm),]
+AAA$idtrajectory <- 1:nrow(AAA)
+
+## get consecutuve unique id for each "idterm"
+AAA <- transform(AAA,idterm = as.numeric(factor(idterm)))
+
+
+# AAA$speed_trip = (AAA$tripdistance_m/1000)/(AAA$triptime_s/3600)  ## km/h
+# AAA$speed_trip <- round(AAA$speed_trip, digits = 0)
+# AAA <- AAA %>%
+#   filter(tripdistance_m > 0 & tripdistance_m < 150000 &
+#            triptime_s > 60 & triptime_s < 20500 & 
+#             speed_trip < 220 & speed_trip > 15 &
+#            breaktime_s > 60 & breaktime_s < 100000) 
+# AAA <- AAA %>%
+#   select(- speed_trip)
+
+### sample random rows
+# BBB <- sample_n(AAA, 500000)
+BBB <- AAA %>%
+  sample_frac(0.2)
+
+dir <- "D:/Federico/FCDapp"
+# saveRDS(BBB, file = paste0(dir, "/", "route_BRESCIA_random.rds"))
+# saveRDS(BBB, file = paste0(dir, "/", "route_CATANIA_random.rds"))
+# saveRDS(BBB, file = paste0(dir, "/", "route_SALERNO_random.rds"))
+saveRDS(BBB, file = paste0(dir, "/", "route_ROMA_random.rds"))
+# write_csv(data_FK, "route_BRESCIA.csv")
+# write_csv(data_FK, "route_ROMA.csv")
+# write_csv(data_FK, "route_SALERNO.csv")
 # write_csv(data_FK, "route_CATANIA.csv")
 
-data_FK <- read_csv("route_CATANIA.csv")
-## get month
-data_FK$month <- month(as.Date(data_FK$timedate_o))
 
-## shift time (UTC zones)
-data_FK_Feb_Nov <- data_FK %>%
-  filter(month %in% c(2,11)) %>%
-  mutate(timedate_o = timedate_o - hours(1))
+##### --------------------------- ##################
+####################################################
+### load mapmatching data
+dir <- "D:/Federico/FCDapp"
+# mapmatching <- readRDS(file = paste0(dir, "/","matched_routes_ROMA_2019_10_09.rds"))
+mapmatching <- read_csv(file = paste0(dir, "/","matched_routes_ROMA_2019_10_09.csv"))[-1]
+mapmatching <- mapmatching %>% 
+  filter(`load(%)` >= 17) 
+mapmatching <- mapmatching %>% 
+  filter(hr <= 21 & hr >= 6) 
+saveRDS(mapmatching, file = paste0(dir, "/", "matched_routes_ROMA_2019_10_09.rds"))
 
-data_FK_May_Aug <- data_FK %>%
-  filter(month %in% c(5,8)) %>%
-  mutate(timedate_o = timedate_o + hours(0))
-data_FK <- rbind(data_FK_Feb_Nov, data_FK_May_Aug)
 
+# mapmatching <- readRDS(file = paste0(dir, "/","matched_routes_CATANIA_2019_02_14.rds"))
+mapmatching <- read_csv(file = paste0(dir, "/","matched_routes_CATANIA_2019_02_14.csv"))[-1]
+mapmatching <- mapmatching %>% 
+  filter(`load(%)` >= 17) 
+mapmatching <- mapmatching %>% 
+  filter(hr <= 21 & hr >= 6) 
+saveRDS(mapmatching, file = paste0(dir, "/", "matched_routes_CATANIA_2019_02_14.rds"))
+
+
+mapmatching <- read_csv(file = paste0(dir, "/","matched_routes_SALERNO_2019_09_19.csv"))[-1]
+mapmatching <- mapmatching %>% 
+  filter(`load(%)` >= 17) 
+mapmatching <- mapmatching %>% 
+  filter(hr <= 21 & hr >= 6) 
+saveRDS(mapmatching, file = paste0(dir, "/", "matched_routes_SALERNO_2019_09_19.rds"))
+
+
+mapmatching <- read_csv(file = paste0(dir, "/","matched_routes_BRESCIA_2019_03_14.csv"))[-1]
+mapmatching <- mapmatching %>% 
+  filter(`load(%)` >= 17) 
+mapmatching <- mapmatching %>% 
+  filter(hr <= 21 & hr >= 6) 
+saveRDS(mapmatching, file = paste0(dir, "/", "matched_routes_BRESCIA_2019_03_14.rds"))
+
+
+
+##### --------------------------- ##################
+####################################################
 
 ## rename data
 data_FK$vehtype <- gsub(1, "auto", (data_FK$vehtype))
@@ -329,16 +462,14 @@ data_FK$vehtype <- gsub(2, "veicoli commerciali", (data_FK$vehtype))
 data_FK$speed_trip = (data_FK$tripdistance_m/1000)/(data_FK$triptime_s/3600)  ## km/h
 data_FK$hour <- hour(data_FK$timedate_o)
 data_FK$day <- weekdays(as.Date(data_FK$timedate_o))
-data_FK$month <- month(as.Date(data_FK$timedate_o))
-data_FK <- data_FK %>%
-  filter(month %in% c(2,5,8,11))
+# data_FK$month <- month(as.Date(data_FK$timedate_o))
 
 
 
 trips <- data_FK %>%
   filter(tripdistance_m > 0 & tripdistance_m < 150000 &
            triptime_s > 60 & triptime_s < 20500 & 
-         speed_trip < 150 & speed_trip > 15 &
+         speed_trip < 220 & speed_trip > 15 &
            breaktime_s > 60 & breaktime_s < 100000) 
 
 # ## quick check -----------------------
@@ -466,14 +597,14 @@ p <- ggplot(data = viaggi_10kmh,
     theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
     theme(axis.text.x=element_text(size=13,face="bold", colour = "black")) +
     theme(axis.title.x = element_blank()) +                  # Remove x-axis label
-    ylab("(%)") +            # Set y-axis label
+    ylab("(% of trips)") +            # Set y-axis label
     xlab(expression(paste("velocità (km/h)"))) +
     theme(axis.title.y = element_text(face="bold", colour="black", size=15),
           axis.text.y  = element_text(angle=0, vjust=0.5, size=15)) +
     theme(axis.title.x = element_text(face="bold", colour="black", size=13),
           axis.text.x  = element_text(angle=0, vjust=0.5, size=10, hjust = 0.5)) + 
     # scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
-    ggtitle("Percentuale di viaggi in funzione della velocità media di viaggio") + 
+    ggtitle("Percentage of trips per mean speed trip") + 
     theme(plot.title = element_text(lineheight=.8, face="bold"))
   p
 
@@ -490,8 +621,10 @@ p <- ggplot(data = viaggi_10kmh,
 ## assign name to month
 trips$month <- as.factor(trips$month)
 trips$month <- gsub(2, "febbraio", (trips$month))
+trips$month <- gsub(3, "marzo", (trips$month))
 trips$month <- gsub(5, "maggio", (trips$month))
 trips$month <- gsub(8, "agosto", (trips$month))
+trips$month <- gsub(10, "ottobre", (trips$month))
 trips$month <- gsub(11, "novembre", (trips$month))
 
 
@@ -859,7 +992,7 @@ trips$triptime_min <- (trips$triptime_s)/60
 
 ### auto ###
 BBB <- NULL
-bin_trip = seq(from = 0, to = 80, by = 5)   ## max 2 ore trip = 120 minutes (2 hour trip)
+bin_trip = seq(from = 0, to = 140, by = 5)   ## max 2 ore trip = 120 minutes (2 hour trip)
 
 for (i in 1:length(bin_trip)){
   if (i==1){
@@ -886,7 +1019,7 @@ viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
 
 ### veicoli commerciali ###
 BBB <- NULL
-bin_stop = seq(from = 0, to = 80, by = 5)   ## max 2 ore trip = 120 minutes (2 hour trip)
+bin_stop = seq(from = 0, to = 130, by = 5)   ## max 2 ore trip = 120 minutes (2 hour trip)
 
 
 for (i in 1:length(bin_trip)){
@@ -926,7 +1059,7 @@ p <- ggplot(data = viaggi_5min,
               aes(bin_trip, perc_count, fill = bin_trip)) + guides(fill=FALSE) +
     geom_bar(stat = "identity") + 
     guides(fill=FALSE) +
-    facet_wrap(~vehtype) +
+    facet_wrap( ~ vehtype, ncol = 1) +
     ylim(0, 30) +
     theme_bw() +
     theme( strip.text = element_text(size = 15)) +
@@ -975,7 +1108,7 @@ trips$breaktime_min <- (trips$breaktime_s)/60
 
 ### auto ###
 BBB <- NULL
-bin_stop = seq(from = 0, to = 120, by = 10)   
+bin_stop = seq(from = 0, to = 180, by = 10)   
 
 for (i in 1:length(bin_stop)){
   if (i==1){
@@ -1002,7 +1135,7 @@ viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
 
 ### veicoli commerciali ###
 BBB <- NULL
-bin_stop = seq(from = 0, to = 120, by = 10)   ## max 2 ore trip = 120 minutes (2 hour trip)
+bin_stop = seq(from = 0, to = 180, by = 10)   ## max 2 ore trip = 120 minutes (2 hour trip)
 
 
 for (i in 1:length(bin_stop)){
@@ -1043,7 +1176,7 @@ p <- ggplot(data = viaggi_5min,
               aes(bin_stop, perc_count, fill = vehtype)) + guides(fill=FALSE) +
     geom_bar(stat = "identity") + 
     guides(fill=FALSE) +
-    facet_wrap(~vehtype) +
+    facet_wrap( ~ vehtype, ncol = 1) +
     # ylim(0, 30) +
     theme_bw() +
     theme( strip.text = element_text(size = 15)) +
@@ -1063,6 +1196,154 @@ p <- ggplot(data = viaggi_5min,
 
 
 ````
+
+
+
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 9.** Numero di viaggi per sosta temporale (5 min)."}
+
+## summary statistics for stop time #############
+
+
+############################
+### tempi di sosta GG #####
+### ----------- ############
+
+#### Istogramma di tutti i viaggi con tempi di sosta ad intervalli di 10 minutes
+# ## quick check -----------------------
+# ## tempo di sosta
+# ggplot(trips, aes(breaktime_min)) +
+# geom_density()
+
+
+trips <- trips %>%
+  filter(breaktime_min < 24*60)   # D_Sosta_Dur in units of HOURS
+
+### auto ###
+BBB <- NULL
+bin_stop = seq(from = 0, to = 1000, by = 10)   
+
+for (i in 1:length(bin_stop)){
+  if (i==1){
+    AAA <- trips %>%
+      filter(vehtype == "auto") %>%
+      filter(breaktime_min <= bin_stop[i])  %>%
+      summarise(counts = length(idtrajectory))
+  }else{
+    AAA <- trips %>%
+       filter(vehtype == "auto") %>%
+      filter(breaktime_min <= bin_stop[i] & breaktime_min >= bin_stop[i-1]) %>%
+      summarise(counts = length(idtrajectory))
+   
+  }
+  BBB<- rbind(BBB, AAA)
+  
+}
+
+viaggi_5min_auto <- as.data.frame(cbind(bin_stop, BBB))
+viaggi_5min_auto <- na.omit(viaggi_5min_auto)
+viaggi_5min_auto$vehtype <- "auto"
+viaggi_5min_auto$N_tot_trips <- sum(viaggi_5min_auto$counts)
+
+
+### veicoli commerciali ###
+BBB <- NULL
+bin_stop = seq(from = 0, to = 1000, by = 10)   ## max 2 ore trip = 120 minutes (2 hour trip)
+
+
+for (i in 1:length(bin_stop)){
+  if (i==1){
+    AAA <- trips %>%
+      filter(vehtype == "veicoli commerciali") %>%
+      filter(breaktime_min <= bin_stop[i])  %>%
+      summarise(counts = length(idtrajectory))
+  }else{
+    AAA <- trips %>%
+       filter(vehtype == "veicoli commerciali") %>%
+      filter(breaktime_min <= bin_stop[i] & breaktime_min >= bin_stop[i-1]) %>%
+      summarise(counts = length(idtrajectory))
+   
+  }
+  BBB<- rbind(BBB, AAA)
+  
+}
+
+viaggi_5min_commerciali <- as.data.frame(cbind(bin_stop, BBB))
+viaggi_5min_commerciali <- na.omit(viaggi_5min_commerciali)
+viaggi_5min_commerciali$vehtype <- "veicoli commerciali"
+viaggi_5min_commerciali$N_tot_trips <- sum(viaggi_5min_commerciali$counts)
+
+viaggi_5min <- rbind(viaggi_5min_auto,
+                        viaggi_5min_commerciali)
+## calculate percentage of trips
+## calculate percentage of trips by vehtype
+viaggi_5min$perc_count <- round((viaggi_5min$counts/viaggi_5min$N_tot_trips)*100, digits = 1)
+
+
+
+## plot
+viaggi_5min$bin_stop <- as.factor(viaggi_5min$bin_stop)
+
+p <- ggplot(data = viaggi_5min,
+              aes(bin_stop, perc_count, fill = vehtype)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") +
+    # facet_wrap(~vehtype) +
+    # ylim(0, 30) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 15)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=13,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("(%)") +            # Set y-axis label
+    xlab(expression(paste("tempo di sosta (minuti)"))) +
+    theme(axis.title.x = element_text(face="bold", colour="black", size=13),
+          axis.text.x  = element_text(angle=90, vjust=0.5, size=5, hjust = 0.5)) + 
+    theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+    # scale_x_continuous(breaks=c(0, 5, 10, 15, 20)) +
+    ggtitle("Percentuale di soste per durata temporale") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+  p
+
+  
+  ggplot() + 
+  geom_density(data=trips, aes(x = breaktime_min, group=vehtype, color=vehtype), adjust=2) +
+     scale_x_continuous(trans='log10', breaks=c(3, 10, 50, 780)) +
+                                 theme(legend.title=element_blank()) + 
+                                 # aes(y=stat(count)/sum(stat(count))) + 
+                                 scale_y_continuous(labels = scales::percent) +
+                                 theme_bw() +
+                                 theme( strip.text = element_text(size = 10)) +
+                                 guides(fill=FALSE) +
+                                 theme(axis.text.x=element_text(angle=0,hjust=0.5,vjust=1, size=10)) +
+                                 theme(axis.text.x=element_text(size=10, colour = "black")) +
+                                 theme(axis.title.x = element_text(face="bold", colour="black", size=10)) +
+                                 geom_vline(xintercept = 3, col="gray", lty=2, size=0.5) +
+                                 geom_vline(xintercept = 10, col="gray", lty=2, size=0.5) +
+                                 geom_vline(xintercept = 70, col="gray", lty=2, size=0.5) +
+                                 geom_vline(xintercept = 250, col="gray", lty=2, size=0.5) +
+                                 geom_vline(xintercept = 730, col="gray", lty=2, size=0.5) +
+                                 xlab("tempo di sosta (minuti)") +
+                                 ylab("density") +
+                                 theme(axis.title.y = element_text(face="bold", colour="black", size=10),
+                                       axis.text.y  = element_text(angle=0, vjust=0.5, size=10, colour="black")) +
+                                 ggtitle("distribuzione dei tempi di sosta") +
+                                 theme(plot.title = element_text(lineheight=.8, face="bold", size = 10))
+  
+
+
+
+````
+
+
+
+
+
+
+
 
 
 
@@ -1381,5 +1662,6 @@ p <- ggplot(data = viaggi_5min,
 
 
 ````
+
 
 

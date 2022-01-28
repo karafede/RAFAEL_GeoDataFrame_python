@@ -124,7 +124,7 @@ viasat_data = pd.read_sql_query('''
                           LEFT JOIN dataraw 
                                       ON mapmatching_2019.idtrace = dataraw.id  
                                       /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                      WHERE dataraw.vehtype::bigint = 2
+                                       WHERE dataraw.vehtype::bigint = 2
                                       ''', conn_HAIG)
 
 
@@ -174,6 +174,9 @@ all_counts_uv.drop_duplicates(['u', 'v'], inplace=True)
 ## rescale all data by an arbitrary number
 all_counts_uv["scales"] = (all_counts_uv.counts/max(all_counts_uv.counts)) * 7
 
+## Normalize to 1 and get loads
+all_counts_uv["load(%)"] = round(all_counts_uv["counts"]/max(all_counts_uv["counts"]),4)*100
+
 ################################################################################
 # create basemap CATANIA
 ave_LAT = 37.510284
@@ -183,7 +186,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 
 
 folium.GeoJson(
-all_counts_uv[['u','v', 'counts', 'scales', 'geometry']].to_json(),
+all_counts_uv[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
     style_function=lambda x: {
         'fillColor': 'red',
         'color': 'red',
@@ -196,13 +199,16 @@ highlight_function=lambda x: {'weight':3,
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'counts']),
+        fields=['u', 'v', 'load(%)']),
+        # fields=['u', 'v', 'counts']),
     ).add_to(my_map)
 
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/plot_EGDES_all_dates/'
 # my_map.save(path + "traffic_" + DATE + "_all_EDGES_counts_Catania.html")
 # my_map.save(path + "MON_25_Feb_2019_HEAVY_traffic_counts_all_EDGES_all_Catania.html")
-my_map.save(path + "November_CARS_traffic_counts_all_EDGES_all_Catania.html")
+# my_map.save(path + "November_CARS_traffic_counts_all_EDGES_all_Catania.html")
+# my_map.save(path + "MON_25_Feb_2019_HEAVY_traffic_loads_all_EDGES_Catania.html")
+my_map.save(path + "HEAVY_traffic_loads_all_EDGES_all_Catania.html")
 
 
 now2 = datetime.now()
@@ -271,3 +277,7 @@ highlight_function=lambda x: {'weight':3,
 
 path = 'D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/plot_EGDES_all_dates/'
 my_map.save(path + "DIFF_May_Aug_CARS_counts_all_EDGES_all_Catania.html")
+
+
+
+
