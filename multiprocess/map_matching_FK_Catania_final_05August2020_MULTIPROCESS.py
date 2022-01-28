@@ -1,6 +1,6 @@
 
 import os
-os.chdir('D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data')
+os.chdir('D:/ENEA_CAS_WORK/Catania_RAFAEL')
 os.getcwd()
 
 from math import radians, cos, sin, asin, sqrt
@@ -27,6 +27,8 @@ from datetime import date
 from datetime import datetime
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import *
+from sqlalchemy import exc
+from sqlalchemy.pool import NullPool
 import sqlalchemy as sal
 import geopy.distance
 import warnings
@@ -75,11 +77,11 @@ sum(AAA.length)
 ########################################################################################
 
 # connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_Viasat_CT()
+conn_HAIG = db_connect.connect_HAIG_CATANIA()
 cur_HAIG = conn_HAIG.cursor()
 
 # erase existing table
-# cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching_2019 CASCADE")
+# cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching CASCADE")
 # conn_HAIG.commit()
 
 # Function to generate WKB hex
@@ -90,67 +92,90 @@ def wkb_hexer(line):
 
 # Create an SQL connection engine to the output DB
 # engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_CT')
-engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_CT')
+engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_CATANIA', poolclass=NullPool)
 
 
-# ## import OSM network into the DB 'HAIG_Viasat_CT'
-# ###  to a DB and populate the DB  ###
-# connection = engine.connect()
-# gdf_edges_ALL['geom'] = gdf_edges_ALL['geometry'].apply(wkb_hexer)
-# gdf_edges_ALL.drop('geometry', 1, inplace=True)
-# gdf_edges_ALL.to_sql("OSM_edges", con=connection, schema="public",
-#                    if_exists='append')
-#
-# gdf_nodes_ALL['geom'] = gdf_nodes_ALL['geometry'].apply(wkb_hexer)
-# gdf_nodes_ALL.drop('geometry', 1, inplace=True)
-# gdf_nodes_ALL.to_sql("OSM_nodes", con=connection, schema="public",
-#                    if_exists='append')
-#
-# # create index on the column (u,v) togethers in the table 'gdf_edges_ALL' ###
-# # Multicolumn Indexes ####
-#
-# cur_HAIG.execute("""
-# CREATE INDEX edges_UV_idx ON public."OSM_edges"(u,v);
-# """)
-# conn_HAIG.commit()
-#
-# conn_HAIG.close()
-# cur_HAIG.close()
+
+'''
+## import OSM network into the DB 'HAIG_CATANIA'
+###  to a DB and populate the DB  ###
+connection = engine.connect()
+gdf_edges_ALL['geom'] = gdf_edges_ALL['geometry'].apply(wkb_hexer)
+gdf_edges_ALL.drop('geometry', 1, inplace=True)
+gdf_edges_ALL.to_sql("edges", con=connection, schema="net",
+                   if_exists='append')
+
+gdf_nodes_ALL['geom'] = gdf_nodes_ALL['geometry'].apply(wkb_hexer)
+gdf_nodes_ALL.drop('geometry', 1, inplace=True)
+gdf_nodes_ALL.to_sql("nodes", con=connection, schema="net",
+                   if_exists='append')
+
+##### "edges": convert "geometry" field as LINESTRING
+with engine.connect() as conn, conn.begin():
+    print(conn)
+    sql = """ALTER TABLE net.edges
+    ALTER COLUMN geom TYPE Geometry(LINESTRING, 4326)
+     USING ST_SetSRID(geom::Geometry, 4326)"""
+    conn.execute(sql)
 
 
-# ## get all ID terminal of Viasat data  (25443, from routecheck_2019)
-# all_VIASAT_IDterminals = pd.read_sql_query(
-#     ''' SELECT "idterm"
-#         FROM public.routecheck_2019''', conn_HAIG)
-# ## make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
-# all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
-# ## all_ID_TRACKS = [int(i) for i in all_ID_TRACKS]
-# ## save 'all_ID_TRACKS' as list
-# with open("all_ID_TRACKS_2019.txt", "w") as file:
-#     file.write(str(all_ID_TRACKS))
+##### "nodes": convert "geometry" field as POINTS
+with engine.connect() as conn, conn.begin():
+    print(conn)
+    sql = """ALTER TABLE net.nodes
+    ALTER COLUMN geom TYPE Geometry(POINT, 4326)
+    USING ST_SetSRID(geom::Geometry, 4326)"""
+    conn.execute(sql)
+
+## create index on the column (u,v) togethers in the table 'edges' ###
+## Multicolumn Indexes ####
+
+cur_HAIG.execute("""
+CREATE INDEX edges_UV_idx ON net.edges(u,v);
+""")
+conn_HAIG.commit()
+
+conn_HAIG.close()
+cur_HAIG.close()
+'''
+
+
+
+"""
+## get all ID terminal of Viasat data  (25443, from routecheck)
+all_VIASAT_IDterminals = pd.read_sql_query(
+    ''' SELECT "idterm"
+        FROM public.routecheck''', conn_HAIG)
+## make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
+all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
+## all_ID_TRACKS = [int(i) for i in all_ID_TRACKS]
+## save 'all_ID_TRACKS' as list
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/all_ID_TRACKS_2019.txt", "w") as file:
+     file.write(str(all_ID_TRACKS))
+
+
+### get all terminals corresponding to 'fleet' (670, from routecheck)
+viasat_fleet = pd.read_sql_query('''
+              SELECT idterm, vehtype
+              FROM public.routecheck
+              WHERE vehtype = '2' ''', conn_HAIG)
+## make an unique list
+idterms_fleet = list(viasat_fleet.idterm.unique())
+## save 'all_ID_TRACKS' as list
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/idterms_fleet.txt", "w") as file:
+     file.write(str(idterms_fleet))
+"""
 
 
 ## reload 'all_ID_TRACKS' as list
-# with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
+# with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/all_ID_TRACKS_2019.txt", "r") as file:
 #     all_ID_TRACKS = eval(file.readline())
-with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019_new.txt", "r") as file:
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/all_ID_TRACKS_2019_new.txt", "r") as file:
     all_ID_TRACKS = eval(file.readline())
 
 
-# ### get all terminals corresponding to 'fleet' (670, from routecheck_2019)
-# viasat_fleet = pd.read_sql_query('''
-#               SELECT idterm, vehtype
-#               FROM public.routecheck_2019
-#               WHERE vehtype = '2' ''', conn_HAIG)
-# # make an unique list
-# idterms_fleet = list(viasat_fleet.idterm.unique())
-# ## save 'all_ID_TRACKS' as list
-# with open("idterms_fleet.txt", "w") as file:
-#     file.write(str(idterms_fleet))
-
-
 ## reload 'idterms_fleet' as list
-with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterms_fleet.txt", "r") as file:
+with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/idterms_fleet.txt", "r") as file:
     idterms_fleet = eval(file.readline())
 
 
@@ -176,7 +201,7 @@ def func(arg):
     track_ID = str(track_ID)
     print("idterm:", track_ID)
     viasat_data = pd.read_sql_query('''
-                SELECT * FROM public.routecheck_2019 
+                SELECT * FROM public.routecheck 
                 WHERE "idterm" = '%s' ''' % track_ID, conn_HAIG)
     ### FILTERING #############################################
     # viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
@@ -938,7 +963,7 @@ def func(arg):
                                 ## final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
                                 ## final_map_matching_table_GV.drop('geometry', 1, inplace=True)
 
-                                final_map_matching_table_GV.to_sql("mapmatching_2019", con=connection, schema="public",
+                                final_map_matching_table_GV.to_sql("mapmatching", con=connection, schema="public",
                                                  if_exists='append')
 
                                 #################################################################
@@ -947,11 +972,13 @@ def func(arg):
                                 sum_distance_mapmatching = sum(final_map_matching_table_GV.length)
                                 ## calculate the accuracy of the matched route compared to the sum of the differences of the progressives (from Viasat data)
                                 ###  ACCURACY: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
-                                accuracy = int(int((sum_distance_mapmatching / sum_progressive) * 100))
-                                df_accuracy = pd.DataFrame({'accuracy': [accuracy], 'TRIP_ID': [trip]})
-
-                                # df_accuracy.to_sql("accuracy_2019", con=connection, schema="public",
-                                #                  if_exists='append')
+                                try:
+                                    accuracy = int(int((sum_distance_mapmatching / sum_progressive) * 100))
+                                    df_accuracy = pd.DataFrame({'accuracy': [accuracy], 'TRIP_ID': [trip]})
+                                    df_accuracy.to_sql("accuracy", con=connection, schema="public",
+                                                  if_exists='append')
+                                except ZeroDivisionError:
+                                    pass
 
                                 connection.close()
 
@@ -968,7 +995,7 @@ def func(arg):
 
 if __name__ == '__main__':
     # pool = mp.Pool(processes=mp.cpu_count()) ## use all available processors
-    pool = mp.Pool(processes=55)     ## use 60 processors
+    pool = mp.Pool(processes=35)     ## use 60 processors
     print("++++++++++++++++ POOL +++++++++++++++++", pool)
     results = pool.map(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
     pool.close()
@@ -977,3 +1004,6 @@ if __name__ == '__main__':
 
     conn_HAIG.close()
     cur_HAIG.close()
+
+
+### ZeroDivisionError: float division by zero

@@ -1,6 +1,6 @@
 
 import os
-os.chdir('D:/ENEA_CAS_WORK/SENTINEL/viasat_data')
+os.chdir('D:/ENEA_CAS_WORK/ROMA_2019')
 os.getcwd()
 
 from math import radians, cos, sin, asin, sqrt
@@ -56,94 +56,48 @@ today = date.today()
 today = today.strftime("%b-%d-%Y")
 
 
-os.chdir('D:/ENEA_CAS_WORK/SENTINEL/viasat_data')
+os.chdir('D:/ENEA_CAS_WORK/ROMA_2019')
 os.getcwd()
 ## load grafo
-file_graphml = 'Fisciano__Italy_50km.graphml'
+file_graphml = 'Roma__Italy_70km.graphml'
 grafo_ALL = ox.load_graphml(file_graphml)
 ## ox.plot_graph(grafo_ALL)
 # gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
 gdf_nodes_ALL, gdf_edges_ALL = ox.graph_to_gdfs(grafo_ALL)
 
-########################################################################################
-########## DATABASE OPERATIONS #########################################################
-########################################################################################
-
 '''
-
 AAA = gdf_edges_ALL.drop_duplicates(['u', 'v'])
 AAA = pd.DataFrame(AAA)
 len(AAA)
 sum(AAA.length)
-
-AAA = gdf_edges_ALL[gdf_edges_ALL['highway']== "motorway"]
-AAA.drop_duplicates(['u', 'v'], inplace=True)
-AAA = pd.DataFrame(AAA)
-sum(AAA.length)
-
-
-BBB = gdf_edges_ALL[gdf_edges_ALL['highway']== "motorway_link"]
-BBB.drop_duplicates(['u', 'v'], inplace=True)
-BBB = pd.DataFrame(BBB)
-sum(BBB.length) + sum(AAA.length)
-
-    
-os.chdir('D:/ENEA_CAS_WORK/SENTINEL/viasat_data')
-file_graphml = 'Fisciano__Italy_50km_cost.graphml'
-grafo_ALL = ox.load_graphml(file_graphml)
-for u, v, key, attr in grafo_ALL.edges(keys=True, data=True):
-    if len(attr['cost']) > 0:
-        attr['cost'] = float(attr.get("cost"))
-gdf_nodes_ALL, gdf_edges_ALL = ox.graph_to_gdfs(grafo_ALL)
-BBB = pd.DataFrame(gdf_edges_ALL)
-
-## find new max speed on each edge
-BBB['new_maxspeed'] = (BBB.length/1000)/(BBB.cost/3600)   ## units are km/h
-BBB['highway'] = BBB['highway'].str.replace(']', '')
-
-### get only urban roads
-# urban_roads = ['primary', 'secondary', 'tertiary',  'residential']
-# URBAN = BBB[BBB.highway.isin(urban_roads)]
-URBAN = BBB[BBB.new_maxspeed <= 50]
-URBAN.drop_duplicates(['u', 'v'], inplace=True)
-URBAN = pd.DataFrame(URBAN)
-print("length urban roads(km): ", sum(URBAN.length)/1000)
-print("number of urban roads: ", len(URBAN))
-
-# EXTRAURBAN = BBB[~BBB.highway.isin(urban_roads)]
-EXTRAURBAN = BBB[BBB.new_maxspeed > 50]
-EXTRAURBAN.drop_duplicates(['u', 'v'], inplace=True)
-EXTRAURBAN = pd.DataFrame(EXTRAURBAN)
-print("length extraurban roads(km): ", sum(EXTRAURBAN.length)/1000)
-print("number of extraurban roads: ", len(EXTRAURBAN))
-
 '''
 
-BBB = pd.DataFrame(gdf_edges_ALL)
+########################################################################################
+########## DATABASE OPERATIONS #########################################################
+########################################################################################
 
 # connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_SALERNO()
-# conn_HAIG = db_connect.connect_HAIG_Viasat_SA()
+conn_HAIG = db_connect.connect_HAIG_ROMA()
 cur_HAIG = conn_HAIG.cursor()
 
-
 # erase existing table
-# cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching_2019 CASCADE")
-# cur_HAIG.execute("DROP TABLE IF EXISTS accuracy_2019 CASCADE")
+# cur_HAIG.execute("DROP TABLE IF EXISTS mapmatching_all CASCADE")
+# cur_HAIG.execute("DROP TABLE IF EXISTS accuracy CASCADE")
 # conn_HAIG.commit()
 
 # Function to generate WKB hex
+## I use this funxtion when I want to insert data into a DB (no need to plot)
 def wkb_hexer(line):
     return line.wkb_hex
 
-# Create an SQL connection engine to the output DB
-# engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_SA')
-engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_SALERNO', poolclass=NullPool)
 
+# Create an SQL connection engine to the output DB
+# engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_RM_2019')
+engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_ROMA', poolclass=NullPool)
 
 
 '''
-## import OSM network into the DB 'HAIG_SALERNO'
+## import OSM network into the DB 'HAIG_Viasat_RM_2019'
 ###  to a DB and populate the DB  ###
 connection = engine.connect()
 gdf_edges_ALL['geom'] = gdf_edges_ALL['geometry'].apply(wkb_hexer)
@@ -187,61 +141,61 @@ cur_HAIG.close()
 
 
 """
-
-## get all ID terminal of Viasat data  (25443, from routecheck_2019)
+## get all ID terminal of Viasat data  (from routecheck)
 all_VIASAT_IDterminals = pd.read_sql_query(
-    ''' SELECT "idterm"
-        FROM public.routecheck_2019''', conn_HAIG)
+     ''' SELECT "idterm"
+         FROM public.routecheck''', conn_HAIG)
 ## make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
 all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
-## all_ID_TRACKS = [int(i) for i in all_ID_TRACKS]
 ## save 'all_ID_TRACKS' as list
-with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019.txt", "w") as file:
+with open("D:\\ENEA_CAS_WORK\\ROMA_2019\\all_ID_TRACKS_2019.txt", "w") as file:
      file.write(str(all_ID_TRACKS))
+"""
 
 
-### get all terminals corresponding to 'fleet' (670, from routecheck_2019)
+"""
+## get all terminals corresponding to 'fleet' (from routecheck_2019)
 viasat_fleet = pd.read_sql_query('''
               SELECT idterm, vehtype
-              FROM public.routecheck_2019
+              FROM public.routecheck
               WHERE vehtype = '2' ''', conn_HAIG)
 ## make an unique list
 idterms_fleet = list(viasat_fleet.idterm.unique())
 ## save 'all_ID_TRACKS' as list
-with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/idterms_fleet.txt", "w") as file:
+with open("D:\\ENEA_CAS_WORK\\ROMA_2019\\idterms_fleet.txt", "w") as file:
      file.write(str(idterms_fleet))
-     
+
 """
 
-
-
 ## reload 'all_ID_TRACKS' as list
-# with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
-#     all_ID_TRACKS = eval(file.readline())
-with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019_new.txt", "r") as file:
-    all_ID_TRACKS = eval(file.readline())
+with open("D:/ENEA_CAS_WORK/ROMA_2019/all_ID_TRACKS_2019.txt", "r") as file:
+     all_ID_TRACKS = eval(file.readline())
+# with open("D:/ENEA_CAS_WORK/ROMA_2019/all_ID_TRACKS_2019_new.txt", "r") as file:
+#    all_ID_TRACKS = eval(file.readline())
 
 
 
 ## reload 'idterms_fleet' as list
-with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/idterms_fleet.txt", "r") as file:
+with open("D:/ENEA_CAS_WORK/ROMA_2019/idterms_fleet.txt", "r") as file:
     idterms_fleet = eval(file.readline())
 
-# 2745653 in idterms_fleet
 
-# track_ID = '3273302'
-# track_ID = '2400053'       # type 2 (2019)
-# track_ID = '2745653'       # type 2 (2017)
-# all_ID_TRACKS = ['3273302']
+# track_ID = '4378843'
+# 5922087
 
-####################################################################################
-# # create basemap
-# ave_LAT = 40.811313
-# ave_LON = 14.755231
+# ####################################################################################
+# ### create basemap (Roma)
+# import folium
+#
+# ave_LAT = 41.888009265234906
+# ave_LON = 12.500281904062206
+#
 # my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
-####################################################################################
+# ####################################################################################
+
 
 ## read each TRIP from each idterm (TRACK_ID or idtrajectory)
+
 
 def func(arg):
     last_track_idx, track_ID = arg
@@ -266,7 +220,7 @@ def func(arg):
         viasat = viasat.sort_values('timedate')
         viasat.reset_index(drop=True, inplace=True)
 
-        if len(viasat) > 4:
+        if len(viasat) > 5:
             ## introduce a dynamic buffer
             # dx = max(viasat.longitude) - min(viasat.longitude)
             # dy = max(viasat.latitude) - min(viasat.latitude)
@@ -1006,18 +960,13 @@ def func(arg):
                                 ## final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
                                 ## final_map_matching_table_GV.drop('geometry', 1, inplace=True)
 
-                                final_map_matching_table_GV.to_sql("mapmatching", con=connection, schema="public",
+                                final_map_matching_table_GV.to_sql("mapmatching_all", con=connection, schema="public",
                                                  if_exists='append')
 
                                 #################################################################
                                 #################################################################
                                 ### find the travelled distance of the matched route
                                 sum_distance_mapmatching = sum(final_map_matching_table_GV.length)
-
-                                del edges_matched_route_GV
-                                del edges_matched_route
-                                del final_map_matching_table_GV
-
                                 ## calculate the accuracy of the matched route compared to the sum of the differences of the progressives (from Viasat data)
                                 ###  ACCURACY: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
                                 try:
@@ -1025,10 +974,6 @@ def func(arg):
                                     df_accuracy = pd.DataFrame({'accuracy': [accuracy], 'TRIP_ID': [trip]})
                                     df_accuracy.to_sql("accuracy", con=connection, schema="public",
                                                      if_exists='append')
-
-                                    del df_accuracy
-                                    del accuracy
-
                                 except ZeroDivisionError:
                                     pass
                                 connection.close()
@@ -1040,14 +985,13 @@ def func(arg):
 ################################################
 ##### run all script using multiprocessing #####
 ################################################
-## https://pythonspeed.com/articles/python-multiprocessing/
 
 ## check how many processer we have available:
 # print("available processors:", mp.cpu_count())
 
 if __name__ == '__main__':
     # pool = mp.Pool(processes=mp.cpu_count()) ## use all available processors
-    pool = mp.Pool(processes=42)     ## use 60 processors
+    pool = mp.Pool(processes=45)     ## use 60 processors
     print("++++++++++++++++ POOL +++++++++++++++++", pool)
     results = pool.map(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
     pool.close()
@@ -1056,16 +1000,3 @@ if __name__ == '__main__':
 
     conn_HAIG.close()
     cur_HAIG.close()
-
-
-
-# The above exception was the direct cause of the following exception:
-#
-# Traceback (most recent call last):
-#   File "D:/ENEA_CAS_WORK/Catania_RAFAEL/multiprocess/map_matching_FK_Salerno_final_13May2020_MULTIPROCESS.py", line 1050, in <module>
-#     results = pool.map(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
-#   File "C:\Anaconda3\envs\gdal_py37\lib\multiprocessing\pool.py", line 268, in map
-#     return self._map_async(func, iterable, mapstar, chunksize).get()
-#   File "C:\Anaconda3\envs\gdal_py37\lib\multiprocessing\pool.py", line 657, in get
-#     raise self._value
-# ValueError: Cannot convert non-finite values (NA or inf) to integer
