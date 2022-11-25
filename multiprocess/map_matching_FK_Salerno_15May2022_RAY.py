@@ -31,10 +31,8 @@ from sqlalchemy import exc
 from sqlalchemy.pool import NullPool
 import sqlalchemy as sal
 import geopy.distance
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-pd.options.mode.chained_assignment = None  # default='warn'
 
+import warnings
 
 import multiprocessing as mp
 from multiprocessing import Process, freeze_support, Manager
@@ -45,14 +43,17 @@ import contextlib
 from multiprocessing import Manager
 from multiprocessing import Pool
 
+import ray
+
+
+
 import dill as Pickle
 from joblib import Parallel, delayed
 from joblib.externals.loky import set_loky_pickler
 set_loky_pickler('pickle')
 from multiprocessing import Pool,RLock
+import pickle
 
-import warnings
-warnings.filterwarnings("ignore")
 
 # today date
 today = date.today()
@@ -126,9 +127,8 @@ print("number of extraurban roads: ", len(EXTRAURBAN))
 BBB = pd.DataFrame(gdf_edges_ALL)
 
 # connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_SALERNO()
-# conn_HAIG = db_connect.connect_HAIG_Viasat_SA()
-cur_HAIG = conn_HAIG.cursor()
+# conn_HAIG = db_connect.connect_HAIG_SALERNO()
+# cur_HAIG = conn_HAIG.cursor()
 
 
 # erase existing table
@@ -142,8 +142,7 @@ def wkb_hexer(line):
 
 # Create an SQL connection engine to the output DB
 # engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_SA')
-engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_SALERNO', poolclass=NullPool)
-
+# engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_SALERNO', poolclass=NullPool)
 
 
 '''
@@ -220,10 +219,10 @@ with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/idterms_fleet.txt", "w") as fil
 
 
 ## reload 'all_ID_TRACKS' as list
-# with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
-#      all_ID_TRACKS = eval(file.readline())
-with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019_new_test.txt", "r") as file:
-    all_ID_TRACKS = eval(file.readline())
+with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
+      all_ID_TRACKS = eval(file.readline())
+# with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019_new_test.txt", "r") as file:
+#    all_ID_TRACKS = eval(file.readline())
 
 
 
@@ -248,8 +247,16 @@ with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/idterms_fleet.txt", "r") as fil
 
 ## read each TRIP from each idterm (TRACK_ID or idtrajectory)
 
-def func(arg):
-    last_track_idx, track_ID = arg
+@ray.remote
+def func(track_ID):
+    conn_HAIG = db_connect.connect_HAIG_SALERNO()
+    engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_SALERNO', poolclass=NullPool)
+
+    ## ignore warnings
+    warnings.filterwarnings('ignore')
+
+    cur_HAIG = conn_HAIG.cursor()
+    # last_track_idx, track_ID = arg
     track_ID = str(track_ID)
     print("idterm:", track_ID)
     viasat_data = pd.read_sql_query('''
@@ -359,8 +366,13 @@ def func(arg):
                 viasat_gdf = viasat_gdf.to_crs(epsg=4326)
 
                 # Buffer the points by some units (unit is kilometer)
-                buffer = viasat_gdf.buffer(buffer_diam)  # 25 meters # this is a geoseries  (0.00010)
+                viasat_gdf.crs = "epsg:4326"
+                viasat_gdf = viasat_gdf.to_crs(crs=3857)  ## set crs to meter (mercator coordinates)
+                buffer = viasat_gdf.buffer(8)   ## buffer diameter == 8 meters
+                buffer = buffer.to_crs(crs=4326)
+                # buffer = viasat_gdf.buffer(buffer_diam)  # 10 meters # this is a geoseries  (0.00010) with "epsg 4326"
                 # make a dataframe
+
                 #### ---------------------- >>>>>>
                 buffer_viasat = pd.DataFrame(buffer)
                 buffer_viasat.columns = ['geometry']
@@ -402,12 +414,18 @@ def func(arg):
                             # index_buff.append(via_buff.Index)
                             STREET = streets.u, streets.v, via_buff.Index
                             # get distance between Viasat measurement and edge
-                            distance = (Point(viasat[['longitude', 'latitude']].iloc[via_buff.Index]).distance(streets.geometry))*100000 # roughly meter conversion
-                            # print("distance track-edge: ", distance, " meters")
+                            # a = Point(viasat[['longitude', 'latitude']].iloc[via_buff.Index])
+                            # b = streets.geometry
+                            ## setup projection (CRS)
+                            # a.crs = 3857
+                            # b.crs = 3857
+                            # dists = (b.distance(a))*100000
+                            dists = (Point(viasat[['longitude', 'latitude']].iloc[via_buff.Index]).distance(streets.geometry))*100000 # roughly meter conversion
+                            # distance = (Point(viasat[['longitude', 'latitude']].iloc[via_buff.Index]).distance(streets.geometry))                             # print("distance track-edge: ", distance, " meters")
                             edge.append(STREET)
-                            dist = distance
-                            distance = distance, via_buff.Index
-                            DISTANCES.append(distance)
+                            dist = dists
+                            dists = dists, via_buff.Index
+                            DISTANCES.append(dists)
                             DISTANCES_dict[streets.u] = dist
                 # now2 = datetime.now()
                 # print(now2 - now1)
@@ -726,7 +744,7 @@ def func(arg):
                                     lat = float(viasat.latitude[viasat.ID == track_list[i]])
                                     lon = float(viasat.longitude[viasat.ID == track_list[i]])
                                     point = (lat, lon)
-                                    u, v, key = ox.get_nearest_edge(grafo, point)
+                                    u, v, key = ox.distance.nearest_edges(grafo, lon, lat)
                                     nearest_node = min((u, v), key=lambda n: ox.distance.great_circle_vec(lat, lon, grafo.nodes[n]['y'], grafo.nodes[n]['x']))
                                     max_prob_node.append(nearest_node)
                             # check if there is a node with the minimum path to the the next node
@@ -764,8 +782,8 @@ def func(arg):
                                 point0 = (lat0, lon0)
                             ####/////////////////////////////////////////########################################
                                 if np.mean(dists) <= (distance_VIASAT/2):
-                                    u0, v0, key0 = ox.get_nearest_edge(grafo, point0)
-                                    u1, v1, key1 = ox.get_nearest_edge(grafo, point1)
+                                    u0, v0, key0 = ox.distance.nearest_edges(grafo, lon0, lat0)
+                                    u1, v1, key1 = ox.distance.nearest_edges(grafo, lon1, lat1)
                                     nn0 = min((u0, v0), key=lambda n: ox.distance.great_circle_vec(lat0, lon0, grafo.nodes[n]['y'], grafo.nodes[n]['x']))
                                     max_prob_node.append(nn0)
                                     nn1 = min((u1, v1), key=lambda n: ox.distance.great_circle_vec(lat1, lon1, grafo.nodes[n]['y'], grafo.nodes[n]['x']))
@@ -781,37 +799,50 @@ def func(arg):
                     ###################################################################################
 
                     # get unique values (ordered) - remove duplicates
-                    max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
-
+                    try:
+                        max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
+                    except UnboundLocalError:
+                        pass
                     ##### get last element of the "adjacency_list" (dictionary)
-                    last_key_nodes = list(adjacency_list.keys())[-1]
-                    last_nodes = list(adjacency_list[last_key_nodes])  ## get both of them!
-                    max_prob_node.extend(last_nodes)
+                    try:
+                        last_key_nodes = list(adjacency_list.keys())[-1]
+                        last_nodes = list(adjacency_list[last_key_nodes])  ## get both of them!
+                        max_prob_node.extend(last_nodes)
+                    except IndexError:
+                        pass
 
                     ### check that the nodes are on the same direction!!!!! ####
                     ## remove nodes that are not on the same directions..........
                     NODE_TO_REMOVE = []
-                    for i in range(len(max_prob_node)-2):
-                        if (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:,[0]]) and (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:, [1]]):
-                                node_to_remove = ([max_prob_node[1:(len(max_prob_node) - 1)][i]])[0]
-                                NODE_TO_REMOVE.append(node_to_remove)
-                    ## remove node from the max_prob_node list
-                    if len(NODE_TO_REMOVE) != 0:
-                        max_prob_node = [i for i in max_prob_node if i not in NODE_TO_REMOVE]
-
+                    try:
+                        for i in range(len(max_prob_node)-2):
+                            if (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:,[0]]) and (([max_prob_node[1:(len(max_prob_node) - 1)][i]]) not in df_edges.values[:, [1]]):
+                                    node_to_remove = ([max_prob_node[1:(len(max_prob_node) - 1)][i]])[0]
+                                    NODE_TO_REMOVE.append(node_to_remove)
+                        ## remove node from the max_prob_node list
+                        if len(NODE_TO_REMOVE) != 0:
+                            max_prob_node = [i for i in max_prob_node if i not in NODE_TO_REMOVE]
+                    except UnboundLocalError:
+                        pass
 
                     ## check that the first GPS track point is near the first node of the 'max_prob_node'
                     i = 0
-                    lat0 = float(viasat.latitude[viasat.ID == track_list[i]])
-                    lon0 = float(viasat.longitude[viasat.ID == track_list[i]])
-                    point0 = (lat0, lon0)
-                    u0, v0, key0 = ox.get_nearest_edge(grafo, point0)
-                    nearest_node_first = min((u0, v0), key=lambda n: ox.distance.great_circle_vec(lat0, lon0, grafo.nodes[n]['y'], grafo.nodes[n]['x']))
-                    if nearest_node_first in max_prob_node:
-                        if max_prob_node[0] != nearest_node_first:
-                            idx = max_prob_node.index(nearest_node_first)
-                            ## move 'nearest_node_first' at the first place
-                            max_prob_node.insert(0, max_prob_node.pop(idx))
+                    try:
+                        lat0 = float(viasat.latitude[viasat.ID == track_list[i]])
+                        lon0 = float(viasat.longitude[viasat.ID == track_list[i]])
+                        point0 = (lat0, lon0)
+                        u0, v0, key0 = ox.distance.nearest_edges(grafo, lon0, lat0)
+                        nearest_node_first = min((u0, v0), key=lambda n: ox.distance.great_circle_vec(lat0, lon0, grafo.nodes[n]['y'], grafo.nodes[n]['x']))
+                    except IndexError:
+                        pass
+                    try:
+                        if nearest_node_first in max_prob_node:
+                            if max_prob_node[0] != nearest_node_first:
+                                idx = max_prob_node.index(nearest_node_first)
+                                ## move 'nearest_node_first' at the first place
+                                max_prob_node.insert(0, max_prob_node.pop(idx))
+                    except UnboundLocalError:
+                        pass
 
                     # append the very first node to the max_prob_node list
                     # max_prob_node = [u0] + max_prob_node
@@ -822,38 +853,44 @@ def func(arg):
                     ## check that there is continuity between the first and second pair of node (within two consecutive buffers)
                     EDGES_BUFFER = df_edges.drop_duplicates('buffer_ID')
                     ## get the buffer number in which there is the u0
-                    if len(EDGES_BUFFER[EDGES_BUFFER.u == u0]) > 0:
-                        n_buffer = EDGES_BUFFER[EDGES_BUFFER.u == u0]['buffer_ID'].iloc[0]
-                        # check if the consecutive bugger exists...
-                        if (n_buffer + 1) in list(EDGES_BUFFER['buffer_ID']):
-                            ## append the very first node to the max_prob_node list
-                            max_prob_node = [u0] + max_prob_node
+                    try:
+                        if len(EDGES_BUFFER[EDGES_BUFFER.u == u0]) > 0:
+                            n_buffer = EDGES_BUFFER[EDGES_BUFFER.u == u0]['buffer_ID'].iloc[0]
+                            # check if the consecutive bugger exists...
+                            if (n_buffer + 1) in list(EDGES_BUFFER['buffer_ID']):
+                                ## append the very first node to the max_prob_node list
+                                max_prob_node = [u0] + max_prob_node
 
+                        ## remove duplicates
+                        max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
+                    except UnboundLocalError:
+                        pass
 
-                    ## remove duplicates
-                    max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
-
-                    ### make a Dataframe with the list of the max_prob_nodes
-                    DF_max_prob_node = pd.DataFrame(max_prob_node)
-                    DF_max_prob_node = DF_max_prob_node.rename(columns={0: 'u'})
-                    ## merge 'max_prob_node' with edges
-                    ## make a list of all consecutive u,v from EDGES_BUFFER...
-                    node_EDGES = EDGES_BUFFER[['u', 'v']].values.tolist()
-                    node_EDGES = [val for sublist in node_EDGES for val in sublist]
-                    ## remove duplicates
-                    node_EDGES = list(OrderedDict.fromkeys(node_EDGES))
-                    ## make a dataframe
-                    DF_node_EDGES = pd.DataFrame(node_EDGES)
-                    DF_node_EDGES = DF_node_EDGES.rename(columns={0: 'u'})
+                    try:
+                        ### make a Dataframe with the list of the max_prob_nodes
+                        DF_max_prob_node = pd.DataFrame(max_prob_node)
+                        DF_max_prob_node = DF_max_prob_node.rename(columns={0: 'u'})
+                        ## merge 'max_prob_node' with edges
+                        ## make a list of all consecutive u,v from EDGES_BUFFER...
+                        node_EDGES = EDGES_BUFFER[['u', 'v']].values.tolist()
+                        node_EDGES = [val for sublist in node_EDGES for val in sublist]
+                        ## remove duplicates
+                        node_EDGES = list(OrderedDict.fromkeys(node_EDGES))
+                        ## make a dataframe
+                        DF_node_EDGES = pd.DataFrame(node_EDGES)
+                        DF_node_EDGES = DF_node_EDGES.rename(columns={0: 'u'})
 
                     # filter gdf_edges with df_nodes
-                    keys = list(DF_max_prob_node.columns.values)
-                    index_edges = DF_node_EDGES.set_index(keys).index
-                    index_df_nodes = DF_max_prob_node.set_index(keys).index
-                    max_prob_node = DF_node_EDGES[index_edges.isin(index_df_nodes)]
 
-                    max_prob_node = list(max_prob_node['u'])
-
+                        keys = list(DF_max_prob_node.columns.values)
+                        index_edges = DF_node_EDGES.set_index(keys).index
+                        index_df_nodes = DF_max_prob_node.set_index(keys).index
+                        max_prob_node = DF_node_EDGES[index_edges.isin(index_df_nodes)]
+                        max_prob_node = list(max_prob_node['u'])
+                    except KeyError:
+                        pass
+                    except UnboundLocalError:
+                        pass
                     ## attach the FIRST NODE of the EDGES initialy found
                     ## make a list of all the indices of the VIASAT DATA
                     VIASAT_INDICES = list(viasat.ID)
@@ -866,32 +903,39 @@ def func(arg):
                     lon_last = float(viasat.longitude[viasat.ID == last_index])
                     point_last = (lat_last, lon_last)
                     ## get the node with the minimu, distance from the track correspondingg to the BUFFER number..
-                    u0, v0, key0 = ox.get_nearest_edge(grafo, point0)
+                    u0, v0, key0 = ox.distance.nearest_edges(grafo, lon0, lat0)
                     very_first_node = min((u0, v0), key=lambda n: ox.distance.great_circle_vec(lat0, lon0, grafo.nodes[n]['y'],
                                                                                       grafo.nodes[n]['x']))
-                    u_last, v_last, key_last = ox.get_nearest_edge(grafo, point_last)
+                    u_last, v_last, key_last = ox.distance.nearest_edges(grafo, lon_last, lat_last)
                     very_last_node = min((u_last, v_last),
                                          key=lambda n: ox.distance.great_circle_vec(lat_last, lon_last, grafo.nodes[n]['y'],
                                                                            grafo.nodes[n]['x']))
                     # ox.get_nearest_node(grafo, point0)
                     ## append the 'very_first_node' and the 'very_last_node'
-                    max_prob_node = [very_first_node] + max_prob_node + [very_last_node]
-
-                    ## remove duplicates
-                    max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
-
+                    try:
+                        max_prob_node = [very_first_node] + max_prob_node + [very_last_node]
+                        ## remove duplicates
+                        max_prob_node = list(OrderedDict.fromkeys(max_prob_node))
+                    except UnboundLocalError:
+                        pass
                     #### build matched route with all max_prob_node  #####
                     matched_route = []
                     all_matched_edges = []
-                    for origin, destination in zip(max_prob_node, max_prob_node[1:]):
-                        try:
-                            # use full complete graph to build the final path
-                            route = nx.dijkstra_path(grafo, origin, destination, weight='length')
-                            path_edges = list(zip(route, route[1:]))
-                            all_matched_edges.append(path_edges)
-                            matched_route.append(route)
-                        except nx.NetworkXNoPath:
-                            pass
+                    try:
+                        for origin, destination in zip(max_prob_node, max_prob_node[1:]):
+                            try:
+                                # use full complete graph to build the final path
+                                route = nx.dijkstra_path(grafo, origin, destination, weight='length')
+                                path_edges = list(zip(route, route[1:]))
+                                all_matched_edges.append(path_edges)
+                                matched_route.append(route)
+                            except nx.NetworkXNoPath as ne:
+                                print(ne)
+                            except nx.NodeNotFound as te:
+                                print(te)
+                                pass
+                    except UnboundLocalError:
+                        pass
 
                     ##########///////////////////////////////////////////////////// ##########################################
                     # if more than 2 element of the matched_route[2] are in matched_route[3], then delete matched_route[3]
@@ -970,16 +1014,20 @@ def func(arg):
 
                         edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].ffill()
                         edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].bfill()
-                        edges_matched_route_GV['totalseconds'] = edges_matched_route_GV.totalseconds.astype('int')
-
+                        try:
+                            edges_matched_route_GV['totalseconds'] = edges_matched_route_GV.totalseconds.astype('int')
+                        except ValueError:
+                            pass
                         edges_matched_route_GV['timedate'] = edges_matched_route_GV['timedate'].ffill()
                         edges_matched_route_GV['timedate'] = edges_matched_route_GV['timedate'].bfill()
 
                         # compute the difference between last and first time within the same "progressive" value
                         edges_matched_route_GV['progressive'] = edges_matched_route_GV['progressive'].ffill()
                         edges_matched_route_GV['progressive'] = edges_matched_route_GV['progressive'].bfill()
-                        edges_matched_route_GV['progressive'] = edges_matched_route_GV.progressive.astype('int')
-
+                        try:
+                            edges_matched_route_GV['progressive'] = edges_matched_route_GV.progressive.astype('int')
+                        except ValueError:
+                            pass
                         edges_matched_route_GV = edges_matched_route_GV.rename(columns={'id': 'idtrace'})
                         edges_matched_route_GV['sequenza'] = edges_matched_route_GV.index
 
@@ -1005,7 +1053,10 @@ def func(arg):
                         else:
                             df_speed['mean_speed'] = (df_speed.progressive/1000)/(df_speed.totalseconds/3600)
                             # add last instant speed
-                            df_speed["mean_speed"].iloc[len(df_speed)-1] = first.speed.iloc[len(first)-1]
+                            try:
+                                df_speed["mean_speed"].iloc[len(df_speed)-1] = first.speed.iloc[len(first)-1]
+                            except IndexError:
+                                pass
                         # merge df_speed with main dataframe "edges_matched_route_GV" using "idtrace" as common field
                         edges_matched_route_GV = pd.merge(edges_matched_route_GV, df_speed, on=['idtrace'], how='left')
                         edges_matched_route_GV.drop(['totalseconds_y'], axis=1, inplace= True)
@@ -1013,7 +1064,10 @@ def func(arg):
 
                         edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].ffill()
                         edges_matched_route_GV['mean_speed'] = edges_matched_route_GV['mean_speed'].bfill()
-                        edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
+                        try:
+                            edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
+                        except ValueError:
+                            pass
                         edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].ffill()
                         edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].bfill()
                         edges_matched_route_GV['idterm'] = edges_matched_route_GV['idterm'].ffill()
@@ -1040,7 +1094,7 @@ def func(arg):
                                 ## final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
                                 ## final_map_matching_table_GV.drop('geometry', 1, inplace=True)
 
-                                final_map_matching_table_GV.to_sql("mapmatching_test", con=connection, schema="public",
+                                final_map_matching_table_GV.to_sql("mapmatching_ray", con=connection, schema="public",
                                                  if_exists='append')
 
                                 #################################################################
@@ -1071,6 +1125,7 @@ def func(arg):
                                 pass
     return
 
+
 ################################################
 ##### run all script using multiprocessing #####
 ################################################
@@ -1079,17 +1134,42 @@ def func(arg):
 ## check how many processer we have available:
 # print("available processors:", mp.cpu_count())
 
+
+"""
+from timebudget import timebudget
+
+@timebudget
+def run_complex_operations(operation, all_ID_TRACKS):
+    ray.get([operation.remote(i) for i in all_ID_TRACKS])
+
+
+ray.init()
+run_complex_operations(func, all_ID_TRACKS)
+"""
+
+num_cpus = 40
+ray.init(num_cpus=num_cpus)  # Specify this system has 10 CPUs
+# print("++++++++++++++++ RAY Parallel +++++++++++++++++")
+results = ray.get([func.remote(track_ID) for track_ID in all_ID_TRACKS])
+
+"""
 if __name__ == '__main__':
     # pool = mp.Pool(processes=mp.cpu_count()) ## use all available processors
-    pool = mp.Pool(processes=50)     ## use 60 processors
-    print("++++++++++++++++ POOL +++++++++++++++++", pool)
-    results = pool.map(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
-    pool.close()
-    pool.close()
-    pool.join()
+    # pool = mp.Pool(processes=20)     ## use 60 processors
+    num_cpus = 10
+    ray.init(num_cpus=num_cpus)  # Specify this system has 20 CPUs
+    # print("++++++++++++++++ RAY Parallel +++++++++++++++++")
+    results = ray.get([func.remote(track_ID) for track_ID in all_ID_TRACKS])
+    # results = ray.get([func.remote(pickle.dumps(track_ID)) for track_ID in all_ID_TRACKS])
+    # print("++++++++++++++++ POOL +++++++++++++++++", pool)
+    # results = ray.get([do_some_work.remote(x) for x in range(4)])
+    # results = ray.get([func.remote(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
+    # results = pool.map(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
+    # results = ray.get(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
 
-    conn_HAIG.close()
     cur_HAIG.close()
+    conn_HAIG.close()
+"""
 
 
 
